@@ -1,0 +1,87 @@
+name: Ciclo autonomo del agente
+
+on:
+  schedule:
+    # NOTA: reducido de cada 2hs a cada 4hs en sesion 16 cont. para no exceder
+    # el limite gratis del repo privado. Corriendo ya en el Repo B (publico,
+    # minutos ilimitados), se puede volver a cada 2hs si Leo lo confirma --
+    # cambiar a '0 */2 * * *' cuando lo decida.
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+
+jobs:
+
+  deploy-edge-function:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Instalar Supabase CLI
+        run: |
+          mkdir -p "$HOME/.local/share/supabase"
+          curl -sL https://github.com/supabase/cli/releases/download/v2.107.0/supabase_2.107.0_linux_amd64.tar.gz \
+            | tar -xzf - -C "$HOME/.local/share/supabase"
+          echo "$HOME/.local/share/supabase" >> $GITHUB_PATH
+
+      - name: Deploy notify-approval Edge Function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy notify-approval \
+            --project-ref btvfhopootvkqnpbctsq \
+            --no-verify-jwt
+
+      - name: Configurar secrets de la Edge Function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase secrets set \
+            GMAIL_USER=julietamusictube@gmail.com \
+            GMAIL_APP_PASS=${{ secrets.GMAIL_APP_PASS }} \
+            --project-ref btvfhopootvkqnpbctsq
+
+  run-agent:
+    runs-on: ubuntu-latest
+    needs: deploy-edge-function
+    steps:
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar agente
+        env:
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          DEVTO_API_KEY: ${{ secrets.DEVTO_API_KEY }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_REPO: ${{ secrets.GH_REPO }}
+          MAKE_WEBHOOK_PR_MERGE: ${{ secrets.MAKE_WEBHOOK_PR_MERGE }}
+          MAKE_WEBHOOK_NOTIFY: ${{ secrets.MAKE_WEBHOOK_NOTIFY }}
+          MAKE_WEBHOOK_GITHUB_FILES: ${{ secrets.MAKE_WEBHOOK_GITHUB_FILES }}
+          MAKE_API_TOKEN: ${{ secrets.MAKE_API_TOKEN }}
+          HASHNODE_API_KEY: ${{ secrets.HASHNODE_API_KEY }}
+          HASHNODE_PUBLICATION_ID: ${{ secrets.HASHNODE_PUBLICATION_ID }}
+          BLOGGER_CLIENT_ID: ${{ secrets.BLOGGER_CLIENT_ID }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
+          BLOGGER_REFRESH_TOKEN: ${{ secrets.BLOGGER_REFRESH_TOKEN }}
+          BLOGGER_BLOG_ID: ${{ secrets.BLOGGER_BLOG_ID }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SEARCH_CONSOLE_REFRESH_TOKEN: ${{ secrets.SEARCH_CONSOLE_REFRESH_TOKEN }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: python agente_principal.py
