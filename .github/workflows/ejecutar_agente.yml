@@ -46,7 +46,6 @@ jobs:
 
   run-agent:
     runs-on: ubuntu-latest
-    needs: deploy-edge-function
     steps:
       - name: Checkout repo privado (agente-autonomo)
         uses: actions/checkout@v4
