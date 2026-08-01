@@ -1,0 +1,38 @@
+name: Importar Trends Manual (automático)
+
+on:
+  push:
+    paths:
+      - 'trends_csv_pendientes/*.csv'
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install supabase
+
+      - name: Importar CSVs pendientes
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python importar_trends_manual.py
+
+      - name: Commit de los archivos movidos a procesados/
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add trends_csv_pendientes/
+          git diff --staged --quiet || git commit -m "Auto: CSVs de trends procesados y movidos"
+          git push
