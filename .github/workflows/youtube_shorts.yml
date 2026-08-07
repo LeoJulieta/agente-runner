@@ -1,0 +1,95 @@
+name: Agente YouTube Shorts
+
+on:
+  schedule:
+    # Cada 3 horas -- 8 Shorts por dia para maximizar alcance y monetizacion
+    - cron: '0 0,3,6,9,12,15,18,21 * * *'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Modo debug (no sube a YouTube)'
+        required: false
+        default: 'false'
+
+jobs:
+  generar-short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      # FIX (migracion Repo B): en vez de checkoutear este mismo repo (que
+      # solo tiene los workflows), traemos el codigo real del repo privado
+      # LeoJulieta/agente-autonomo usando el PAT de solo lectura. El resto
+      # del workflow corre exactamente igual que antes -- solo cambia de
+      # donde viene el codigo.
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation
+          echo "ffmpeg: $(ffmpeg -version 2>&1 | head -1)"
+          echo "Fuentes instaladas OK"
+
+      - name: Instalar dependencias Python
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements_shorts.txt
+
+      - name: Smoke test -- verificar piezas externas
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        run: |
+          python healthcheck.py
+
+      - name: Ejecutar agente YouTube Shorts
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # FIX (7/8): faltaba -- el secret CEREBRAS_API_KEY ya existia en
+          # GitHub pero nunca se declaraba aca, asi que el script nunca lo
+          # veia (por eso el log mostraba "Cerebras: no" pese a que el
+          # secret estaba creado). Mismo patron que GROQ_API_KEYS/
+          # OPENROUTER_API_KEY de arriba.
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          DEBUG_MODE: ${{ github.event.inputs.debug }}
+          # Agregadas (sesion evolution_engine, 5/8): las necesitan
+          # approval_manager.py y evolution_engine.py, que ahora corren
+          # desde este workflow ademas del de agente_principal.py. Mismos
+          # secrets que ya existen en el repo (ver ejecutar_agente.yml).
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_REPO: ${{ secrets.GH_REPO }}
+          MAKE_WEBHOOK_GITHUB_FILES: ${{ secrets.MAKE_WEBHOOK_GITHUB_FILES }}
+        run: |
+          python youtube_shorts_agent.py
+
+      - name: Limpiar archivos temporales
+        if: always()
+        run: |
+          rm -f /tmp/youtube_short_final.mp4
+          echo "Limpieza completada"
