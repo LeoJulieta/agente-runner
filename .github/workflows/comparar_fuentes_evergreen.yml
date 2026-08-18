@@ -1,0 +1,41 @@
+name: Comparar Fuentes Evergreen (manual, una vez)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ganadores_ids:
+        description: 'IDs de video ganadores, separados por coma (vacio = usa los 3 de hoy)'
+        required: false
+        default: ''
+      flojos_ids:
+        description: 'IDs de video flojos, separados por coma (vacio = usa los 3 de hoy)'
+        required: false
+        default: ''
+
+jobs:
+  comparar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements_shorts.txt
+
+      - name: Ejecutar comparacion de fuentes
+        env:
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
+          GANADORES_IDS: ${{ github.event.inputs.ganadores_ids }}
+          FLOJOS_IDS: ${{ github.event.inputs.flojos_ids }}
+        run: python comparar_fuentes_evergreen.py
