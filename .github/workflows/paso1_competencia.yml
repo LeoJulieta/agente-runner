@@ -1,0 +1,38 @@
+name: Paso 1 - Competencia 55+ (manual, una vez)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  paso1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+        # FIX (21/8, ronda de mejora): lingua-language-detector (2.x, la
+        # version que trae "pip install" sin fijar numero) requiere
+        # Python >= 3.12 segun su propio README de GitHub -- confirmado
+        # por busqueda antes de entregar, no asumido. El resto del
+        # proyecto usa 3.11, pero este workflow es aislado (su propio
+        # install, no toca requirements_shorts.txt), asi que subir la
+        # version aca no afecta nada mas.
+
+      - name: Instalar dependencias
+        run: pip install requests supabase lingua-language-detector
+
+      - name: Ejecutar Paso 1
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+        run: python3 paso1/paso1_competencia.py
