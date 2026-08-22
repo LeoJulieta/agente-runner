@@ -1,0 +1,39 @@
+name: Promover candidato Paso 1
+
+on:
+  workflow_dispatch:
+    inputs:
+      id_pendiente:
+        description: 'ID en paso1_candidatos_pendientes'
+        required: true
+      destino:
+        description: 'cola (trending_cola) o pool (yt_evergreen_topics) -- dejar vacio si vas a descartar'
+        required: false
+        default: ''
+      descartar_motivo:
+        description: 'Si en vez de promover queres descartar, poné el motivo aca (ej: "cura milagro cancer") y dejá destino vacio'
+        required: false
+        default: ''
+
+jobs:
+  promover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Instalar dependencias
+        run: pip install supabase
+
+      - name: Promover o descartar
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ID_PENDIENTE: ${{ github.event.inputs.id_pendiente }}
+          DESTINO: ${{ github.event.inputs.destino }}
+          DESCARTAR_MOTIVO: ${{ github.event.inputs.descartar_motivo }}
+        run: python3 promover_candidato_paso1.py

@@ -1,12 +1,17 @@
-name: Paso 1 - Competencia 55+ (manual, una vez)
+name: Paso 1 - Competencia 55+ (semanal + manual)
 
 on:
+  schedule:
+    # Domingos 20:00 UTC -- semanal, no cada hora (estos canales no
+    # publican tan seguido como para justificar mas frecuencia, y
+    # correrlo mas seguido solo gasta cuota trayendo los mismos videos)
+    - cron: '0 20 * * 0'
   workflow_dispatch:
 
 jobs:
   paso1:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout repo privado (agente-autonomo)
         uses: actions/checkout@v4
