@@ -1,0 +1,78 @@
+name: SOLO_METRICAS (Health Check + Seed Test cada 2hs)
+
+on:
+  schedule:
+    # Cron cada 2 horas UTC (06:00, 08:00, 10:00, ..., 04:00)
+    - cron: '0 */2 * * *'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Modo debug (solo sync sin upload)'
+        required: false
+        default: 'false'
+
+jobs:
+  solo-metricas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Heredar patrón de producción: checkout del repo privado con PRIVATE_REPO_PAT
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias del sistema
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg fonts-dejavu-core fonts-liberation
+          echo "ffmpeg: $(ffmpeg -version 2>&1 | head -1)"
+          echo "Fuentes instaladas OK"
+
+      - name: Instalar dependencias Python
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements_shorts.txt
+
+      - name: Smoke test -- verificar piezas externas
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        run: |
+          python healthcheck.py
+
+      - name: Ejecutar SOLO_METRICAS (health check + seed test)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          BLOGGER_CLIENT_SECRET: ${{ secrets.BLOGGER_CLIENT_SECRET }}
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          GOOGLE_FACTCHECK_API_KEY: ${{ secrets.GOOGLE_FACTCHECK_API_KEY }}
+          VOCES_TTS_PT_BR_CONFIRMADA: ${{ secrets.VOCES_TTS_PT_BR_CONFIRMADA }}
+          DEBUG_MODE: ${{ github.event.inputs.debug }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_REPO: ${{ secrets.GH_REPO }}
+          MAKE_WEBHOOK_GITHUB_FILES: ${{ secrets.MAKE_WEBHOOK_GITHUB_FILES }}
+        run: |
+          python3 -c "from youtube_shorts_agent import solo_metricas; solo_metricas()"
+
+      - name: Limpiar archivos temporales
+        if: always()
+        run: |
+          rm -f /tmp/youtube_short_final.mp4
+          echo "Limpieza completada"
