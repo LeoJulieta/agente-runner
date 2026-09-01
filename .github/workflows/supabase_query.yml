@@ -1,0 +1,37 @@
+name: SUPABASE_QUERY (ejecutar consultas versionadas)
+
+on:
+  workflow_dispatch:
+    inputs:
+      query_file:
+        description: 'Ruta del archivo query en supabase/queries/ (solo archivos commiteados)'
+        required: true
+        default: 'supabase/queries/estado_h2_opcion_a.py'
+
+jobs:
+  supabase-query:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Checkout del repo con PRIVATE_REPO_PAT para acceder a archivos commiteados
+      - name: Checkout repo privado
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias Python
+        run: |
+          pip install --upgrade pip
+          pip install supabase
+
+      - name: Ejecutar consulta Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python tools/run_supabase_file.py ${{ github.event.inputs.query_file }}
