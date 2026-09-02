@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       query_file:
+        execute:
+        description: 'Ejecutar escritura real (true) o solo preview (false)'
+        required: false
+        default: 'false'
         description: 'Ruta del archivo query en supabase/queries/ (solo archivos commiteados)'
         required: true
         default: 'supabase/queries/estado_h2_opcion_a.py'
@@ -31,6 +35,7 @@ jobs:
 
       - name: Ejecutar consulta Supabase
         env:
+          SUPABASE_EXECUTE: ${{ github.event.inputs.execute }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
