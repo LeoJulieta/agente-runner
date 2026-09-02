@@ -4,20 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       query_file:
-        execute:
-        description: 'Ejecutar escritura real (true) o solo preview (false)'
-        required: false
-        default: 'false'
         description: 'Ruta del archivo query en supabase/queries/ (solo archivos commiteados)'
         required: true
         default: 'supabase/queries/estado_h2_opcion_a.py'
+      execute:
+        description: 'Ejecutar escritura real (true) o solo preview (false)'
+        required: false
+        default: 'false'
 
 jobs:
   supabase-query:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # Checkout del repo con PRIVATE_REPO_PAT para acceder a archivos commiteados
       - name: Checkout repo privado
         uses: actions/checkout@v4
         with:
