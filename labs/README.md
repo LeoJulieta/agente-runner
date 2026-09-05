@@ -13,10 +13,10 @@
 def calculate_confidence(status: str, evidence_count: int, reproducible: bool, last_test: datetime) -> float:
     """
     confidence = clamp(
-        base[status] 
-        + 0.02 * min(evidence_count, 10) 
-        + 0.05 * reproducible 
-        − 0.01 * días_desde_last_test, 
+        base[status]
+        + 0.02 * min(evidence_count, 10)
+        + 0.05 * reproducible
+        − 0.01 * días_desde_last_test,
         0, 1
     )
     """
@@ -26,23 +26,23 @@ def calculate_confidence(status: str, evidence_count: int, reproducible: bool, l
         "STALE": 0.5,
         "CADUCADO": 0.1
     }
-    
+
     from datetime import datetime, timezone
     days_since = (datetime.now(timezone.utc) - last_test).days if last_test else 0
-    
+
     score = (
         base.get(status, 0)
         + 0.02 * min(evidence_count, 10)
         + 0.05 * (1 if reproducible else 0)
         - 0.01 * days_since
     )
-    
+
     return max(0, min(1, score))  # clamp a [0, 1]
 ```
 
 ### Regla de STALE automático
 
-Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` debido a antigüedad (`días_desde_last_test`), 
+Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` debido a antigüedad (`días_desde_last_test`),
 se marca automáticamente como `STALE` hasta que se re-pruebe.
 
 ## Estructura de la tabla `lab_results`
