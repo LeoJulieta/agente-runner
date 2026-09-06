@@ -1,0 +1,29 @@
+name: Competencia Shorts (semanal automático)
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'  # todos los lunes 12:00 UTC
+  workflow_dispatch: {}     # tambien se puede disparar manual sin inputs, para probar
+
+jobs:
+  sincronizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests supabase
+
+      - name: Sincronizar videos de canales seguidos
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          MODO: sincronizar
+        run: python competencia_shorts.py

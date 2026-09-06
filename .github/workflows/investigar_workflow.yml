@@ -1,0 +1,49 @@
+name: Investigar Por Que Funciono (manual, primera corrida real)
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_views:
+        description: 'Piso de views para investigar (default del script: 20)'
+        required: false
+        default: '20'
+      limit:
+        description: 'Cuantos videos investigar en esta corrida (default del script: 15)'
+        required: false
+        default: '15'
+
+jobs:
+  investigar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # NOTA: primera corrida real contra GDELT/Wikipedia/Google News en vivo
+    # -- el propio script admite (linea 62-63) que nunca se probo contra
+    # las APIs reales, solo validado en sandbox sin red. Timeout generoso
+    # (20 min) porque no hay dato real de cuanto tarda: 15 videos x
+    # (llamadas a 3 fuentes + throttle de GDELT de 5s + sleep de 2s entre
+    # videos) puede acumularse.
+    steps:
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements_shorts.txt
+
+      - name: Ejecutar investigacion
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          GROQ_API_KEYS: ${{ secrets.GROQ_API_KEYS }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          python3 investigar_por_que_funciono.py \
+            --min-views "${{ github.event.inputs.min_views }}" \
+            --limit "${{ github.event.inputs.limit }}"

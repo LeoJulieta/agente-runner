@@ -1,0 +1,41 @@
+name: Suite de Regresion (texto roto, filtro seguridad, gate)
+
+on:
+  push:
+    paths:
+      - 'youtube_shorts_agent.py'
+      - 'test_texto_completo.py'
+  workflow_dispatch:
+
+jobs:
+  correr-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repo privado (agente-autonomo)
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements_shorts.txt
+        # NOTA: no hace falta pytest -- test_texto_completo.py corre solo
+        # (tiene su propio runner en el bloque if __name__ == "__main__").
+        # Tampoco hacen falta secrets (SUPABASE_URL, etc.): el archivo de
+        # test ya pone valores falsos con os.environ.setdefault() antes
+        # de importar youtube_shorts_agent.py, precisamente para que este
+        # workflow no necesite ningun secret real -- los 22 tests son
+        # puros o mockean la red ellos mismos.
+
+      - name: Correr suite de regresion
+        run: python3 test_texto_completo.py
+        # El script hace sys.exit(1) si algun test falla (FIX 21/8) -- eso
+        # es lo que hace que este step, y por lo tanto el workflow entero,
+        # se marque en rojo cuando corresponde. Sin ese exit code el gate
+        # no serviria de nada, quedaria siempre en verde.

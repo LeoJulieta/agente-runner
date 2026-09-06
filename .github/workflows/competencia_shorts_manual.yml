@@ -1,0 +1,54 @@
+name: Competencia Shorts (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'descubrir (busca canales nuevos) o sincronizar (trae videos de los ya guardados)'
+        required: true
+        default: 'descubrir'
+        type: choice
+        options:
+          - descubrir
+          - sincronizar
+      keyword:
+        description: 'Solo para modo=descubrir: que buscar'
+        required: false
+        default: 'shocking facts shorts'
+      categoria:
+        description: 'Solo para modo=descubrir: etiqueta para agrupar estos canales'
+        required: false
+        default: 'facts'
+      max_canales:
+        description: 'Solo para modo=descubrir: cuantos canales traer (cuesta 100 unidades de cuota x corrida, no por canal)'
+        required: false
+        default: '5'
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: LeoJulieta/agente-autonomo
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements_shorts.txt
+
+      - name: Correr competencia_shorts.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          MODO: ${{ inputs.modo }}
+          KEYWORD: ${{ inputs.keyword }}
+          CATEGORIA: ${{ inputs.categoria }}
+          MAX_CANALES: ${{ inputs.max_canales }}
+        run: python competencia_shorts.py
