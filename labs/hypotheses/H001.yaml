@@ -1,0 +1,34 @@
+id: H001
+description: "Correlación entre hora de publicación y views en primeras 3 horas"
+class: A
+gen: 0
+
+dataset:
+  - youtube_shorts_log
+
+vars:
+  independent:
+    - hora_publicacion
+  dependent:
+    - views_primeras_3h
+
+metric:
+  primary: correlation
+
+baseline:
+  type: fixed
+  value: 0.3
+  description: "Umbral de correlación significativa (fixed)"
+
+comparison:
+  type: greater_than
+  description: "Correlación medida > 0.3 (umbral significativo)"
+
+sample_min: 30
+max_runtime: 300
+
+evidence_required: true
+reproducibility_required: true
+
+cost_limit: 0
+authorized: false
