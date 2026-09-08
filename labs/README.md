@@ -1,22 +1,41 @@
-# Arquitectura P/L/D/E - Laboratorios de Experimentación
+# Laboratorio P/L/D/E — Fase 0
 
-## Constitución (4 reglas)
+Este directorio contiene el laboratorio de experimentación controlada (Promete /
+Verificado / Stale / Caducado) para hipótesis del sistema `agente-runner`.
+Fase 0 solo establece la infraestructura mínima de medición y trazabilidad.
+No implementa todavía el motor de hipótesis ni ningún worker externo.
 
-1. **Medición objetiva**: Todo experimento debe producir métricas cuantificables y reproducibles.
-2. **Trazabilidad completa**: Cada ejecución registra `lab_id`, `gen`, `params`, `metrics`, `status`, `evidence_count`.
-3. **Confianza calculada**: El `confidence` NO se guarda, se calcula al leer con fórmula transparente.
-4. **Genealogía explícita**: Campo `gen` guarda la generación del experimento para seguimiento evolutivo.
+## Constitución (5 reglas)
 
-## Fórmula de Confidence
+1. **Medición objetiva.** Todo resultado se basa en una métrica medible y
+   reproducible (duración, conteos, deltas) — nunca en una apreciación
+   subjetiva de si "funcionó bien".
+2. **Trazabilidad.** Cada corrida queda registrada en `lab_results` con su
+   `lab_id`, sus `params`, sus `metrics` y su `status`. Nada se descarta ni se
+   sobrescribe: la historia completa vive en la tabla.
+3. **Confidence calculada al leer, no al escribir.** El campo de confianza no
+   se guarda como columna; se calcula en el momento de la lectura a partir de
+   `status`, `evidence_count`, `reproducible` y la antigüedad del último test
+   (ver fórmula abajo).
+4. **Genealogía por `gen`.** Cada evolución de una hipótesis incrementa `gen`
+   en vez de reemplazar la fila anterior, preservando el linaje completo de
+   cómo llegó a su estado actual.
+5. **Baseline congelado — INVIOLABLE.** Una vez que un `lab_id` establece su
+   primera medición base, esa fila no se edita ni se borra bajo ninguna
+   circunstancia. Todo cambio posterior es una fila nueva.
+
+## Fórmula de confidence
+
+Calculada al leer, no almacenada:
 
 ```python
 def calculate_confidence(status: str, evidence_count: int, reproducible: bool, last_test: datetime) -> float:
     """
     confidence = clamp(
-        base[status] 
-        + 0.02 * min(evidence_count, 10) 
-        + 0.05 * reproducible 
-        − 0.01 * días_desde_last_test, 
+        base[status]
+        + 0.02 * min(evidence_count, 10)
+        + 0.05 * reproducible
+        − 0.01 * días_desde_last_test,
         0, 1
     )
     """
@@ -26,24 +45,20 @@ def calculate_confidence(status: str, evidence_count: int, reproducible: bool, l
         "STALE": 0.5,
         "CADUCADO": 0.1
     }
-    
     from datetime import datetime, timezone
     days_since = (datetime.now(timezone.utc) - last_test).days if last_test else 0
-    
     score = (
         base.get(status, 0)
         + 0.02 * min(evidence_count, 10)
         + 0.05 * (1 if reproducible else 0)
         - 0.01 * days_since
     )
-    
     return max(0, min(1, score))  # clamp a [0, 1]
 ```
 
 ### Regla de STALE automático
 
-Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` debido a antigüedad (`días_desde_last_test`), 
-se marca automáticamente como `STALE` hasta que se re-pruebe.
+Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` debido a antigüedad (`días_desde_last_test`), se marca automáticamente como `STALE` hasta que se re-pruebe.
 
 ## Estructura de la tabla `lab_results`
 
@@ -76,3 +91,66 @@ se marca automáticamente como `STALE` hasta que se re-pruebe.
 - ❌ Dashboards
 
 Cada componente adicional debe justificarse con evidencia de necesidad real.
+
+## Motor de hipótesis (Fase 1)
+
+El motor `lab_engine.py` ejecuta hipótesis declaradas en `labs/hypotheses/*.yaml`.
+
+### Contrato YAML
+
+Cada hipótesis es un archivo YAML con esta estructura:
+
+```yaml
+id: H001
+description: "Descripción de la hipótesis"
+class: A  # A (read-only) | B (recurso externo) | C (producción/dinero)
+gen: 0
+
+dataset:
+  - nombre_tabla
+
+vars:
+  independent:
+    - columna_independiente
+  dependent:
+    - columna_dependiente
+
+metric:
+  primary: nombre_metrica
+
+baseline:
+  type: fixed  # fixed | historical_median | mean
+  value: 0.3   # valor fijo para baseline
+  description: "Descripción del baseline"
+
+comparison:
+  type: greater_than  # greater_than | less_than | delta_percent
+  description: "Descripción de la comparación"
+
+sample_min: 30
+max_runtime: 300
+
+evidence_required: true
+reproducibility_required: true
+
+cost_limit: 0
+authorized: false  # true solo si clase B tiene aprobación
+```
+
+### Clases de hipótesis
+
+- **Clase A**: Read-only sobre tablas existentes. Puede ejecutarse tras aprobación de batch.
+- **Clase B**: Requiere recurso externo (API, sandbox, worker). Necesita `authorized: true` en el contrato.
+- **Clase C**: Producción, dinero, terceros. El motor SIEMPRE la rechaza (camino humano obligatorio).
+
+### Regla INVIOLABLE 5: Baseline congelado
+
+Al registrar una hipótesis (primera corrida), el motor calcula el baseline y lo congela en una fila con `status: PROMETE`. Ese baseline NUNCA se recalcula. Si el dataset cambia, se crea `gen+1` con baseline propio.
+
+### Uso
+
+```bash
+python labs/lab_engine.py --hypothesis H001
+```
+
+O desde GitHub Actions: **Actions → Lab Run → Run workflow → hypothesis_id: H001**

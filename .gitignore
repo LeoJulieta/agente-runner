@@ -1,27 +1,52 @@
 ```
-# Compiled and build artifacts
-*.pyc
+# Python
 __pycache__/
-*.o
-*.obj
-
-# Dependencies
-.venv/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
 venv/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
-# Environment
+.venv/
+.ENV
+.ENV.*
 .env
-.env.local
-*.env.*
+.env.*
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage/
 
-# Editors
+# Build artifacts
+build/
+dist/
+*.egg
+*.egg-info/
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor files
 .vscode/
 .idea/
+*.swp
+*.swo
+*.tmp
 
-# Original rules preserved
+# Environment specific
+.env.local
+.env.*.local
 ```

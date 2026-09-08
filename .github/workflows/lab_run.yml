@@ -1,0 +1,27 @@
+name: Lab Run - Ejecutar Hipótesis
+
+on:
+  workflow_dispatch:
+    inputs:
+      hypothesis_id:
+        description: "ID de la hipótesis (ej: H001)"
+        required: true
+        type: string
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pip install supabase pyyaml
+
+      - name: Ejecutar hipótesis
+        run: python labs/lab_engine.py --hypothesis ${{ inputs.hypothesis_id }}
