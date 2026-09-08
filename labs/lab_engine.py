@@ -22,8 +22,61 @@ import json
 import argparse
 import yaml
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from supabase import create_client
+
+# ==============================================================================
+# UTILIDADES PARA DERIVACIÓN DE VARIABLES (Timezone & Transformaciones)
+# ==============================================================================
+
+TZ_USHUAIA = timezone(timedelta(hours=-3))
+
+def _parse_ts(value):
+    """Parsea string ISO a datetime, manejando 'Z' y formatos variados."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+def _derive_value(row, spec):
+    """
+    Deriva una variable virtual según el bloque `derive` del contrato.
+    
+    Ejemplo spec:
+      source: created_at
+      subtract_hours_from_column: hs_al_publicar_al_sync
+      tz_offset_hours: -3
+      extract: hour
+    
+    Lógica: ts = created_at - hs_al_publicar_al_sync -> convertir a UTC-3 -> extraer hora
+    """
+    if not spec:
+        return None
+    
+    ts = _parse_ts(row.get(spec.get("source")))
+    if ts is None:
+        return None
+    
+    # Restar horas si se especifica (ej: hs_al_publicar_al_sync)
+    subtract_col = spec.get("subtract_hours_from_column")
+    if subtract_col:
+        hs = row.get(subtract_col)
+        if hs is None:
+            return None
+        ts = ts - timedelta(hours=float(hs))
+    
+    # Convertir a zona horaria local (ej: UTC-3 para Ushuaia)
+    tz_offset = spec.get("tz_offset_hours")
+    if tz_offset is not None:
+        ts = ts.astimezone(timezone(timedelta(hours=tz_offset)))
+    
+    # Extraer componente (default: hora del día)
+    if spec.get("extract", "hour") == "hour":
+        return ts.hour
+    
+    return None
 
 
 def load_hypothesis(hypothesis_id: str) -> dict:
@@ -81,22 +134,23 @@ def freeze_baseline(contract: dict, supabase) -> dict:
             if not dataset:
                 raise ValueError("Contrato sin dataset para calcular baseline")
 
-            # Para H001: leer views_primeras_3h de youtube_shorts_log
-            # donde hora_publicacion existe
-            # (simplificado: leer últimas 100 filas y calcular mediana)
+            dependent_var = contract.get("vars", {}).get("dependent", [])
+            if not dependent_var:
+                raise ValueError("Contrato sin vars.dependent")
+
+            # CORRECCIÓN: Filtrar nulls explícitamente y ordenar por fecha
             response = (
                 supabase.table(dataset[0])
-                .select("*")
+                .select(dependent_var[0])
+                .not_.is_(dependent_var[0], None)
+                .order("created_at", desc=True)
                 .limit(100)
                 .execute()
             )
 
             rows = response.data or []
-            dependent_var = contract.get("vars", {}).get("dependent", [])
-            if not dependent_var:
-                raise ValueError("Contrato sin vars.dependent")
-
             values = [r.get(dependent_var[0]) for r in rows if r.get(dependent_var[0]) is not None]
+            
             if not values:
                 baseline_value = 0
             else:
@@ -128,54 +182,114 @@ def freeze_baseline(contract: dict, supabase) -> dict:
 
 
 def measure(contract: dict, supabase) -> dict:
-    """Mide métrica según contrato (solo lectura si clase A)"""
+    """
+    Mide métrica según contrato (solo lectura si clase A).
+    
+    Mejoras Fase 1.1:
+    - Filtra nulls explícitamente en ambas columnas
+    - Ordena por fecha descendente para tomar muestras recientes
+    - Respeta sample_min del contrato
+    - Soporta bloque `derive` para variables virtuales (ej: hora_local)
+    """
     clase = contract.get("class", "A")
     if clase != "A":
         raise NotImplementedError("Solo clase A implementada en Fase 1")
-
+    
     dataset = contract.get("dataset", [])
     if not dataset:
         raise ValueError("Contrato sin dataset")
-
-    # Para H001: correlación entre hora_publicacion y views_primeras_3h
-    # Simplificado: leer últimas 50 filas y calcular correlación simple
-    response = (
-        supabase.table(dataset[0])
-        .select("*")
-        .limit(50)
-        .execute()
-    )
-
-    rows = response.data or []
+    
     independent_var = contract.get("vars", {}).get("independent", [])
     dependent_var = contract.get("vars", {}).get("dependent", [])
-
+    
     if not independent_var or not dependent_var:
         raise ValueError("Contrato sin vars.independent o vars.dependent")
-
-    x_values = [r.get(independent_var[0]) for r in rows if r.get(independent_var[0]) is not None]
-    y_values = [r.get(dependent_var[0]) for r in rows if r.get(dependent_var[0]) is not None]
-
-    # Calcular correlación simple (Pearson)
-    if len(x_values) < 2 or len(y_values) < 2:
-        n = 0
+    
+    x_name = independent_var[0]
+    y_name = dependent_var[0]
+    
+    # Soporte para variables derivadas (derive block)
+    derive = contract.get("derive", {}) or {}
+    x_spec = derive.get(x_name)
+    
+    # Construir lista de columnas necesarias para el SELECT
+    cols = {y_name}
+    if x_spec:
+        cols.add(x_spec.get("source"))
+        if x_spec.get("subtract_hours_from_column"):
+            cols.add(x_spec.get("subtract_hours_from_column"))
+    else:
+        cols.add(x_name)
+    
+    select_cols = ",".join(sorted(c for c in cols if c))
+    order_col = (x_spec.get("source") if x_spec else "created_at") or "created_at"
+    
+    # Construir query con filtros NOT NULL explícitos
+    query = supabase.table(dataset[0]).select(select_cols).not_.is_(y_name, None)
+    
+    if x_spec:
+        query = query.not_.is_(x_spec.get("source"), None)
+        if x_spec.get("subtract_hours_from_column"):
+            query = query.not_.is_(x_spec.get("subtract_hours_from_column"), None)
+    else:
+        query = query.not_.is_(x_name, None)
+    
+    # Ordenar por fecha descendente y limitar a 200 filas (para tener margen)
+    response = query.order(order_col, desc=True).limit(200).execute()
+    
+    rows = response.data or []
+    
+    # Procesar filas: derivar X si corresponde, filtrar nulls
+    x_values, y_values = [], []
+    for r in rows:
+        y = r.get(y_name)
+        if y is None:
+            continue
+        
+        if x_spec:
+            x = _derive_value(r, x_spec)
+        else:
+            x = r.get(x_name)
+        
+        if x is None:
+            continue
+        
+        x_values.append(float(x))
+        y_values.append(float(y))
+    
+    # Verificar sample_min
+    sample_min = int(contract.get("sample_min", 0) or 0)
+    n = len(x_values)
+    sample_ok = n >= sample_min
+    
+    if not sample_ok:
+        return {
+            "correlation": None,
+            "sample_size": n,
+            "sample_min": sample_min,
+            "sample_ok": False,
+            "reason": f"muestra insuficiente: {n} < {sample_min}",
+        }
+    
+    # Calcular correlación de Pearson
+    x_mean = sum(x_values) / n
+    y_mean = sum(y_values) / n
+    
+    numerator = sum((x_values[i] - x_mean) * (y_values[i] - y_mean) for i in range(n))
+    denom_x = sum((v - x_mean) ** 2 for v in x_values) ** 0.5
+    denom_y = sum((v - y_mean) ** 2 for v in y_values) ** 0.5
+    
+    if denom_x == 0 or denom_y == 0:
         correlation = 0.0
     else:
-        # Simplificación: correlación básica
-        n = min(len(x_values), len(y_values))
-        x_mean = sum(x_values[:n]) / n
-        y_mean = sum(y_values[:n]) / n
-
-        numerator = sum((x_values[i] - x_mean) * (y_values[i] - y_mean) for i in range(n))
-        denom_x = sum((x_values[i] - x_mean) ** 2 for i in range(n)) ** 0.5
-        denom_y = sum((y_values[i] - y_mean) ** 2 for i in range(n)) ** 0.5
-
-        if denom_x == 0 or denom_y == 0:
-            correlation = 0.0
-        else:
-            correlation = numerator / (denom_x * denom_y)
-
-    return {"correlation": round(correlation, 4), "sample_size": n}
+        correlation = numerator / (denom_x * denom_y)
+    
+    return {
+        "correlation": round(correlation, 4),
+        "sample_size": n,
+        "sample_min": sample_min,
+        "sample_ok": True,
+    }
 
 
 def compare(measured: dict, baseline: dict, contract: dict) -> dict:
@@ -183,7 +297,16 @@ def compare(measured: dict, baseline: dict, contract: dict) -> dict:
     comparison_type = contract.get("comparison", {}).get("type", "greater_than")
     metric_name = contract.get("metric", {}).get("primary", "correlation")
 
-    measured_value = measured.get(metric_name, 0)
+    # CORRECCIÓN: Nunca usar default 0 silencioso
+    measured_value = measured.get(metric_name)
+    if measured_value is None:
+        return {
+            "measured_value": None,
+            "baseline_value": baseline if isinstance(baseline, (int, float)) else 0,
+            "comparison_type": comparison_type,
+            "passed": False,
+        }
+
     baseline_value = baseline if isinstance(baseline, (int, float)) else 0
 
     if comparison_type == "greater_than":
@@ -254,8 +377,9 @@ def main():
         new_evidence_count = previous_evidence_count + 1
         reproducible = new_evidence_count >= 2
 
-        # Status: VERIFICADO si comparación pasó, PROMETE si no
-        status = "VERIFICADO" if comparison["passed"] else "PROMETE"
+        # CORRECCIÓN: Status depende de sample_ok Y comparación pasada
+        passed = bool(comparison["passed"]) and bool(measured.get("sample_ok", False))
+        status = "VERIFICADO" if passed else "PROMETE"
 
         insert_payload = {
             "lab_id": lab_id,

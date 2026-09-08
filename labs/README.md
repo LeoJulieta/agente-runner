@@ -115,6 +115,14 @@ vars:
   dependent:
     - columna_dependiente
 
+# Opcional: deriva variables virtuales (ej: hora_local desde timestamp)
+derive:
+  nombre_variable_virtual:
+    source: columna_origen
+    subtract_hours_from_column: columna_restar
+    tz_offset_hours: -3
+    extract: hour
+
 metric:
   primary: nombre_metrica
 
@@ -136,6 +144,8 @@ reproducibility_required: true
 cost_limit: 0
 authorized: false  # true solo si clase B tiene aprobación
 ```
+
+**Regla de muestreo**: Si `sample_size < sample_min`, el motor reporta `status: PROMETE` con `reason: "muestra insuficiente"` y NO calcula la métrica (correlation = null).
 
 ### Clases de hipótesis
 

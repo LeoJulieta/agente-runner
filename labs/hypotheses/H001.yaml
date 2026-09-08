@@ -12,6 +12,14 @@ vars:
   dependent:
     - views_primeras_3h
 
+# Bloque derive: deriva hora_publicacion desde created_at - hs_al_publicar_al_sync (UTC-3)
+derive:
+  hora_publicacion:
+    source: created_at
+    subtract_hours_from_column: hs_al_publicar_al_sync
+    tz_offset_hours: -3
+    extract: hour
+
 metric:
   primary: correlation
 
