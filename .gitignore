@@ -1,52 +1,75 @@
 ```
-# Python
-__pycache__/
+# Executables/binaries
+runner
+
+# Compiled and binary files
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
+
+# Dependencies
+node_modules/
 venv/
 .venv/
-.ENV
-.ENV.*
-.env
-.env.*
-.pytest_cache/
-.mypy_cache/
-.coverage
-coverage/
-
-# Build artifacts
-build/
+__pycache__/
 dist/
-*.egg
-*.egg-info/
-*.so
-*.dylib
-*.dll
-*.exe
+build/
+target/
+.gradle/
+.mypy_cache/
+.pytest_cache/
 
-# Logs
-*.log
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Editor files
+# Editors/IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Logs and temp files
+*.log
 *.tmp
 
-# Environment specific
+# System files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
 .env.local
-.env.*.local
+*.env.*
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```
