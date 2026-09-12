@@ -2,10 +2,11 @@ name: Importar Trends Manual (automático)
 
 on:
   push:
-  branches:
+    branches:
       - main
     paths:
       - 'trends_csv_pendientes/*.csv'
+  workflow_dispatch:
 
 jobs:
   importar:
