@@ -3,9 +3,10 @@ name: Importar Studio Export (automático)
 on:
   push:
     branches:
-      - main: 
+      - main
     paths:
       - 'studio_zips_pendientes/*.zip'
+  workflow_dispatch:
 
 jobs:
   importar:
