@@ -1,0 +1,26 @@
+name: Lab Batch - Ejecutar Lote de Hipótesis
+'on':
+  workflow_dispatch:
+    inputs:
+      hypothesis_ids:
+        description: 'IDs separados por coma (ej: H002,H003)'
+        required: true
+        type: string
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: pip install supabase pyyaml
+      - name: Ejecutar lote secuencial
+        run: |
+          for id in $(echo "${{ inputs.hypothesis_ids }}" | tr "," " "); do
+            echo "=== Hipótesis $id ==="
+            python labs/lab_engine.py --hypothesis "$id" || echo "FALLÓ $id"
+          done
