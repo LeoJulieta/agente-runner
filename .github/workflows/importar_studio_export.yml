@@ -2,6 +2,8 @@ name: Importar Studio Export (automático)
 
 on:
   push:
+    branches:
+      - main: 
     paths:
       - 'studio_zips_pendientes/*.zip'
 
