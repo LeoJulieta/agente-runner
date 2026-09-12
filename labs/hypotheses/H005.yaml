@@ -1,0 +1,30 @@
+id: H005
+description: Correlación positiva entre hora UTC de publicación y views en primeras
+  3 horas
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - hora_utc
+  dependent:
+  - views_primeras_3h
+derive:
+  hora_utc:
+    source: created_at
+    extract: hour
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: 0.3
+comparison:
+  type: greater_than
+  description: Correlación medida > 0.3 (correlación moderada o fuerte)
+sample_min: 30
+max_runtime: 300
+evidence_required: true
+reproducibility_required: true
+cost_limit: 0
+authorized: false
