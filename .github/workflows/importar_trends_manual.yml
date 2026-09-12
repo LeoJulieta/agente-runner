@@ -2,6 +2,8 @@ name: Importar Trends Manual (automático)
 
 on:
   push:
+  branches:
+      - main
     paths:
       - 'trends_csv_pendientes/*.csv'
 
