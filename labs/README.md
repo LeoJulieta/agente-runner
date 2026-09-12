@@ -3,7 +3,7 @@
 Este directorio contiene el laboratorio de experimentación controlada (Promete /
 Verificado / Stale / Caducado) para hipótesis del sistema `agente-runner`.
 Fase 0 solo establece la infraestructura mínima de medición y trazabilidad.
-No implementa todavía el motor de hipótesis ni ningún worker externo.
+El motor de hipótesis está VERIFICADO desde Fase 1.
 
 ## Constitución (5 reglas)
 
@@ -68,12 +68,13 @@ Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` d
 | `lab_id` | text | Identificador del experimento (ej: `lab_001`) |
 | `gen` | int | Generación (default 0) |
 | `params` | jsonb | Parámetros del experimento |
-| `metrics` | jsonb | Métricas resultantes |
+| metrics | jsonb | Métricas resultantes (**siempre objeto**, nunca string) |
 | `status` | text | `PROMETE` \| `VERIFICADO` \| `STALE` \| `CADUCADO` |
 | `evidence_count` | int | Cantidad de ejecuciones exitosas acumuladas |
 | `reproducible` | bool | `true` si `evidence_count >= 2` |
 | `last_test` | timestamptz | Última vez que se ejecutó |
 | `creado_en` | timestamptz | Timestamp de creación |
+**Nota técnica**: No existe columna confidence — se calcula al leer (regla 3).
 
 ## Fase 0: Tubo de Ensayo
 
@@ -89,6 +90,9 @@ Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` d
 - ❌ Evolution engine
 - ❌ `lab_workers`
 - ❌ Dashboards
+- ❌ Generador de experimentos
+- ❌ Workers externos / IP no-datacenter del puente GAS
+- ❌ Automatización de merge o publicación fuera de PRs auditados
 
 Cada componente adicional debe justificarse con evidencia de necesidad real.
 
