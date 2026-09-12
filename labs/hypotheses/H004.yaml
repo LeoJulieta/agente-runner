@@ -1,0 +1,31 @@
+id: H004
+description: Correlación negativa entre hora local de publicación y views en primeras
+  3 horas
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - hora_local
+  dependent:
+  - views_primeras_3h
+derive:
+  hora_local:
+    source: created_at
+    tz_offset_hours: -3
+    extract: hour
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: -0.3
+comparison:
+  type: less_than
+  description: Correlación medida < -0.3 (correlación moderada o fuerte negativa)
+sample_min: 30
+max_runtime: 300
+evidence_required: true
+reproducibility_required: true
+cost_limit: 0
+authorized: false
