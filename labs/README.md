@@ -168,3 +168,9 @@ python labs/lab_engine.py --hypothesis H001
 ```
 
 O desde GitHub Actions: **Actions → Lab Run → Run workflow → hypothesis_id: H001**
+## Batches y aprobación
+
+- **Generador determinístico**: Los lotes se generan con `labs/gen_batch.py` (el catálogo vive en el código y se audita en el PR).
+- **Flujo**: generador → PR → auditoría de lote por Qwen → verde único de Leo → dos dispatches de `Lab Batch` (reproducibilidad) → veredictos en `lab_results`.
+- **Múltiples comparaciones**: con n≈66 y |r|>0.3, ~1.4% de falso positivo por test (~0.10 esperados en 7 tests); sin corrección a esta escala.
+- **Guardía out-of-time**: todo ganador se re-dispatchea a los 7 días; si cae, pasa a STALE.
