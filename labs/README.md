@@ -75,6 +75,7 @@ Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` d
 | `last_test` | timestamptz | Última vez que se ejecutó |
 | `creado_en` | timestamptz | Timestamp de creación |
 **Nota técnica**: No existe columna confidence — se calcula al leer (regla 3).
+**Seguridad**: RLS habilitado (deny-all anon) + trigger de protección Regla 2/5 a nivel DB (migration 002).
 
 ## Fase 0: Tubo de Ensayo
 
