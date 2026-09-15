@@ -1,0 +1,61 @@
+name: Guard Rail - Commit Directo a Main
+on:
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
+  issues: write
+jobs:
+  check-direct-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verificar si es commit directo no autorizado
+        id: check_commit
+        run: |
+          COMMIT_HASH=$(git rev-parse HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_AUTHOR=$(git log -1 --pretty=%an)
+          echo "Commit Hash: $COMMIT_HASH"
+          echo "Commit Message: $COMMIT_MSG"
+          echo "Commit Author: $COMMIT_AUTHOR"
+          if echo "$COMMIT_MSG" | grep -qE '\(#[0-9]+\)'; then
+            echo "Es un merge de PR - permitido"
+            echo "allowed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ "$COMMIT_AUTHOR" = "github-actions[bot]" ] || [ "$COMMIT_AUTHOR" = "github-actions" ]; then
+            echo "Es $COMMIT_AUTHOR - permitido"
+            echo "allowed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "⚠️ Commit directo detectado"
+          echo "allowed=false" >> $GITHUB_OUTPUT
+          echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          echo "commit_author=$COMMIT_AUTHOR" >> $GITHUB_OUTPUT
+          echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+      - name: Abrir issue si es commit directo no autorizado
+        if: steps.check_commit.outputs.allowed == 'false'
+        env:
+          ISSUE_HASH: ${{ steps.check_commit.outputs.commit_hash }}
+          ISSUE_AUTHOR: ${{ steps.check_commit.outputs.commit_author }}
+          ISSUE_MSG: ${{ steps.check_commit.outputs.commit_message }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "⚠️ Commit directo a main detectado" \
+            --body "## Alerta de Canal Incorrecto
+          Se detectó un commit directo a la rama main sin pasar por PR.
+          **Detalles:**
+          - **Hash:** $ISSUE_HASH
+          - **Autor:** $ISSUE_AUTHOR
+          - **Mensaje:** $ISSUE_MSG
+          **Acción requerida:**
+          1. Revertir el commit si es posible
+          2. Recordar que los cambios deben ir mediante PR
+          3. Solo merges a main están permitidos (excepto emergencias)" \
+            --label "bug"
