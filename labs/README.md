@@ -206,3 +206,15 @@ O desde GitHub Actions: **Actions → Lab Run → Run workflow → hypothesis_id
 - **Flujo**: generador → PR → auditoría de lote por Qwen → verde único de Leo → dos dispatches de `Lab Batch` (reproducibilidad) → veredictos en `lab_results`.
 - **Múltiples comparaciones**: con n≈66 y |r|>0.3, ~1.4% de falso positivo por test (~0.10 esperados en 7 tests); sin corrección a esta escala.
 - **Guardía out-of-time**: todo ganador se re-dispatchea a los 7 días; si cae, pasa a STALE.
+
+## Constitución v2 — Espacio de búsqueda abierto
+
+1. **Máquina de experimentos, no de laboratorios.** No construimos 100 laboratorios: construimos una máquina que ejecuta N experimentos en el mismo laboratorio.
+2. **Descubrimiento, no catálogo.** No le enseñamos a la máquina todas las formas de ganar dinero: construimos una máquina capaz de descubrir formas que todavía no conocemos.
+3. **La taxonomía es un mapa, no una frontera.** Describe lo que sabemos hoy; el enjambre tiene permiso permanente para descubrir lo que todavía no sabemos nombrar. Los namespaces son `known`, `combination`, `emerging` (vacía al inicio) y `unknown` (presupuesto, no catálogo).
+4. **Un ganador no elimina el bosque.** Ninguna generación puede asignar más del 60% del presupuesto experimental a una sola familia de hipótesis, y el presupuesto `unknown` nunca llega a 0. Regla técnica anti-convergencia prematura.
+5. **Un experimento no fracasa: produce evidencia.** Favorable, desfavorable, insuficiente o inválida. Los estados son `VERIFIED / PROMISING / INCONCLUSIVE / FAILED / INVALID / STALE`, y todo `FAILED` o `INCONCLUSIVE` lleva `failure_reason` estructurado (metodológicas: `insufficient_sample`, `weak_effect`, `high_variance`, `temporal_instability`, `invalid_hypothesis`; de mercado: `no_demand`, `saturated_offer`, `price_insufficient`, `no_distribution`, `market_shifted`, `wrong_product`, `wrong_channel`) más `pivot_hint`.
+6. **Cinco poblaciones simultáneas.** 🟢 Exploradores (territorios nuevos), 🔵 Explotadores (ramas con evidencia), 🟣 Reexploradores (caminos descartados: el mundo cambia), 🟡 Recombinadores (cruces entre ramas), 🟠 Descubridores (rompen suposiciones del sistema declarando `assumption_under_test`).
+7. **Exploración sin dirección, confirmación con dirección.** En exploración no se fija `expected_direction`; al promover una señal a validación confirmatoria, la dirección se preregistra antes de medir.
+8. **Lo desconocido que funciona propone, no certifica.** Una hipótesis `category: unknown` que llega a `VERIFIED` propone una entrada nueva en `emerging:`; la creación real requiere auditoría + verde humano.
+9. **La imaginación puede ser infinita; la evidencia no.** Toda hipótesis nace `PROMETE` con `evidence_count=0`; ninguna se convierte en hecho sin evidencia reproducible.
