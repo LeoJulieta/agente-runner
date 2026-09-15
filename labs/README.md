@@ -97,6 +97,37 @@ Si un resultado con `status='VERIFICADO'` cae por debajo de `confidence < 0.7` d
 
 Cada componente adicional debe justificarse con evidencia de necesidad real.
 
+## Publicación automática
+
+El sistema cuenta con dos workflows para gestionar el flujo de publicación:
+
+### Workflow `auto_pr.yml`
+
+- **Propósito**: Crear PRs automáticamente desde GitHub Actions
+- **Trigger**: `workflow_dispatch` con inputs `branch_name` y `commit_message`
+- **Permisos**: `contents: write` (mínimo necesario)
+- **Funcionamiento**: 
+  1. Crea una rama desde `main`
+  2. El contenido del commit es generado por el workflow que lo invoca
+  3. Realiza commit y push
+  4. Abre un PR automáticamente con `gh pr create`
+
+### Guard-rail `guard_canal_manual.yml`
+
+- **Propósito**: Detectar y registrar commits directos a `main` sin pasar por PR
+- **Trigger**: `on: push` a `main`
+- **Acción**: Si el autor NO es `github-actions[bot]` ni un merge de PR, abre automáticamente un issue con:
+  - Título: `⚠️ Commit directo a main detectado`
+  - Body: hash del commit, autor y mensaje
+- **Objetivo**: Prevenir incidentes de canal incorrecto sin intervención humana
+
+### Tu rol como maintainer
+
+- **Solo mergeás PRs**, nunca publicás manual a menos que sea emergencia
+- Los workflows automáticos (`github-actions[bot]`) están permitidos
+- Los merges de PR están permitidos
+- Cualquier otro commit directo a `main` disparará una alerta vía issue
+
 ## Motor de hipótesis (Fase 1)
 
 El motor `lab_engine.py` ejecuta hipótesis declaradas en `labs/hypotheses/*.yaml`.
