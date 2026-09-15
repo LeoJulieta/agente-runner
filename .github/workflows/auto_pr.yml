@@ -1,0 +1,76 @@
+name: Auto PR Workflow
+on:
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Nombre de la rama a crear'
+        required: true
+        type: string
+      commit_message:
+        description: 'Mensaje del commit'
+        required: true
+        type: string
+      generator_command:
+        description: 'Comando generador de contenido (opcional)'
+        required: false
+        default: ''
+        type: string
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Configurar Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Crear rama desde main
+        env:
+          BRANCH_NAME: ${{ inputs.branch_name }}
+        run: |
+          git checkout main
+          git pull origin main
+          git checkout -b "$BRANCH_NAME"
+      - name: Generar contenido (whitelist)
+        if: inputs.generator_command != ''
+        env:
+          GEN_CMD: ${{ inputs.generator_command }}
+        run: |
+          case "$GEN_CMD" in
+            "python labs/gen_batch.py") python labs/gen_batch.py ;;
+            *) echo "Comando no permitido"; exit 1 ;;
+          esac
+      - name: Commit y push
+        id: do_commit
+        env:
+          COMMIT_MSG: ${{ inputs.commit_message }}
+          BRANCH_NAME: ${{ inputs.branch_name }}
+        run: |
+          git add -A
+          if ! git diff --staged --quiet; then
+            git commit -m "$COMMIT_MSG"
+            git push origin "$BRANCH_NAME"
+            echo "committed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No hay cambios para commitear"
+            echo "committed=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Abrir PR
+        if: steps.do_commit.outputs.committed == 'true'
+        env:
+          BRANCH_NAME: ${{ inputs.branch_name }}
+          COMMIT_MSG: ${{ inputs.commit_message }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --title "PR automático: $BRANCH_NAME" \
+            --body "PR creado automáticamente. Commit: $COMMIT_MSG"
