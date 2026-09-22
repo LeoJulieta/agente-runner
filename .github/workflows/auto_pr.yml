@@ -43,8 +43,9 @@ jobs:
         env:
           GEN_CMD: ${{ inputs.generator_command }}
         run: |
-          case "$GEN_CMD" in
+                    case "$GEN_CMD" in
             "python labs/gen_batch.py") python labs/gen_batch.py ;;
+            "python labs/gen_enjambre.py") python labs/gen_enjambre.py ;;
             *) echo "Comando no permitido"; exit 1 ;;
           esac
       - name: Commit y push
