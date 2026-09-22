@@ -1,0 +1,27 @@
+known:
+  - publicidad_adsense
+  - afiliados_amazon
+  - afiliados_saas
+  - sponsors_directos
+  - pdfs_guias
+  - pdfs_templates
+  - cursos_online
+  - micro_saas
+  - apis_pago
+  - membresias_newsletter
+  - servicios_productizados
+  - datasets_venta
+  - prompts_venta
+  - codigo_venta
+  - plantillas_venta
+
+combination:
+  - activo_x_modelo_x_señal
+  - recombinacion_ramas
+
+emerging: []
+# Vacía al inicio; se llena con propuestas de hipótesis UNKNOWN VERIFIED
+
+unknown:
+  presupuesto_minimo: 0.05  # 5% del enjambre mínimo
+  # No es catálogo: es presupuesto permanente
