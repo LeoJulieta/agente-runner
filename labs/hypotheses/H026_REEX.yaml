@@ -1,0 +1,25 @@
+id: H026_REEX
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - tasa_clic_afiliado
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: 0.3
+comparison:
+  type: greater_than
+  description: Correlación medida > umbral
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: reexplorer
+category: micro_saas
+income_category: micro_saas

@@ -1,0 +1,25 @@
+id: H006_EXPR
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - categoria
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: 0.3
+comparison:
+  type: greater_than
+  description: Correlación medida > umbral
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: explorer
+category: afiliados_saas
+income_category: afiliados_saas
