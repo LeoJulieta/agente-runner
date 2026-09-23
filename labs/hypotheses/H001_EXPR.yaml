@@ -1,0 +1,25 @@
+id: H001_EXPR
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - views_24h
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: 0.3
+comparison:
+  type: greater_than
+  description: Correlación medida > umbral
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: explorer
+category: pdfs_guias
+income_category: pdfs_guias

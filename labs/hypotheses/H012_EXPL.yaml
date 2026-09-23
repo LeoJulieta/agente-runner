@@ -1,0 +1,32 @@
+id: H012_EXPL
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - hora_publicacion
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: -0.3
+comparison:
+  type: less_than
+  description: Correlación negativa > 0.3
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: exploiter
+category: apis_pago
+income_category: apis_pago
+derive:
+  hora_publicacion:
+    source: created_at
+    extract: hour
+    tz_offset_hours: -3
+    subtract_hours_from_column: hs_al_publicar_al_sync
+expected_direction: negative

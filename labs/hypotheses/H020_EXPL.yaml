@@ -1,0 +1,26 @@
+id: H020_EXPL
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - interacciones_totales
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: 0.3
+comparison:
+  type: greater_than
+  description: Correlación positiva > 0.3
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: exploiter
+category: afiliados_amazon
+income_category: afiliados_amazon
+expected_direction: positive

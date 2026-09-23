@@ -1,0 +1,25 @@
+id: H033_RECO
+class: A
+gen: 0
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - created_at
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: -0.3
+comparison:
+  type: less_than
+  description: Correlación negativa > 0.3
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: recombiner
+category: combination
+expected_direction: negative
