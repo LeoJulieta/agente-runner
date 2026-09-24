@@ -1,28 +1,40 @@
 name: Guard Rail - Commit Directo a Main
+
 on:
   push:
     branches:
       - main
+
 permissions:
   contents: read
   issues: write
+
 jobs:
   check-direct-commit:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 2
+
       - name: Verificar si es commit directo no autorizado
         id: check_commit
         run: |
           COMMIT_HASH=$(git rev-parse HEAD)
           COMMIT_MSG=$(git log -1 --pretty=%B)
+          COMMIT_SUBJECT=$(git log -1 --pretty=%s)
           COMMIT_AUTHOR=$(git log -1 --pretty=%an)
           echo "Commit Hash: $COMMIT_HASH"
           echo "Commit Message: $COMMIT_MSG"
           echo "Commit Author: $COMMIT_AUTHOR"
+          # FIX (23/9): los merge commits reales ("Merge pull request #N from ...")
+          # no llevan el sufijo "(#N)" de los squash/rebase merges; aceptarlos tambien.
+          if echo "$COMMIT_SUBJECT" | grep -qE '^Merge pull request #[0-9]+ from '; then
+            echo "Es un merge de PR - permitido"
+            echo "allowed=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           if echo "$COMMIT_MSG" | grep -qE '\(#[0-9]+\)'; then
             echo "Es un merge de PR - permitido"
             echo "allowed=true" >> $GITHUB_OUTPUT
@@ -37,7 +49,15 @@ jobs:
           echo "allowed=false" >> $GITHUB_OUTPUT
           echo "commit_hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
           echo "commit_author=$COMMIT_AUTHOR" >> $GITHUB_OUTPUT
-          echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          # FIX (23/9): el mensaje completo es multilinea; escribirlo con la sintaxis
+          # heredoc de GITHUB_OUTPUT. Con key=value, la 2da linea se parsea como un
+          # file-command invalido y rompe el step ("Unable to process file command").
+          {
+            echo "commit_message<<GUARD_EOF"
+            echo "$COMMIT_MSG"
+            echo "GUARD_EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Abrir issue si es commit directo no autorizado
         if: steps.check_commit.outputs.allowed == 'false'
         env:
