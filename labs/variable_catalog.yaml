@@ -1,0 +1,62 @@
+# Catálogo único de verdad para el laboratorio P/L/D/E.
+# Fuente común del generador y del motor.
+# El motor valida este catálogo contra information_schema al arrancar cada corrida.
+
+variables:
+  # OUTCOME (solo dependiente)
+  views_primeras_3h:
+    type: integer
+    role: outcome
+    independent: false
+
+  # ACCIONABLES PRE-PUBLICACIÓN (palancas reales de timing)
+  hora_publicacion:
+    type: derived
+    role: actionable_pre_publicacion
+    source: created_at
+    extract: hour
+    tz_offset_hours: -3
+    independent: true
+
+  dia_semana:
+    type: derived
+    role: actionable_pre_publicacion
+    source: created_at
+    extract: weekday
+    independent: true
+
+  # OPERACIONAL (confusor de medición, no palanca)
+  hs_al_publicar_al_sync:
+    type: numeric
+    role: operacional_confusor_medicion
+    independent: true
+
+  # OBSERVACIONAL POST-PUBLICACIÓN (asociativo, no causal)
+  likes:
+    type: integer
+    role: observational_post_publicacion
+    independent: true
+
+  # EXCLUIDAS
+  views:
+    type: integer
+    role: excluida_tautologia
+    independent: false
+    reason: "views_primeras_3h es parte mecánica de views; correlación espuria"
+
+  created_at:
+    type: timestamptz
+    role: excluida_timestamp
+    independent: false
+    reason: "solo vía derive"
+
+# Poblaciones autorizadas para cada variable independiente
+population_allowlist:
+  explorer: [hora_publicacion, dia_semana, hs_al_publicar_al_sync, likes]
+  exploiter: [hora_publicacion, dia_semana, hs_al_publicar_al_sync]
+  reexplorer: [hora_publicacion, dia_semana]
+  recombiner: [hora_publicacion, dia_semana, hs_al_publicar_al_sync]
+  discoverer: [hs_al_publicar_al_sync, likes, dia_semana]
+
+# Transformaciones de derive permitidas
+derive_allowlist: [hour, weekday, subtract_hours]
