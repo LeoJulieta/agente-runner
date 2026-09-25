@@ -7,14 +7,20 @@ Uso: python labs/lab_engine.py --hypothesis <id>
 
 Flujo:
 1. Cargar contrato YAML desde labs/hypotheses/<id>.yaml
-2. Verificar clase (A|B|C) y aplicar reglas
-3. Congelar baseline (si es primera corrida) o leer baseline congelado
-4. Medir (solo lectura en tablas existentes si clase A)
-5. Comparar métrica vs baseline congelado
-6. Insertar fila en lab_results (gen, params, metrics, status, evidence_count)
+2. Schema Gate: validar columnas contra information_schema
+3. Derive Gate: validar derivadas contra variable_catalog.yaml
+4. Contract Gate: validar roles y autorizaciones
+5. Verificar clase (A|B|C) y aplicar reglas
+6. Congelar baseline (si es primera corrida) o leer baseline congelado
+7. Medir (solo lectura en tablas existentes si clase A)
+8. Comparar métrica vs baseline congelado
+9. Insertar fila en lab_results (gen, params, metrics, status, evidence_count)
 
 Regla INVIOLABLE 5: El baseline se congela al registrar la hipótesis (status PROMETE).
 El motor NUNCA recalcula el baseline. Dataset nuevo → gen+1 con baseline propio.
+
+PR B (24/9): Schema Gate + Derive Gate + Contract Gate antes de freeze_baseline.
+INVALID no escribe fila PROMETE ni mide.
 """
 import os
 import sys
@@ -48,9 +54,9 @@ def _derive_value(row, spec):
       source: created_at
       subtract_hours_from_column: hs_al_publicar_al_sync
       tz_offset_hours: -3
-      extract: hour
+      extract: hour | weekday
 
-    Lógica: ts = created_at - hs_al_publicar_al_sync -> convertir a UTC-3 -> extraer hora
+    Lógica: ts = created_at - hs_al_publicar_al_sync -> convertir a UTC-3 -> extraer hora o weekday
     """
     if not spec:
         return None
@@ -72,11 +78,175 @@ def _derive_value(row, spec):
     if tz_offset is not None:
         ts = ts.astimezone(timezone(timedelta(hours=tz_offset)))
 
-    # Extraer componente (default: hora del día)
-    if spec.get("extract", "hour") == "hour":
+    # Extraer componente
+    extract = spec.get("extract", "hour")
+    if extract == "hour":
         return ts.hour
+    elif extract == "weekday":
+        return ts.weekday()  # 0=lunes, 6=domingo
 
     return None
+
+# ==============================================================================
+# GATES DE VALIDACIÓN (PR B: 24/9)
+# ==============================================================================
+
+def _load_catalog():
+    """Carga variable_catalog.yaml desde labs/"""
+    path = Path("labs/variable_catalog.yaml")
+    if not path.exists():
+        raise FileNotFoundError(f"Catálogo no encontrado: {path}")
+    with open(path, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+def _validate_schema_gate(contract: dict, catalog: dict, supabase) -> tuple[bool, str]:
+    """
+    Schema Gate: valida que todas las columnas existan en DB y tengan tipo compatible.
+    Devuelve (válido, motivo).
+    """
+    dataset = contract.get("dataset", [])
+    if not dataset:
+        return False, "contrato_sin_dataset"
+
+    table_name = dataset[0]
+    vars_dict = contract.get("vars", {})
+    independent = vars_dict.get("independent", [])
+    dependent = vars_dict.get("dependent", [])
+
+    # Consultar information_schema
+    try:
+        response = supabase.rpc("get_table_columns", {"table_name": table_name}).execute()
+        if not response.data:
+            # Fallback: query directa a information_schema
+            query = f"""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = '{table_name}'
+            """
+            response = supabase.from_("dummy").select("*").execute()  # placeholder
+            # Si no hay RPC, hacer query directa
+            cols_response = supabase.table(table_name).select("*").limit(1).execute()
+            if not cols_response.data:
+                return False, f"tabla_{table_name}_vacia_o_inexistente"
+            # Extraer columnas de la primera fila
+            db_columns = set(cols_response.data[0].keys())
+        else:
+            db_columns = {row["column_name"] for row in response.data}
+    except Exception as e:
+        # Fallback: intentar SELECT * LIMIT 1
+        try:
+            cols_response = supabase.table(table_name).select("*").limit(1).execute()
+            if not cols_response.data:
+                return False, f"tabla_{table_name}_vacia_o_inexistente"
+            db_columns = set(cols_response.data[0].keys())
+        except:
+            return False, f"no_se_puede_leer_schema_de_{table_name}"
+
+    # Validar dependiente
+    if dependent:
+        dep_col = dependent[0]
+        if dep_col not in db_columns:
+            return False, f"dependiente_{dep_col}_no_existe"
+
+    # Validar independientes (crudas o fuente de derivadas)
+    derive = contract.get("derive", {}) or {}
+    for indep in independent:
+        if indep in derive:
+            # Es derivada: validar fuente
+            source = derive[indep].get("source")
+            if source and source not in db_columns:
+                return False, f"fuente_{source}_de_{indep}_no_existe"
+            # Validar columna de resta si aplica
+            subtract_col = derive[indep].get("subtract_hours_from_column")
+            if subtract_col and subtract_col not in db_columns:
+                return False, f"columna_resta_{subtract_col}_no_existe"
+        else:
+            # Es cruda: validar existencia
+            if indep not in db_columns:
+                return False, f"independiente_{indep}_no_existe"
+
+    return True, ""
+
+def _validate_derive_gate(contract: dict, catalog: dict) -> tuple[bool, str]:
+    """
+    Derive Gate: valida que las derivadas estén autorizadas en el catálogo.
+    """
+    derive = contract.get("derive", {}) or {}
+    if not derive:
+        return True, ""
+
+    catalog_vars = catalog.get("variables", {})
+    derive_allowlist = catalog.get("derive_allowlist", [])
+
+    for var_name, spec in derive.items():
+        # Validar que la variable esté en el catálogo
+        if var_name not in catalog_vars:
+            return False, f"derivada_{var_name}_no_en_catalogo"
+
+        # Validar que sea tipo derived
+        if catalog_vars[var_name].get("type") != "derived":
+            return False, f"{var_name}_no_es_derivada_segun_catalogo"
+
+        # Validar transformación permitida
+        extract = spec.get("extract", "hour")
+        if extract not in derive_allowlist:
+            return False, f"transformacion_{extract}_no_permitida"
+
+        # Validar fuente
+        source = spec.get("source")
+        expected_source = catalog_vars[var_name].get("source")
+        if source != expected_source:
+            return False, f"fuente_{source}_no_coincide_con_catalogo_{expected_source}"
+
+    return True, ""
+
+def _validate_contract_gate(contract: dict, catalog: dict) -> tuple[bool, str]:
+    """
+    Contract Gate: valida roles, autorizaciones y exclusiones metodológicas.
+    """
+    catalog_vars = catalog.get("variables", {})
+    population_allowlist = catalog.get("population_allowlist", {})
+
+    vars_dict = contract.get("vars", {})
+    independent = vars_dict.get("independent", [])
+    dependent = vars_dict.get("dependent", [])
+    population = contract.get("population_type")
+
+    if not independent or not dependent:
+        return False, "contrato_sin_vars"
+
+    # Validar dependiente
+    dep_col = dependent[0]
+    if dep_col not in catalog_vars:
+        return False, f"dependiente_{dep_col}_no_en_catalogo"
+    if catalog_vars[dep_col].get("role") != "outcome":
+        return False, f"dependiente_{dep_col}_no_es_outcome"
+
+    # Validar independientes
+    for indep in independent:
+        if indep not in catalog_vars:
+            return False, f"independiente_{indep}_no_en_catalogo"
+
+        var_info = catalog_vars[indep]
+
+        # No puede ser outcome
+        if var_info.get("role") == "outcome":
+            return False, f"{indep}_es_outcome_no_puede_ser_independiente"
+
+        # No puede estar marcada como independent: false
+        if not var_info.get("independent", True):
+            return False, f"{indep}_no_autorizada_como_independiente"
+
+        # Validar contra population_allowlist
+        if population and population in population_allowlist:
+            if indep not in population_allowlist[population]:
+                return False, f"{indep}_no_autorizada_para_{population}"
+
+    # Validar que independiente != dependiente
+    if set(independent) & set(dependent):
+        return False, "independiente_y_dependiente_superpuestas"
+
+    return True, ""
 
 def load_hypothesis(hypothesis_id: str) -> dict:
     """Carga contrato YAML desde labs/hypotheses/<id>.yaml"""
@@ -188,7 +358,7 @@ def measure(contract: dict, supabase) -> dict:
     - Filtra nulls explícitamente en ambas columnas
     - Ordena por fecha descendente para tomar muestras recientes
     - Respeta sample_min del contrato
-    - Soporta bloque `derive` para variables virtuales (ej: hora_local)
+    - Soporta bloque `derive` para variables virtuales (ej: hora_local, dia_semana)
     """
     clase = contract.get("class", "A")
     if clase != "A":
@@ -340,19 +510,61 @@ def main():
         # 1. Cargar contrato
         contract = load_hypothesis(args.hypothesis)
 
-        # 2. Verificar clase
+        # 2. Cargar catálogo
+        catalog = _load_catalog()
+
+        # 3. Schema Gate (antes de freeze_baseline)
+        schema_ok, schema_reason = _validate_schema_gate(contract, catalog, supabase)
+        if not schema_ok:
+            output = {
+                "lab_id": contract["id"],
+                "status": "INVALID",
+                "failure_reason": "invalid_hypothesis",
+                "gate_failed": "schema_gate",
+                "reason": schema_reason,
+            }
+            print(json.dumps(output))
+            sys.exit(0)  # No es error, es INVALID legítimo
+
+        # 4. Derive Gate
+        derive_ok, derive_reason = _validate_derive_gate(contract, catalog)
+        if not derive_ok:
+            output = {
+                "lab_id": contract["id"],
+                "status": "INVALID",
+                "failure_reason": "invalid_hypothesis",
+                "gate_failed": "derive_gate",
+                "reason": derive_reason,
+            }
+            print(json.dumps(output))
+            sys.exit(0)
+
+        # 5. Contract Gate
+        contract_ok, contract_reason = _validate_contract_gate(contract, catalog)
+        if not contract_ok:
+            output = {
+                "lab_id": contract["id"],
+                "status": "INVALID",
+                "failure_reason": "invalid_hypothesis",
+                "gate_failed": "contract_gate",
+                "reason": contract_reason,
+            }
+            print(json.dumps(output))
+            sys.exit(0)
+
+        # 6. Verificar clase
         check_class_permissions(contract)
 
-        # 3. Congelar baseline (o leer congelado)
+        # 7. Congelar baseline (o leer congelado)
         baseline = freeze_baseline(contract, supabase)
 
-        # 4. Medir
+        # 8. Medir
         measured = measure(contract, supabase)
 
-        # 5. Comparar
+        # 9. Comparar
         comparison = compare(measured, baseline, contract)
 
-        # 6. Insertar fila en lab_results
+        # 10. Insertar fila en lab_results
         lab_id = contract["id"]
 
         # Leer última fila para incrementar evidence_count
