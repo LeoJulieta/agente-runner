@@ -181,6 +181,14 @@ def _validate_derive_gate(contract: dict, catalog: dict) -> tuple[bool, str]:
     catalog_vars = catalog.get("variables", {})
     derive_allowlist = catalog.get("derive_allowlist", [])
 
+    # Validar que toda variable declared como derived en el catálogo tenga derive en el contrato
+    catalog_vars = catalog.get("variables", {})
+    independent_vars = contract.get("vars", {}).get("independent", [])
+    for indep_var in independent_vars:
+        if indep_var in catalog_vars and catalog_vars[indep_var].get("type") == "derived":
+            if indep_var not in derive:
+                return False, f"variable_{indep_var}_es_derived_pero_contrato_no_tiene_derive"
+
     for var_name, spec in derive.items():
         # 1. Validar que la variable esté en el catálogo
         if var_name not in catalog_vars:
@@ -272,7 +280,16 @@ def _validate_contract_gate(contract: dict, catalog: dict) -> tuple[bool, str]:
                 return False, f"{indep}_no_autorizada_para_{population}"
 
         # Validar var_roles declarados contra catálogo (si el contrato los trae)
-    declared_roles = contract.get("var_roles", {}) or {}
+    # var_roles es obligatorio: el contrato debe declarar los roles de todas sus variables
+    declared_roles = contract.get("var_roles")
+    if declared_roles is None:
+        return False, "contrato_sin_var_roles_obligatorio"
+    
+    # Validar que todas las variables del contrato tengan rol declarado
+    all_vars = set(independent) | set(dependent)
+    missing_roles = all_vars - set(declared_roles.keys())
+    if missing_roles:
+        return False, f"var_roles_faltantes_para_{','.join(missing_roles)}"
     for var_name, declared_role in declared_roles.items():
         if var_name not in catalog_vars:
             return False, f"var_roles_{var_name}_no_en_catalogo"
