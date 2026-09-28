@@ -1,0 +1,29 @@
+id: H076_DISC
+class: A
+gen: 1
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - likes
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: 0.3
+comparison:
+  type: greater_than
+  description: Correlación medida > umbral
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: discoverer
+category: datasets_venta
+income_category: datasets_venta
+var_roles:
+  likes: observational_post_publicacion
+  views_primeras_3h: outcome
+assumption_under_test: los_likes_reflejan_engagement_temprano_y_no_exposicion_acumulada

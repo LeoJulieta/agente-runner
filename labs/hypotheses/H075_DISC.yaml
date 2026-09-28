@@ -1,0 +1,29 @@
+id: H075_DISC
+class: A
+gen: 1
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - hs_al_publicar_al_sync
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: 0.3
+comparison:
+  type: greater_than
+  description: Correlación medida > umbral
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: discoverer
+category: sponsors_directos
+income_category: sponsors_directos
+var_roles:
+  hs_al_publicar_al_sync: operacional_confusor_medicion
+  views_primeras_3h: outcome
+assumption_under_test: views_primeras_3h_es_comparable_entre_videos_con_distinto_retraso_de_sync

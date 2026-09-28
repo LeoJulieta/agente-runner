@@ -1,0 +1,29 @@
+id: H061_EXPL
+class: A
+gen: 1
+dataset:
+- youtube_shorts_log
+vars:
+  independent:
+  - hs_al_publicar_al_sync
+  dependent:
+  - views_primeras_3h
+metric:
+  primary: correlation
+baseline:
+  type: fixed
+  value: -0.3
+comparison:
+  type: less_than
+  description: Correlación negativa > 0.3
+sample_min: 30
+max_runtime: 300
+cost_limit: 0
+authorized: false
+population_type: exploiter
+category: plantillas_venta
+income_category: plantillas_venta
+var_roles:
+  hs_al_publicar_al_sync: operacional_confusor_medicion
+  views_primeras_3h: outcome
+expected_direction: negative
