@@ -150,9 +150,21 @@ def _validate_schema_gate(contract: dict, catalog: dict, supabase) -> tuple[bool
 
     # Validar independientes (crudas o fuente de derivadas)
     derive = contract.get("derive", {}) or {}
+    catalog_vars = catalog.get("variables", {})
+
     for indep in independent:
-        if indep in derive:
-            # Es derivada: validar fuente
+        # Consultar catálogo: ¿es derived?
+        is_derived = (
+            indep in catalog_vars
+            and catalog_vars[indep].get("type") == "derived"
+        )
+
+        if is_derived:
+            # Variable derived: no buscar como columna física.
+            # El Derive Gate validará que tenga derive y sea exacto.
+            if indep not in derive:
+                continue  # Derive Gate lo rechazará
+            # Validar fuente
             source = derive[indep].get("source")
             if source and source not in db_columns:
                 return False, f"fuente_{source}_de_{indep}_no_existe"
@@ -161,7 +173,7 @@ def _validate_schema_gate(contract: dict, catalog: dict, supabase) -> tuple[bool
             if subtract_col and subtract_col not in db_columns:
                 return False, f"columna_resta_{subtract_col}_no_existe"
         else:
-            # Es cruda: validar existencia
+            # Variable física: debe existir en DB
             if indep not in db_columns:
                 return False, f"independiente_{indep}_no_existe"
 
@@ -169,34 +181,72 @@ def _validate_schema_gate(contract: dict, catalog: dict, supabase) -> tuple[bool
 
 def _validate_derive_gate(contract: dict, catalog: dict) -> tuple[bool, str]:
     """
-    Derive Gate: valida que las derivadas estén autorizadas en el catálogo.
+    Derive Gate: valida que la especificación completa del derive coincida
+    exactamente con lo que autoriza el catálogo. No solo los parámetros
+    que el catálogo declara, sino también que el contrato no invente
+    parámetros que el catálogo nunca autorizó.
     """
     derive = contract.get("derive", {}) or {}
+    
+    catalog_vars = catalog.get("variables", {})
+    derive_allowlist = catalog.get("derive_allowlist", [])
+    
+    # NUEVO: Validar que toda variable declared como derived en el catálogo tenga derive en el contrato
+    independent_vars = contract.get("vars", {}).get("independent", [])
+    for indep_var in independent_vars:
+        if indep_var in catalog_vars and catalog_vars[indep_var].get("type") == "derived":
+            if indep_var not in derive:
+                return False, f"variable_{indep_var}_es_derived_pero_contrato_no_tiene_derive"
+    
+    # AHORA sí el early return
     if not derive:
         return True, ""
 
-    catalog_vars = catalog.get("variables", {})
-    derive_allowlist = catalog.get("derive_allowlist", [])
-
     for var_name, spec in derive.items():
-        # Validar que la variable esté en el catálogo
+        # 1. Validar que la variable esté en el catálogo
         if var_name not in catalog_vars:
             return False, f"derivada_{var_name}_no_en_catalogo"
 
-        # Validar que sea tipo derived
+        # 2. Validar que sea tipo derived
         if catalog_vars[var_name].get("type") != "derived":
             return False, f"{var_name}_no_es_derivada_segun_catalogo"
 
-        # Validar transformación permitida
+        # 3. Validar transformación permitida
         extract = spec.get("extract", "hour")
         if extract not in derive_allowlist:
             return False, f"transformacion_{extract}_no_permitida"
 
-        # Validar fuente
-        source = spec.get("source")
-        expected_source = catalog_vars[var_name].get("source")
-        if source != expected_source:
-            return False, f"fuente_{source}_no_coincide_con_catalogo_{expected_source}"
+        # 4. Construir la especificación autorizada según el catálogo
+        catalog_var_info = catalog_vars[var_name]
+        authorized_spec = {
+            "source": catalog_var_info.get("source"),
+            "extract": catalog_var_info.get("extract", "hour"),
+        }
+        if "tz_offset_hours" in catalog_var_info:
+            authorized_spec["tz_offset_hours"] = catalog_var_info["tz_offset_hours"]
+        if "optional_subtract_column" in catalog_var_info:
+            authorized_spec["subtract_hours_from_column"] = catalog_var_info["optional_subtract_column"]
+
+        # 5. Validar igualdad completa: el contrato solo puede tener exactamente
+        #    los parámetros que el catálogo autoriza, con los valores exactos
+        spec_keys = set(spec.keys())
+        authorized_keys = set(authorized_spec.keys())
+        
+        # Parámetros inventados por el contrato
+        unauthorized_params = spec_keys - authorized_keys
+        if unauthorized_params:
+            return False, f"parametros_no_autorizados_en_derive_{var_name}: {','.join(unauthorized_params)}"
+
+        # Parámetros faltantes (el catálogo los requiere pero el contrato no los declara)
+        missing_params = authorized_keys - spec_keys
+        if missing_params:
+            return False, f"parametros_faltantes_en_derive_{var_name}: {','.join(missing_params)}"
+
+        # Validar valores exactos
+        for param, expected_value in authorized_spec.items():
+            actual_value = spec.get(param)
+            if actual_value != expected_value:
+                return False, f"parametro_{param}_en_{var_name}_tiene_valor_{actual_value}_pero_catalogo_autoriza_{expected_value}"
 
     return True, ""
 
@@ -242,6 +292,24 @@ def _validate_contract_gate(contract: dict, catalog: dict) -> tuple[bool, str]:
             if indep not in population_allowlist[population]:
                 return False, f"{indep}_no_autorizada_para_{population}"
 
+        # Validar var_roles declarados contra catálogo (si el contrato los trae)
+    # var_roles es obligatorio: el contrato debe declarar los roles de todas sus variables
+    declared_roles = contract.get("var_roles")
+    if declared_roles is None:
+        return False, "contrato_sin_var_roles_obligatorio"
+    
+    # Validar que todas las variables del contrato tengan rol declarado
+    all_vars = set(independent) | set(dependent)
+    missing_roles = all_vars - set(declared_roles.keys())
+    if missing_roles:
+        return False, f"var_roles_faltantes_para_{','.join(missing_roles)}"
+    for var_name, declared_role in declared_roles.items():
+        if var_name not in catalog_vars:
+            return False, f"var_roles_{var_name}_no_en_catalogo"
+        catalog_role = catalog_vars[var_name].get("role")
+        if declared_role != catalog_role:
+            return False, f"var_roles_{var_name}_declarado_{declared_role}_distinto_al_catalogo_{catalog_role}"
+            
     # Validar que independiente != dependiente
     if set(independent) & set(dependent):
         return False, "independiente_y_dependiente_superpuestas"

@@ -16,6 +16,7 @@ variables:
     source: created_at
     extract: hour
     tz_offset_hours: -3
+    optional_subtract_column: hs_al_publicar_al_sync
     independent: true
 
   dia_semana:
@@ -23,6 +24,7 @@ variables:
     role: actionable_pre_publicacion
     source: created_at
     extract: weekday
+    tz_offset_hours: -3
     independent: true
 
   # OPERACIONAL (confusor de medición, no palanca)

@@ -3,26 +3,29 @@
 labs/gen_enjambre.py
 Generador determinístico de hipótesis para enjambre experimental.
 
-Distribución de poblaciones (40 hormigas total):
-- 25% Exploradores (~10): combinaciones nuevas de variables sin expected_direction
-- 30% Explotadores (~12): profundizar variables con señal, con expected_direction
-- 15% Reexploradores (~6): reformular hipótesis fallidas con diferentes ventanas
-- 15% Recombinadores (~6): combinar variables de hipótesis PROMISING/VERIFIED
-- 15% Descubridores (~6): atacar suposiciones declaradas, al menos 1 category: unknown
+Gen 1 (25/9): el catálogo labs/variable_catalog.yaml es la fuente única de
+verdad (pools por población, roles y derivadas). Emite IDs H041-H080,
+var_roles explícitos y suposiciones de MEDICIÓN para discoverers.
+
+Distribución de poblaciones (40 hormigas):
+- 10 explorer / 12 exploiter / 6 reexplorer / 6 recombiner / 6 discoverer
 
 Uso: python labs/gen_enjambre.py [--outdir <dir>]
 """
-import os
 import sys
 import random
 import yaml
 from pathlib import Path
 
 SEED = 42
+GEN = 1
+GEN_OFFSET = 40                       # gen 0 ocupó H001-H040
 TOTAL_HYPOTHESES = 40
+LAST_INDEX = GEN_OFFSET + TOTAL_HYPOTHESES   # 80: H080_DISC es el único unknown
 OUTPUT_DIR = Path("labs/hypotheses")
+CATALOG_PATH = Path("labs/variable_catalog.yaml")
+TAXONOMY_PATH = Path("labs/taxonomia_ingresos.yaml")
 
-# Distribución exacta
 POPULATIONS = {
     "explorer": 10,      # 25%
     "exploiter": 12,     # 30%
@@ -31,26 +34,18 @@ POPULATIONS = {
     "discoverer": 6,     # 15%
 }
 
-# Columnas reales existentes en youtube_shorts_log
-REAL_COLUMNS = [
-    "views_primeras_3h",
-    "views_24h",
-    "views_7d",
-    "interacciones_totales",
-    "tasa_clic_afiliado",
-    "duracion_segundos",
-    "categoria",
-    "created_at",
-    "hs_al_publicar_al_sync",
+# Suposiciones de MEDICIÓN, atacables con el motor correlacional actual.
+# Cada una va pareja a su proxy medible (deuda D1: las de mercado esperan
+# experimentos categóricos/comparativos).
+DISCOVERER_PAIRS = [
+    ("hs_al_publicar_al_sync",
+     "views_primeras_3h_es_comparable_entre_videos_con_distinto_retraso_de_sync"),
+    ("likes",
+     "los_likes_reflejan_engagement_temprano_y_no_exposicion_acumulada"),
+    ("dia_semana",
+     "el_efecto_de_la_hora_es_estable_entre_dias_de_semana"),
 ]
 
-# Variables derivables (via bloque derive)
-DERIVABLE_VARS = {
-    "hora_publicacion": {"source": "created_at", "extract": "hour", "tz_offset_hours": -3},
-    "dia_semana": {"source": "created_at", "extract": "weekday"},
-}
-
-# Categorías conocidas de la taxonomía
 KNOWN_CATEGORIES = [
     "publicidad_adsense",
     "afiliados_amazon",
@@ -69,23 +64,22 @@ KNOWN_CATEGORIES = [
     "plantillas_venta",
 ]
 
-# Suposiciones típicas para discoverers
-ASSUMPTIONS = [
-    "solo_funciona_en_ingles",
-    "el_contenido_largo_convierte_mejor",
-    "necesitamos_audiencia_previa",
-    "hay_que_vender_producto_proprio",
-    "los_shorts_no_generan_ingresos",
-    "la_calidad_es_mas_importante_que_cantidad",
-]
+
+def load_catalog() -> dict:
+    """Carga el catálogo único de verdad."""
+    if not CATALOG_PATH.exists():
+        raise FileNotFoundError(f"Catálogo no encontrado: {CATALOG_PATH}")
+    with open(CATALOG_PATH, encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
 
 def load_taxonomy() -> dict:
     """Carga taxonomía de ingresos desde YAML."""
-    path = Path("labs/taxonomia_ingresos.yaml")
-    if not path.exists():
+    if not TAXONOMY_PATH.exists():
         return {"known": KNOWN_CATEGORIES, "combination": [], "emerging": [], "unknown": {}}
-    with open(path, encoding="utf-8") as f:
+    with open(TAXONOMY_PATH, encoding="utf-8") as f:
         return yaml.safe_load(f)
+
 
 def generate_id(population: str, index: int) -> str:
     """Genera ID único para hipótesis."""
@@ -99,65 +93,27 @@ def generate_id(population: str, index: int) -> str:
     prefix = prefix_map.get(population, "HYP")
     return f"H{index:03d}_{prefix}"
 
-def generate_vars(population: str, taxonomy: dict) -> dict:
-    """Genera vars.independent y vars.dependent según población."""
-    # El seed se setea en generate_hypothesis(SEED + index) para determinismo por hipótesis
 
-    # Variable dependiente fija (métrica de resultado)
-    dependent = ["views_primeras_3h"]
+def build_derive(var_name: str, catalog_vars: dict):
+    """Arma bloque derive desde el catálogo (fuente única de verdad)."""
+    info = catalog_vars.get(var_name, {})
+    if info.get("type") != "derived":
+        return None
+    spec = {"source": info["source"], "extract": info["extract"]}
+    if info.get("tz_offset_hours") is not None:
+        spec["tz_offset_hours"] = info["tz_offset_hours"]
+    if info.get("optional_subtract_column"):
+        spec["subtract_hours_from_column"] = info["optional_subtract_column"]
+    return {var_name: spec}
 
-    if population == "explorer":
-        # Exploradores: combinaciones nuevas de variables reales
-        independent_var = random.choice([c for c in REAL_COLUMNS if c not in dependent])
-        independent = [independent_var]
 
-    elif population == "exploiter":
-        # Explotadores: variables que mostraron señal (hora, duración)
-        independent_var = random.choice(["hora_publicacion", "duracion_segundos", "interacciones_totales"])
-        independent = [independent_var]
-
-    elif population == "reexplorer":
-        # Reexploradores: mismas variables con diferente enfoque temporal
-        independent_var = random.choice(["views_24h", "views_7d", "tasa_clic_afiliado"])
-        independent = [independent_var]
-
-    elif population == "recombiner":
-        # Recombinadores: combinación de variables existentes
-        independent_var = random.choice(REAL_COLUMNS)
-        independent = [independent_var]
-
-    elif population == "discoverer":
-        # Descubridores: proxy medible para atacar suposición
-        independent_var = random.choice(["interacciones_totales", "tasa_clic_afiliado", "categoria"])
-        independent = [independent_var]
-    else:
-        independent = [random.choice(REAL_COLUMNS)]
-
-    return {
-        "independent": independent,
-        "dependent": dependent,
-    }
-
-def generate_derive(population: str, independent_var: str) -> dict | None:
-    """Genera bloque derive si la variable es derivable."""
-    if independent_var in DERIVABLE_VARS:
-        spec = DERIVABLE_VARS[independent_var].copy()
-        # Agregar ajuste de timezone si corresponde
-        if "hora_publicacion" in independent_var:
-            spec["subtract_hours_from_column"] = "hs_al_publicar_al_sync"
-        return {independent_var: spec}
-    return None
-
-def generate_baseline(population: str) -> dict:
-    # El seed se setea en generate_hypothesis(SEED + index) para determinismo por hipótesis
-
+def generate_baseline(population: str):
+    """Baseline y comparison según población (confirmación vs exploración)."""
     if population in ["exploiter", "recombiner"]:
-        # Confirmación: baseline con dirección esperada
         value = random.choice([0.2, 0.3, -0.2, -0.3])
         comparison_type = "greater_than" if value > 0 else "less_than"
         description = f"Correlación {'positiva' if value > 0 else 'negativa'} > {abs(value)}"
     else:
-        # Exploración: baseline neutral
         value = 0.3
         comparison_type = "greater_than"
         description = "Correlación medida > umbral"
@@ -170,34 +126,51 @@ def generate_baseline(population: str) -> dict:
         "description": description,
     }
 
-def generate_hypothesis(index: int, population: str, taxonomy: dict) -> dict:
-    """Genera una hipótesis completa."""
+
+def generate_hypothesis(index: int, population: str, pos: int,
+                        catalog: dict, taxonomy: dict) -> dict:
+    """Genera una hipótesis completa de gen 1."""
     random.seed(SEED + index)
 
-    hypothesis_id = generate_id(population, index)
-    vars_dict = generate_vars(population, taxonomy)
-    independent_var = vars_dict["independent"][0]
+    catalog_vars = catalog["variables"]
+    pool = catalog["population_allowlist"][population]
 
-    # Generar derive si aplica
-    derive = generate_derive(population, independent_var)
+    # Elección de variable independiente según población
+    if population == "discoverer":
+        pair = DISCOVERER_PAIRS[pos % len(DISCOVERER_PAIRS)]
+        independent_var, assumption = pair[0], pair[1]
+    elif population in ("reexplorer", "recombiner"):
+        # Ciclado determinístico: garantiza diversidad >= 2 sin azar
+        independent_var = pool[pos % len(pool)]
+        assumption = None
+    else:
+        independent_var = random.choice(pool)
+        assumption = None
 
-    # Generar baseline y comparison
+    dependent_var = "views_primeras_3h"
+    vars_dict = {"independent": [independent_var], "dependent": [dependent_var]}
+
+    derive = build_derive(independent_var, catalog_vars)
     baseline, comparison = generate_baseline(population)
 
-    # Determinar categoría
-    is_unknown_discoverer = (population == "discoverer" and index == TOTAL_HYPOTHESES)
-    if is_unknown_discoverer:
+    # Categoría: unknown solo para la última discoverer (H080_DISC)
+    if population == "discoverer" and index == LAST_INDEX:
         category = "unknown"
-    elif population in ["recombiner"]:
+    elif population == "recombiner":
         category = "combination"
     else:
-        category = random.choice(KNOWN_CATEGORIES)
+        category = random.choice(taxonomy.get("known", KNOWN_CATEGORIES))
 
-    # Construir contrato base
+    # Roles explícitos: el contrato declara, el catálogo manda, el motor verifica
+    var_roles = {
+        independent_var: catalog_vars[independent_var]["role"],
+        dependent_var: catalog_vars[dependent_var]["role"],
+    }
+
     contract = {
-        "id": hypothesis_id,
+        "id": generate_id(population, index),
         "class": "A",
-        "gen": 0,
+        "gen": GEN,
         "dataset": ["youtube_shorts_log"],
         "vars": vars_dict,
         "metric": {"primary": "correlation"},
@@ -210,25 +183,21 @@ def generate_hypothesis(index: int, population: str, taxonomy: dict) -> dict:
         "population_type": population,
         "category": category,
         "income_category": category if category in KNOWN_CATEGORIES else None,
+        "var_roles": var_roles,
     }
 
-    # Agregar derive si existe
     if derive:
         contract["derive"] = derive
 
-    # Agregar expected_direction solo para confirmación (exploiter/recombiner)
     if population in ["exploiter", "recombiner"]:
-        direction = "positive" if baseline["value"] > 0 else "negative"
-        contract["expected_direction"] = direction
+        contract["expected_direction"] = "positive" if baseline["value"] > 0 else "negative"
 
-    # Agregar assumption_under_test solo para discoverer
     if population == "discoverer":
-        contract["assumption_under_test"] = random.choice(ASSUMPTIONS)
+        contract["assumption_under_test"] = assumption
 
-    # Limpiar campos None
     contract = {k: v for k, v in contract.items() if v is not None}
-
     return contract
+
 
 def main():
     outdir = OUTPUT_DIR
@@ -237,82 +206,66 @@ def main():
 
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # Cargar taxonomía
+    catalog = load_catalog()
     taxonomy = load_taxonomy()
+    catalog_vars = catalog["variables"]
 
-    # Generar todas las hipótesis
     hypotheses = []
-    index = 1
+    index = GEN_OFFSET + 1
 
     for population, count in POPULATIONS.items():
-        for _ in range(count):
-            hypothesis = generate_hypothesis(index, population, taxonomy)
-            hypotheses.append(hypothesis)
+        for pos in range(count):
+            hypotheses.append(generate_hypothesis(index, population, pos, catalog, taxonomy))
             index += 1
 
-    # Guardar cada hipótesis en archivo YAML
     for h in hypotheses:
-        filename = f"{h['id']}.yaml"
-        filepath = outdir / filename
+        filepath = outdir / f"{h['id']}.yaml"
         with open(filepath, "w", encoding="utf-8") as f:
             yaml.dump(h, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
         print(f"Generado: {filepath}")
 
     print(f"\nTotal: {len(hypotheses)} hipótesis generadas en {outdir}")
 
-    # Resumen de distribución
     from collections import Counter
-    pop_counts = Counter(h["population_type"] for h in hypotheses)
-    cat_counts = Counter(h["category"] for h in hypotheses)
-
     print("\nDistribución por población:")
-    for pop, count in sorted(pop_counts.items()):
+    for pop, count in sorted(Counter(h["population_type"] for h in hypotheses).items()):
         print(f"  {pop}: {count}")
 
     print("\nDistribución por categoría:")
-    for cat, count in sorted(cat_counts.items()):
+    for cat, count in sorted(Counter(h["category"] for h in hypotheses).items()):
         print(f"  {cat}: {count}")
 
-    # Autocheck de diversidad: IDs únicos y variables distintas por población
-    print("\nAutocheck de diversidad:")
-
-    # Verificar IDs únicos
+    print("\nAutocheck de diversidad y catálogo:")
     ids = [h["id"] for h in hypotheses]
-    assert len(ids) == len(set(ids)), f"ERROR: Hay IDs duplicados"
+    assert len(ids) == len(set(ids)), "ERROR: Hay IDs duplicados"
     print(f"  IDs únicos: {len(set(ids))} (OK)")
 
-    # Verificar prefijos únicos por población
-    from collections import Counter
-    id_prefixes = [h["id"].rsplit("_", 1)[1] for h in hypotheses]
-    prefix_counts = Counter(id_prefixes)
-
     print("  Prefijos por población:")
-    for prefix, count in sorted(prefix_counts.items()):
+    for prefix, count in sorted(Counter(h["id"].rsplit("_", 1)[1] for h in hypotheses).items()):
         print(f"    {prefix}: {count}")
 
-    # Tabla de variables independientes distintas por población
-    print("\nVariables independientes distintas por población:")
     pop_vars = {}
     for h in hypotheses:
-        pop = h["population_type"]
-        indep = tuple(h["vars"]["independent"])
-        if pop not in pop_vars:
-            pop_vars[pop] = set()
-        pop_vars[pop].add(indep)
+        pop_vars.setdefault(h["population_type"], set()).add(tuple(h["vars"]["independent"]))
 
-    all_ok = True
+    print("\nVariables independientes distintas por población:")
     for pop in sorted(pop_vars.keys()):
-        vars_list = list(pop_vars[pop])
-        print(f"  {pop}: {len(vars_list)} variable(s) distinta(s)")
-        if len(vars_list) < 2:
-            print(f"    WARNING: {pop} tiene solo 1 variable distinta")
-            all_ok = False
+        print(f"  {pop}: {len(pop_vars[pop])} variable(s) distinta(s)")
+        assert len(pop_vars[pop]) >= 2, f"ERROR: {pop} tiene solo {len(pop_vars[pop])} variable distinta"
 
-    # Assert: al menos 2 variables distintas por población
-    for pop, vars_set in pop_vars.items():
-        assert len(vars_set) >= 2, f"ERROR: {pop} tiene solo {len(vars_set)} variable distinta (mínimo 2)"
+    # Gate interno: todo contrato emitido debe pasar los gates del motor
+    for h in hypotheses:
+        pop = h["population_type"]
+        indep = h["vars"]["independent"][0]
+        assert indep in catalog["population_allowlist"][pop], f"ERROR: {indep} fuera del pool de {pop}"
+        is_derived = catalog_vars[indep]["type"] == "derived"
+        has_derive = indep in (h.get("derive") or {})
+        assert is_derived == has_derive, f"ERROR: derive inconsistente en {h['id']}"
+        for var_name, role in h["var_roles"].items():
+            assert catalog_vars[var_name]["role"] == role, f"ERROR: var_roles inconsistente en {h['id']}"
 
     print("\n  ✓ Todos los checks pasaron")
+
 
 if __name__ == "__main__":
     main()
