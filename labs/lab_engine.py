@@ -150,9 +150,21 @@ def _validate_schema_gate(contract: dict, catalog: dict, supabase) -> tuple[bool
 
     # Validar independientes (crudas o fuente de derivadas)
     derive = contract.get("derive", {}) or {}
+    catalog_vars = catalog.get("variables", {})
+
     for indep in independent:
-        if indep in derive:
-            # Es derivada: validar fuente
+        # Consultar catálogo: ¿es derived?
+        is_derived = (
+            indep in catalog_vars
+            and catalog_vars[indep].get("type") == "derived"
+        )
+
+        if is_derived:
+            # Variable derived: no buscar como columna física.
+            # El Derive Gate validará que tenga derive y sea exacto.
+            if indep not in derive:
+                continue  # Derive Gate lo rechazará
+            # Validar fuente
             source = derive[indep].get("source")
             if source and source not in db_columns:
                 return False, f"fuente_{source}_de_{indep}_no_existe"
@@ -161,7 +173,7 @@ def _validate_schema_gate(contract: dict, catalog: dict, supabase) -> tuple[bool
             if subtract_col and subtract_col not in db_columns:
                 return False, f"columna_resta_{subtract_col}_no_existe"
         else:
-            # Es cruda: validar existencia
+            # Variable física: debe existir en DB
             if indep not in db_columns:
                 return False, f"independiente_{indep}_no_existe"
 
@@ -175,19 +187,20 @@ def _validate_derive_gate(contract: dict, catalog: dict) -> tuple[bool, str]:
     parámetros que el catálogo nunca autorizó.
     """
     derive = contract.get("derive", {}) or {}
-    if not derive:
-        return True, ""
-
+    
     catalog_vars = catalog.get("variables", {})
     derive_allowlist = catalog.get("derive_allowlist", [])
-
-    # Validar que toda variable declared como derived en el catálogo tenga derive en el contrato
-    catalog_vars = catalog.get("variables", {})
+    
+    # NUEVO: Validar que toda variable declared como derived en el catálogo tenga derive en el contrato
     independent_vars = contract.get("vars", {}).get("independent", [])
     for indep_var in independent_vars:
         if indep_var in catalog_vars and catalog_vars[indep_var].get("type") == "derived":
             if indep_var not in derive:
                 return False, f"variable_{indep_var}_es_derived_pero_contrato_no_tiene_derive"
+    
+    # AHORA sí el early return
+    if not derive:
+        return True, ""
 
     for var_name, spec in derive.items():
         # 1. Validar que la variable esté en el catálogo
