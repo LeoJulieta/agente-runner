@@ -218,3 +218,79 @@ O desde GitHub Actions: **Actions → Lab Run → Run workflow → hypothesis_id
 7. **Exploración sin dirección, confirmación con dirección.** En exploración no se fija `expected_direction`; al promover una señal a validación confirmatoria, la dirección se preregistra antes de medir.
 8. **Lo desconocido que funciona propone, no certifica.** Una hipótesis `category: unknown` que llega a `VERIFIED` propone una entrada nueva en `emerging:`; la creación real requiere auditoría + verde humano.
 9. **La imaginación puede ser infinita; la evidencia no.** Toda hipótesis nace `PROMETE` con `evidence_count=0`; ninguna se convierte en hecho sin evidencia reproducible.
+
+
+## Deudas metodológicas activas
+
+### D5 — `views_primeras_3h` no mide necesariamente primeras 3 horas
+El dataset registra `hs_al_publicar_al_sync` entre 3.03 y 9.85 horas (mediana 4.48h).
+La variable llamada "views_primeras_3h" es en realidad "views al primer sync",
+observado entre ~3 y ~10 horas después de publicar. Cualquier interpretación de
+hipótesis que usen este outcome debe llevar esta advertencia.
+Descubierta 28/9/2026. No se renombra la columna (ruptura de historial) pero sí se reinterpreta.
+
+**Observación sobre `likes` (28/9/2026):** 132 de 147 filas tienen `likes=0` (90%).
+La correlación fuerte `likes → views_primeras_3h` (r=0.60) está dominada por la
+dicotomía "videos con engagement vs sin engagement". Dentro del subconjunto con
+`likes>0` (n=15), la correlación cae a r=0.37. El rol del catálogo
+(`observational_post_publicacion`) protege contra interpretar esto como palanca causal.
+
+## Protocolo de reproducibilidad out-of-time (PR C, 28/9/2026)
+
+**Definición:** una hipótesis es *consistente en ventanas disjuntas* cuando pasa el
+baseline preregistrado en dos particiones temporales independientes (`lt:X` y `gte:X`
+con el mismo corte X). Esto mide consistencia temporal, no causalidad ni universalidad.
+
+**Corte preregistrado gen 1:** `2026-09-11T22:15:03.182831Z`
+(mediana de `created_at` sobre las 145 filas con outcome no nulo al 28/9/2026).
+- Ventana A: `lt:2026-09-11T22:15:03.182831Z` (72 filas)
+- Ventana B: `gte:2026-09-11T22:15:03.182831Z` (73 filas)
+
+**Regla:** un solo corte por generación. Cambiar el corte a posteriori es p-hacking.
+
+**Garantías del motor (PR C):**
+- Una corrida con ventana REQUIERE baseline previo; nunca lo crea ni modifica.
+- Muestra insuficiente o truncamiento (>200 filas) => INVALID, cero inserts.
+- `reproducible=true` solo si: passed en esta corrida + evidencia previa con
+  `passed=true`, `method_fingerprint` idéntico y ventana observada disjunta.
+- El workflow serializa ejecuciones (`concurrency`), así dos primeras corridas
+  no pueden competir por crear el baseline.
+
+**Semántica de `metrics.window`:**
+- `window.label`: límite temporal declarado y normalizado a UTC canónico
+  (microsegundos, sufijo Z) que acotó la consulta. Es el límite preregistrado.
+- `window.start` / `window.end`: timestamp mínimo y máximo de `created_at`
+  (canon UTC) de las observaciones efectivamente utilizables en ESA corrida.
+  Describen la muestra observada; NO reemplazan ni redefinen el límite de `label`.
+- `universe_rows`: filas que cumplieron los filtros de la consulta experimental
+  (outcome no nulo, fuentes no nulas, ventana) y fueron devueltas. No es el total
+  de la tabla en la ventana. Es exacta porque el motor pide MAX+1 y solo acepta
+  si vinieron <= MAX.
+- `universe_rows_at_least: 201`: solo en truncamiento; significa ">= 201".
+- `rows_used`: pares X/Y utilizables tras derivación y filtros.
+- `dataset_rows_at_cutoff`: metadato de preregistro declarado por el operador del
+  workflow. El motor lo copia verbatim y NO lo verifica. Preregistro declarado ≠
+  medición verificada.
+
+**Semántica de `sample_size`:** en corridas válidas o con muestra insuficiente es el
+número de pares X/Y utilizables. En INVALID por truncamiento es `null`: el universo
+se reporta como `universe_rows_at_least` y no se afirma un tamaño de muestra.
+
+**Semántica de `evidence_count`:** número acumulado de filas de evidencia persistidas
+para el lab_id. La fila de baseline (`record_type: baseline`) no cuenta como evidencia.
+
+**Nota metodológica del baseline:** el baseline `historical_median` de la primera
+corrida se calcula sobre los últimos 100 registros del mismo dataset que usa esa
+primera medición, y puede compartir observaciones con ella. Es un umbral
+preregistrado (Regla 5), no una muestra de control estadísticamente independiente.
+La independencia que prueba el protocolo es la temporal entre ventanas disjuntas.
+
+**Alcance de `reproducible`:** solo puede activarse entre dos corridas con ventanas
+observadas disjuntas y el mismo `method_fingerprint`. Una corrida sin ventana nunca
+aporta evidencia independiente. `reproducible=false` NO significa fallo experimental:
+significa "todavía sin confirmación out-of-time".
+
+**Uso:**
+
+    python labs/lab_engine.py --hypothesis H041_EXPR \
+      --window "lt:2026-09-11T22:15:03.182831Z" --cutoff-rows 145
