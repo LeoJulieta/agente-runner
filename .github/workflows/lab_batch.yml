@@ -6,6 +6,19 @@ name: Lab Batch - Ejecutar Lote de Hipótesis
         description: 'IDs separados por coma (ej: H002,H003)'
         required: true
         type: string
+      time_window:
+        description: 'Ventana temporal opcional: lt:<ISO> o gte:<ISO>'
+        required: false
+        default: ''
+        type: string
+      dataset_rows_at_cutoff:
+        description: 'Filas con outcome al momento del preregistro del corte (opcional)'
+        required: false
+        default: ''
+        type: string
+concurrency:
+  group: lab-batch-secuencial
+  cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -13,6 +26,9 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      HYPOTHESIS_IDS: ${{ inputs.hypothesis_ids }}
+      TIME_WINDOW: ${{ inputs.time_window }}
+      CUTOFF_ROWS: ${{ inputs.dataset_rows_at_cutoff }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -20,7 +36,18 @@ jobs:
         run: pip install supabase pyyaml
       - name: Ejecutar lote secuencial
         run: |
-          for id in $(echo "${{ inputs.hypothesis_ids }}" | tr "," " "); do
+          for id in $(printf '%s' "$HYPOTHESIS_IDS" | tr ',' ' '); do
+            case "$id" in
+              H[0-9][0-9][0-9]*)
+                ;;
+              *)
+                echo "ID inválido: $id"
+                exit 1
+                ;;
+            esac
             echo "=== Hipótesis $id ==="
-            python labs/lab_engine.py --hypothesis "$id" || echo "FALLÓ $id"
+            ARGS=(--hypothesis "$id")
+            if [ -n "$TIME_WINDOW" ]; then ARGS+=(--window "$TIME_WINDOW"); fi
+            if [ -n "$CUTOFF_ROWS" ]; then ARGS+=(--cutoff-rows "$CUTOFF_ROWS"); fi
+            python labs/lab_engine.py "${ARGS[@]}" || echo "FALLÓ $id"
           done
