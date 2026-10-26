@@ -1,4 +1,3 @@
-
 name: OpenCode
 
 on:
@@ -10,7 +9,6 @@ on:
 jobs:
   opencode:
     # Solo aceptar comandos escritos por el propietario del repositorio.
-    
     if: >-
       github.event.comment.user.login == github.repository_owner &&
       (
@@ -20,12 +18,13 @@ jobs:
         startsWith(github.event.comment.body, '/opencode ')
       )
 
-
     runs-on: ubuntu-latest
 
     permissions:
       id-token: write
       contents: read
+      pull-requests: read
+      issues: read
 
     steps:
       - name: Checkout repository
