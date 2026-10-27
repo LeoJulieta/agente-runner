@@ -28,23 +28,31 @@ jobs:
           python-version: "3.12"
       - name: Unit tests
         run: python -m unittest -v tests.test_pr_d_manifest
-      - name: Verify corrupt manifest exits 2 and engine is not invoked
+      - name: Verify corrupt manifest exits 2 and the engine wrapper is not invoked
         shell: bash
         run: |
           set -euo pipefail
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
           printf '{broken json' > "$tmp/corrupt.json"
+          # This mirrors the fail-fast ordering: the engine marker is written only
+          # if the exact Gate 0 command succeeds.
           set +e
-          python labs/pr_d_manifest.py --manifest "$tmp/corrupt.json"
+          bash -c 'python labs/pr_d_manifest.py --manifest "$1" --require-runnable --hypothesis-ids H990_PRD_TEST_INIT && touch "$2/engine_invoked"' _ "$tmp/corrupt.json" "$tmp"
           rc=$?
           set -e
           test "$rc" -eq 2
-          # The engine marker must remain absent: invalid manifest means no engine step.
-          if [ -e "$tmp/engine_invoked" ]; then
-            echo "FAIL: engine marker exists despite corrupt manifest"
-            exit 1
-          fi
-          echo "PASS: corrupt manifest exit=$rc; engine invocation absent"
+          test ! -e "$tmp/engine_invoked"
+          echo "PASS: corrupt manifest exit=$rc; engine wrapper not reached"
+      - name: Verify test-only fixture is blocked in runnable mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python labs/pr_d_manifest.py --manifest docs/manifest.json --require-runnable --hypothesis-ids H990_PRD_TEST_INIT,H991_PRD_TEST_MAG
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          echo "PASS: test-only fixture blocked in runnable mode"
       - name: Validate checked-in fixture manifest
         run: python labs/pr_d_manifest.py --manifest docs/manifest.json
