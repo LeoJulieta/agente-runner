@@ -1,12 +1,14 @@
-name: PR D v2 manifest unit tests
+name: PR D v2 manifest gate tests
 
 on:
   pull_request:
     branches: [main]
     paths:
       - "labs/pr_d_manifest.py"
-      - "docs/pr-d-v2-manifest.schema.json"
+      - "docs/manifest.json"
+      - "docs/PR-D-DESIGN.md"
       - "tests/test_pr_d_manifest.py"
+      - ".github/workflows/lab_batch.yml"
       - ".github/workflows/pr-d-v2-manifest-tests.yml"
   workflow_dispatch:
 
@@ -14,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  manifest-unit-tests:
+  manifest-gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -24,5 +26,25 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run manifest validation unit tests
+      - name: Unit tests
         run: python -m unittest -v tests.test_pr_d_manifest
+      - name: Verify corrupt manifest exits 2 and engine is not invoked
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          printf '{broken json' > "$tmp/corrupt.json"
+          set +e
+          python labs/pr_d_manifest.py --manifest "$tmp/corrupt.json"
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          # The engine marker must remain absent: invalid manifest means no engine step.
+          if [ -e "$tmp/engine_invoked" ]; then
+            echo "FAIL: engine marker exists despite corrupt manifest"
+            exit 1
+          fi
+          echo "PASS: corrupt manifest exit=$rc; engine invocation absent"
+      - name: Validate checked-in fixture manifest
+        run: python labs/pr_d_manifest.py --manifest docs/manifest.json
