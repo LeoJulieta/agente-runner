@@ -1,8 +1,8 @@
 # PR-D-DESIGN.md
 
-**Versión contractual:** PR D v2 (propuesta documental; incorpora E1–E5)\
-**Fecha de congelamiento propuesta:** 2026-10-09\
-**Estado:** versión propuesta para auditoría; no fusionada ni vigente en main hasta aprobación del PR documental\
+**Versión contractual:** PR D v2 (contrato documental aprobado; incorpora E1–E5)\\
+**Fecha de congelamiento:** 2026-10-09\\
+**Estado:** contrato documental aprobado y fusionado en `main` mediante PR #75; implementación del motor aún no autorizada\\
 **Alcance:** diseño estadístico y operativo previo a implementación\
 **Principio rector:** evidencia primero. Ninguna regla estadística podrá
 modificarse después de observar los resultados para favorecer una
@@ -533,7 +533,7 @@ estados o decisiones estadísticas diferentes con los mismos datos.
 
 ## 15. Enmiendas contractuales E1–E5 — PR D v2
 
-Esta sección incorpora normativamente E1–E5 al contrato completo PR D v1. En caso de conflicto textual, esta sección complementa y especifica las reglas señaladas; no autoriza modificar el método estadístico fuera de un cambio contractual versionado. La versión v2 solo será la referencia operativa una vez revisada y aprobada mediante el PR documental correspondiente. Hasta entonces, no se implementará el motor con base en esta propuesta.
+Esta sección incorpora normativamente E1–E5 al contrato completo PR D v1. En caso de conflicto textual, esta sección complementa y especifica las reglas señaladas; no autoriza modificar el método estadístico fuera de un cambio contractual versionado. Tras la aprobación y fusión del PR documental #75, PR D v2 es la referencia contractual vigente en `main`. Esta aprobación documental no autoriza por sí sola la implementación del motor: siguen vigentes las condiciones técnicas de aceptación de §14 y §15.6.
 
 ### 15.1 E1 — Manifiesto congelado y especificación individual ausente
 
