@@ -43,7 +43,7 @@
             "uniqueItems": true,
             "items": {
               "type": "string",
-              "pattern": "^H[0-9]{3,}$"
+              "pattern": "^H[0-9]{3,}(_[A-Z0-9]+)*$"
             }
           },
           "m": { "type": "integer", "minimum": 1 },
