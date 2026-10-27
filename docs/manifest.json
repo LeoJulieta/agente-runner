@@ -6,21 +6,40 @@
   "families": [
     {
       "family_id": "TEST_ONLY_FAMILY_I_INITIATION",
-      "hypothesis_ids": ["H990_PRD_TEST_INIT"],
+      "hypothesis_ids": [
+        "H990_PRD_TEST_INIT"
+      ],
       "m": 1,
-      "outcomes": ["TEST_ONLY_views_primeras_3h_positive"],
-      "primary_contrasts": ["TEST_ONLY_condition_A_vs_condition_B"],
-      "windows": ["TEST_ONLY_window_A", "TEST_ONLY_window_B"],
+      "outcomes": [
+        "TEST_ONLY_views_primeras_3h_positive"
+      ],
+      "primary_contrasts": [
+        "TEST_ONLY_condition_A_vs_condition_B"
+      ],
+      "windows": [
+        "TEST_ONLY_window_A",
+        "TEST_ONLY_window_B"
+      ],
       "method_version": "TEST_ONLY_pr-d-v2-gate-fixture/1"
     },
     {
       "family_id": "TEST_ONLY_FAMILY_II_MAGNITUDE",
-      "hypothesis_ids": ["H991_PRD_TEST_MAG"],
+      "hypothesis_ids": [
+        "H991_PRD_TEST_MAG"
+      ],
       "m": 1,
-      "outcomes": ["TEST_ONLY_views_primeras_3h_positive"],
-      "primary_contrasts": ["TEST_ONLY_ln_positive_outcome_condition_A_vs_condition_B"],
-      "windows": ["TEST_ONLY_window_A", "TEST_ONLY_window_B"],
+      "outcomes": [
+        "TEST_ONLY_views_primeras_3h_positive"
+      ],
+      "primary_contrasts": [
+        "TEST_ONLY_ln_positive_outcome_condition_A_vs_condition_B"
+      ],
+      "windows": [
+        "TEST_ONLY_window_A",
+        "TEST_ONLY_window_B"
+      ],
       "method_version": "TEST_ONLY_pr-d-v2-gate-fixture/1"
     }
-  ]
+  ],
+  "execution_status": "fixture"
 }
