@@ -46,7 +46,5 @@ jobs:
             exit 1
           fi
           echo "PASS: corrupt manifest exit=$rc; engine invocation absent"
-      - name: Diagnostic - actual frozen contract SHA-256
-        run: sha256sum docs/PR-D-DESIGN.md
       - name: Validate checked-in fixture manifest
         run: python labs/pr_d_manifest.py --manifest docs/manifest.json
