@@ -23,6 +23,7 @@ class ManifestValidationTests(unittest.TestCase):
         self.manifest = {
             "schema_version": "pr-d-v2-manifest/1",
             "manifest_version": "test-1",
+            "execution_status": "fixture",
             "contract_path": "docs/PR-D-DESIGN.md",
             "contract_sha256": digest,
             "families": [{
