@@ -62,7 +62,7 @@ def validate_manifest(
         raise ManifestError("manifest_not_object")
 
     required = {
-        "schema_version", "manifest_version", "contract_path",
+        "schema_version", "manifest_version", "execution_status", "contract_path",
         "contract_sha256", "families",
     }
     if set(manifest) != required:
@@ -71,6 +71,8 @@ def validate_manifest(
         raise ManifestError("manifest_schema_version_invalid")
     if not isinstance(manifest["manifest_version"], str) or not manifest["manifest_version"].strip():
         raise ManifestError("manifest_version_invalid")
+    if manifest["execution_status"] not in {"fixture", "approved"}:
+        raise ManifestError("manifest_execution_status_invalid")
     if manifest["contract_path"] != CONTRACT_PATH:
         raise ManifestError("manifest_contract_path_invalid")
 
@@ -178,8 +180,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"PR-D-GATE-0: BLOCKED: unexpected validator error: {type(exc).__name__}", file=sys.stderr)
         return 2
     if args.require_runnable:
-        if payload["manifest_version"].startswith("test-only-"):
-            print("PR-D-GATE-0: BLOCKED: test-only manifest; engine must not run.", file=sys.stderr)
+        if payload["execution_status"] != "approved":
+            print("PR-D-GATE-0: BLOCKED: manifest is not explicitly approved; engine must not run.", file=sys.stderr)
             return 2
         requested = {item.strip() for item in args.hypothesis_ids.split(",") if item.strip()}
         frozen = {hid for family in payload["families"] for hid in family["hypothesis_ids"]}
