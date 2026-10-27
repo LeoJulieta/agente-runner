@@ -133,13 +133,57 @@ class RuntimeFaultInjectionTests(unittest.TestCase):
         self.assertEqual(client.rows, [])
         self.assertIn('"status": "INVALID"', output)
 
-    def test_measure_operational_exception_exits_one(self):
+    def test_measurement_runtime_error_currently_exits_one_even_when_unclassified(self):
+        # Characterization only: RuntimeError is injected without an explicit
+        # operational classification. Contract default for unknown errors is 2.
         client = FakeSupabase()
         code, output = self.run_main(
-            client, measure_side_effect=RuntimeError("injected measurement failure")
+            client, measure_side_effect=RuntimeError("injected unclassified measurement failure")
         )
         self.assertEqual(code, 1, output)
-        self.assertIn("injected measurement failure", output)
+        self.assertIn("injected unclassified measurement failure", output)
+
+    def test_invalid_schema_output_contains_explicit_reason(self):
+        client = FakeSupabase()
+        code, output = self.run_main(client, schema_ok=False)
+        self.assertEqual(code, 0, output)
+        self.assertIn('"failure_reason": "invalid_hypothesis"', output)
+        self.assertIn('"reason": "injected"', output)
+
+    def test_malformed_window_currently_exits_one_not_structural_two(self):
+        # Window parsing currently maps malformed windows to exit 1; contract requires 2.
+        out = io.StringIO()
+        with mock.patch.object(sys, "argv", [
+            "lab_engine.py", "--hypothesis", "TEST-FAULT", "--window", "bad-window"
+        ]), mock.patch.dict(os.environ, {
+            "SUPABASE_URL": "https://fake.invalid", "SUPABASE_KEY": "not-a-secret"
+        }), contextlib.redirect_stdout(out):
+            with self.assertRaises(SystemExit) as raised:
+                engine.main()
+        self.assertEqual(raised.exception.code, 1, out.getvalue())
+        self.assertIn("window_invalido", out.getvalue())
+
+    def test_missing_hypothesis_currently_exits_one_without_manifest_semantics(self):
+        # The current engine has no frozen-manifest gate. This captures existing
+        # FileNotFoundError behavior, not the required manifest contract.
+        client = FakeSupabase()
+        out = io.StringIO()
+        patches = [
+            mock.patch.object(engine, "create_client", return_value=client),
+            mock.patch.object(engine, "load_hypothesis", side_effect=FileNotFoundError("missing YAML")),
+            mock.patch.object(sys, "argv", ["lab_engine.py", "--hypothesis", "MISSING"]),
+            mock.patch.dict(os.environ, {
+                "SUPABASE_URL": "https://fake.invalid", "SUPABASE_KEY": "not-a-secret"
+            }),
+        ]
+        with contextlib.ExitStack() as stack:
+            for patcher in patches:
+                stack.enter_context(patcher)
+            with contextlib.redirect_stdout(out):
+                with self.assertRaises(SystemExit) as raised:
+                    engine.main()
+        self.assertEqual(raised.exception.code, 1, out.getvalue())
+        self.assertIn("missing YAML", out.getvalue())
 
 
 if __name__ == "__main__":
