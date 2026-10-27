@@ -13,7 +13,7 @@ from typing import Any
 
 SCHEMA_VERSION = "pr-d-v2-manifest/1"
 CONTRACT_PATH = "docs/PR-D-DESIGN.md"
-HYPOTHESIS_ID = re.compile(r"^H[0-9]{3,}$")
+HYPOTHESIS_ID = re.compile(r"^H[0-9]{3,}(?:_[A-Z0-9]+)*$")
 
 
 class ManifestError(ValueError):
@@ -27,6 +27,26 @@ def sha256_file(path: str | Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
+
+def find_missing_hypothesis_specs(
+    hypothesis_ids: list[str] | tuple[str, ...],
+    *,
+    hypotheses_dir: str | Path = "labs/hypotheses",
+) -> dict[str, str]:
+    """Return declared IDs whose exact YAML spec is absent.
+
+    Missing specs are individual hypothesis failures, not manifest-structure
+    failures. The caller must preserve each ID in frozen family m and record
+    the cause hypothesis_spec_missing. This helper performs no writes.
+    """
+    root = Path(hypotheses_dir)
+    missing: dict[str, str] = {}
+    for hypothesis_id in hypothesis_ids:
+        if not isinstance(hypothesis_id, str) or not HYPOTHESIS_ID.fullmatch(hypothesis_id):
+            raise ManifestError("manifest_hypothesis_id_invalid")
+        if not (root / (hypothesis_id + ".yaml")).is_file():
+            missing[hypothesis_id] = "hypothesis_spec_missing"
+    return missing
 
 def validate_manifest(
     manifest: Any,
