@@ -2,7 +2,7 @@
   "schema_version": "pr-d-v2-manifest/1",
   "manifest_version": "test-only-gate-fixture-1",
   "contract_path": "docs/PR-D-DESIGN.md",
-  "contract_sha256": "66d3e061314d5f7101509dca361fa509c5b13094574b504edfbf5dfd936cf910",
+  "contract_sha256": "0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89",
   "families": [
     {
       "family_id": "TEST_ONLY_FAMILY_I_INITIATION",
