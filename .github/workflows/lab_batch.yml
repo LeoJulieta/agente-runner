@@ -39,22 +39,10 @@ jobs:
       - name: Gate 0 - validar manifiesto congelado antes del motor
         run: |
           set -euo pipefail
-          python labs/pr_d_manifest.py --manifest docs/manifest.json
-          # This committed manifest is intentionally a test fixture, never runnable.
-          # Fail closed until a separately reviewed, real preregistration replaces it.
-          python - <<'PY'
-          import json, sys
-          with open("docs/manifest.json", encoding="utf-8") as f:
-              manifest = json.load(f)
-          if manifest["manifest_version"].startswith("test-only-"):
-              print("PR-D-GATE-0: BLOCKED: test-only manifest; engine must not run.", file=sys.stderr)
-              raise SystemExit(2)
-          requested = {x.strip() for x in __import__("os").environ["HYPOTHESIS_IDS"].split(",") if x.strip()}
-          frozen = {hid for family in manifest["families"] for hid in family["hypothesis_ids"]}
-          if not requested or requested != frozen:
-              print("PR-D-GATE-0: BLOCKED: requested IDs differ from frozen manifest.", file=sys.stderr)
-              raise SystemExit(2)
-          PY
+          python labs/pr_d_manifest.py \
+            --manifest docs/manifest.json \
+            --require-runnable \
+            --hypothesis-ids "$HYPOTHESIS_IDS"
       - name: Install dependencies
         run: pip install supabase pyyaml
       - name: Ejecutar lote secuencial
