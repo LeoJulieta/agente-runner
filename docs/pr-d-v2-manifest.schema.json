@@ -10,12 +10,20 @@
     "manifest_version",
     "contract_path",
     "contract_sha256",
-    "families"
+    "families",
+    "execution_status"
   ],
   "properties": {
-    "schema_version": { "const": "pr-d-v2-manifest/1" },
-    "manifest_version": { "type": "string", "minLength": 1 },
-    "contract_path": { "const": "docs/PR-D-DESIGN.md" },
+    "schema_version": {
+      "const": "pr-d-v2-manifest/1"
+    },
+    "manifest_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contract_path": {
+      "const": "docs/PR-D-DESIGN.md"
+    },
     "contract_sha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"
@@ -36,7 +44,10 @@
           "method_version"
         ],
         "properties": {
-          "family_id": { "type": "string", "minLength": 1 },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
           "hypothesis_ids": {
             "type": "array",
             "minItems": 1,
@@ -46,26 +57,47 @@
               "pattern": "^H[0-9]{3,}(_[A-Z0-9]+)*$"
             }
           },
-          "m": { "type": "integer", "minimum": 1 },
+          "m": {
+            "type": "integer",
+            "minimum": 1
+          },
           "outcomes": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "primary_contrasts": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
           "windows": {
             "type": "array",
             "minItems": 1,
-            "items": { "type": "string", "minLength": 1 }
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           },
-          "method_version": { "type": "string", "minLength": 1 }
+          "method_version": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
+    },
+    "execution_status": {
+      "enum": [
+        "fixture",
+        "approved"
+      ]
     }
   }
 }
