@@ -1,8 +1,10 @@
 # PR-D-DESIGN.md
 
-**Versión contractual:** PR D v2 (contrato documental aprobado; incorpora E1–E5)\\
-**Fecha de congelamiento:** 2026-10-09\\
-**Estado:** contrato documental aprobado y fusionado en `main` mediante PR #75; implementación del motor aún no autorizada\\
+**Versión contractual:** PR D v2 (contrato documental aprobado; incorpora E1–E5)
+
+**Fecha de congelamiento:** 2026-10-09
+
+**Estado:** contrato documental aprobado y fusionado en `main` mediante PR #75; implementación del motor aún no autorizada
 **Alcance:** diseño estadístico y operativo previo a implementación\
 **Principio rector:** evidencia primero. Ninguna regla estadística podrá
 modificarse después de observar los resultados para favorecer una
