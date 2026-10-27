@@ -51,7 +51,7 @@ class PostgreSQLSemanticsTests(unittest.TestCase):
             with psycopg.connect(DATABASE_URL) as conn:
                 conn.execute(
                     f'INSERT INTO "{self.schema}".runs (run_key, record_type, payload) '
-                    "VALUES (%s, %s, %s)",
+                    "VALUES (%s, %s, %s::jsonb)",
                     ("run-atomic", "baseline", '{"value": 1}'),
                 )
                 raise RuntimeError("injected evidence failure")
@@ -61,7 +61,7 @@ class PostgreSQLSemanticsTests(unittest.TestCase):
         with psycopg.connect(DATABASE_URL) as conn:
             conn.execute(
                 f'INSERT INTO "{self.schema}".runs (run_key, record_type, payload) '
-                "VALUES (%s, %s, %s)",
+                "VALUES (%s, %s, %s::jsonb)",
                 ("run-split", "baseline", '{"value": 1}'),
             )
         with self.assertRaisesRegex(RuntimeError, "injected evidence failure"):
@@ -77,14 +77,14 @@ class PostgreSQLSemanticsTests(unittest.TestCase):
         with psycopg.connect(DATABASE_URL) as conn:
             conn.execute(
                 f'INSERT INTO "{self.schema}".runs (run_key, record_type, payload) '
-                "VALUES (%s, %s, %s)",
+                "VALUES (%s, %s, %s::jsonb)",
                 ("run-idempotency", "baseline", '{"value": 1}'),
             )
         with self.assertRaises(psycopg.errors.UniqueViolation):
             with psycopg.connect(DATABASE_URL) as conn:
                 conn.execute(
                     f'INSERT INTO "{self.schema}".runs (run_key, record_type, payload) '
-                    "VALUES (%s, %s, %s)",
+                    "VALUES (%s, %s, %s::jsonb)",
                     ("run-idempotency", "baseline", '{"value": 1}'),
                 )
         self.assertEqual(self.count_rows(), 1)
