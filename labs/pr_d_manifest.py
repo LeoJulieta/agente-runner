@@ -158,6 +158,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", default="docs/manifest.json")
     parser.add_argument("--repository-root", default=".")
+    parser.add_argument(
+        "--require-runnable", action="store_true",
+        help="block test-only fixtures and require exact requested IDs",
+    )
+    parser.add_argument(
+        "--hypothesis-ids", default="",
+        help="comma-separated requested IDs; required with --require-runnable",
+    )
     args = parser.parse_args(argv)
     try:
         payload = load_and_validate_manifest(
@@ -169,6 +177,15 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:  # unknown conditions fail closed
         print(f"PR-D-GATE-0: BLOCKED: unexpected validator error: {type(exc).__name__}", file=sys.stderr)
         return 2
+    if args.require_runnable:
+        if payload["manifest_version"].startswith("test-only-"):
+            print("PR-D-GATE-0: BLOCKED: test-only manifest; engine must not run.", file=sys.stderr)
+            return 2
+        requested = {item.strip() for item in args.hypothesis_ids.split(",") if item.strip()}
+        frozen = {hid for family in payload["families"] for hid in family["hypothesis_ids"]}
+        if not requested or requested != frozen:
+            print("PR-D-GATE-0: BLOCKED: requested IDs differ from frozen manifest.", file=sys.stderr)
+            return 2
     print(
         "PR-D-GATE-0: VALID: "
         f"manifest_version={payload['manifest_version']} "
