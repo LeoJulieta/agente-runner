@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "labs/pr_d_manifest.py"
+      - "docs/pr-d-v2-manifest.schema.json"
       - "tests/test_pr_d_manifest.py"
       - ".github/workflows/pr-d-v2-manifest-tests.yml"
   workflow_dispatch:
