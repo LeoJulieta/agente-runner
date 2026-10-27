@@ -22,7 +22,10 @@ class PersistenceAtomicityCharacterization(unittest.TestCase):
     def test_baseline_and_evidence_use_separate_insert_calls(self):
         s = (ROOT / "labs/lab_engine.py").read_text(encoding="utf-8")
         self.assertIn("persist_baseline(contract, supabase, baseline_value, baseline_type)", s)
-        self.assertGreaterEqual(s.count('.table("lab_results").insert({'), 2)
+        baseline_start = s.index("def persist_baseline(")
+        measure_start = s.index("def measure(", baseline_start)
+        self.assertIn(".insert({", s[baseline_start:measure_start])
+        self.assertIn('insert_response = supabase.table("lab_results").insert({', s)
         self.assertNotIn("persist_baseline_and_evidence", s)
 
 class AuthorizationCharacterization(unittest.TestCase):
@@ -30,7 +33,7 @@ class AuthorizationCharacterization(unittest.TestCase):
         for h in ("H003", "H005"):
             with self.subTest(hypothesis=h):
                 s = (ROOT / "labs/hypotheses" / (h + ".yaml")).read_text(encoding="utf-8")
-                self.assertRegex(s, r"(?m)^authorized:\\s*false\\s*$")
+                self.assertRegex(s, r"(?m)^authorized:\s*false\s*$")
 
     def test_batch_workflow_does_not_verify_a_frozen_manifest(self):
         s = (ROOT / ".github/workflows/lab_batch.yml").read_text(encoding="utf-8")
