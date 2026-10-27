@@ -28,6 +28,7 @@ class FakeQuery:
     def eq(self, *args, **kwargs): return self
     def order(self, *args, **kwargs): return self
     def limit(self, *args, **kwargs): return self
+    @property
     def not_(self): return self
     def is_(self, *args, **kwargs): return self
     def lt(self, *args, **kwargs): return self
@@ -57,8 +58,7 @@ class FakeSupabase:
 
 
 def load_engine_with_dependency_stubs():
-    # lab_engine imports these modules at module load time. Stub only imports;
-    # tested paths below replace data-loading/gate functions and use fake storage.
+    # Stub imports only; no real client or external service is initialized.
     yaml_stub = types.ModuleType("yaml")
     yaml_stub.safe_load = lambda stream: {}
     supabase_stub = types.ModuleType("supabase")
@@ -140,6 +140,7 @@ class RuntimeFaultInjectionTests(unittest.TestCase):
         )
         self.assertEqual(code, 1, output)
         self.assertIn("injected measurement failure", output)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
