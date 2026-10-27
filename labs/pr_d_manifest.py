@@ -1,7 +1,6 @@
-"""Strict validation helpers for the PR D v2 frozen manifest.
+"""Strict, read-only validator for the PR D v2 frozen manifest.
 
-This module is deliberately not wired into the production workflow yet.
-The manifest inventory and acceptance tests must be reviewed before activation.
+This gate never invokes the engine, accesses Supabase, or writes data.
 """
 from __future__ import annotations
 
@@ -148,3 +147,35 @@ def load_and_validate_manifest(
         repository_root=repository_root,
         expected_hypothesis_ids=expected_hypothesis_ids,
     )
+
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point: return 0 on valid manifest, 2 on structural failure."""
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", default="docs/manifest.json")
+    parser.add_argument("--repository-root", default=".")
+    args = parser.parse_args(argv)
+    try:
+        payload = load_and_validate_manifest(
+            args.manifest, repository_root=args.repository_root
+        )
+    except ManifestError as exc:
+        print(f"PR-D-GATE-0: BLOCKED: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # unknown conditions fail closed
+        print(f"PR-D-GATE-0: BLOCKED: unexpected validator error: {type(exc).__name__}", file=sys.stderr)
+        return 2
+    print(
+        "PR-D-GATE-0: VALID: "
+        f"manifest_version={payload['manifest_version']} "
+        f"hypotheses={sum(f['m'] for f in payload['families'])}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
