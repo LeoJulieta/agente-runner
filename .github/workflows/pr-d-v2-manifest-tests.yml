@@ -1,0 +1,27 @@
+name: PR D v2 manifest unit tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "labs/pr_d_manifest.py"
+      - "tests/test_pr_d_manifest.py"
+      - ".github/workflows/pr-d-v2-manifest-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR revision
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run manifest validation unit tests
+        run: python -m unittest -v tests.test_pr_d_manifest
