@@ -1,0 +1,18 @@
+id: H990_PRD_TEST_INIT
+class: TEST_ONLY
+gen: 0
+dataset:
+  - TEST_ONLY_fixture
+vars:
+  independent:
+    - TEST_ONLY_condition
+  dependent:
+    - TEST_ONLY_views_primeras_3h
+metric:
+  primary: TEST_ONLY_logistic_initiation
+sample_min: 1
+max_runtime: 1
+cost_limit: 0
+authorized: false
+test_only: true
+notes: "Fixture only for PR D v2 Gate 0 validation. Not a scientific hypothesis; do not execute."
