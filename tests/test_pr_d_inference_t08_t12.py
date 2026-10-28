@@ -1,7 +1,11 @@
 """Synthetic, deterministic acceptance tests for PR D T08/T12 only."""
 import unittest
+import warnings
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
 
 from labs.pr_d_inference import (
     NON_ESTIMABILITY_REASONS,
@@ -35,7 +39,23 @@ class PRDInferenceT08T12Tests(unittest.TestCase):
         self.assertIsNone(result["metrics"]["p_empirical"])
         self.assertEqual(result["bh_input_p"], 1.0)
 
-    def test_insufficient_n_is_not_mislabeled_as_non_estimability(self):
+    def test_nonconvergence_is_distinguished_from_separation(self):
+        x = np.tile(np.arange(10, dtype=float), 4)
+        y = np.array(([0, 0, 0, 1, 0, 1, 1, 0, 1, 1] * 4), dtype=int)
+        design = np.column_stack([np.ones(len(x)), x])
+
+        def synthetic_nonconvergence(*args, **kwargs):
+            warnings.warn("synthetic nonconvergence", ConvergenceWarning)
+            return SimpleNamespace(mle_retvals={"converged": False})
+
+        with patch("labs.pr_d_inference.sm.Logit.fit", side_effect=synthetic_nonconvergence):
+            result = fit_logistic_mle(y, design, coefficient_index=1, min_n_eff=30)
+        self.assertEqual(result["status"], "INSUFFICIENT_POWER")
+        self.assertEqual(result["metrics"]["non_estimability_reason"], "model_non_convergence")
+        self.assertIsNone(result["metrics"]["p_empirical"])
+        self.assertEqual(result["bh_input_p"], 1.0)
+
+    def test_insufficient_n_is_not_mislabeled_as_nonestimability(self):
         x = np.arange(20, dtype=float)
         y = (x % 2).astype(int)
         design = np.column_stack([np.ones(20), x])
@@ -43,8 +63,7 @@ class PRDInferenceT08T12Tests(unittest.TestCase):
             fit_logistic_mle(y, design, coefficient_index=1, min_n_eff=30)
 
     def test_estimable_logistic_returns_wald_metrics(self):
-        # Fixed synthetic pattern avoids separation and gives both outcomes at
-        # every covariate region; no random generator or real observations.
+        # Fixed synthetic pattern avoids separation; no random generator or real observations.
         x = np.tile(np.arange(10, dtype=float), 4)
         y = np.array(([0, 0, 0, 1, 0, 1, 1, 0, 1, 1] * 4), dtype=int)
         design = np.column_stack([np.ones(len(x)), x])
@@ -76,6 +95,19 @@ class PRDInferenceT08T12Tests(unittest.TestCase):
         self.assertIsNone(nonestimable["p_empirical"])
         self.assertEqual(nonestimable["bh_input_p"], 1.0)
         self.assertTrue(all(0.0 <= row["fdr_q"] <= 1.0 for row in adjusted))
+
+    def test_bh_accepts_nested_contract_metrics_without_fabricating_empirical_p(self):
+        row = fit_logistic_mle(
+            (np.arange(40) >= 20).astype(int),
+            np.column_stack([np.ones(40), np.arange(40, dtype=float)]),
+            coefficient_index=1,
+        )
+        row["hypothesis_id"] = "H990_SEPARATED"
+        adjusted = adjust_bh_family([row])
+        self.assertIsNone(adjusted[0]["metrics"]["p_empirical"])
+        self.assertEqual(adjusted[0]["metrics"]["bh_input_p"], 1.0)
+        self.assertEqual(adjusted[0]["metrics"]["family_m"], 1)
+        self.assertEqual(adjusted[0]["family_m"], 1)
 
     def test_unknown_or_missing_p_does_not_silently_leave_fdr_family(self):
         family = [
