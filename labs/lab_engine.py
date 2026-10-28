@@ -606,7 +606,7 @@ def main():
         baseline_payload = None
         baseline_type_payload = None
         if not found:
-            baseline_payload = json.dumps(baseline_value, default=str)
+            baseline_payload = baseline_value
             baseline_type_payload = baseline_type
 
         try:
