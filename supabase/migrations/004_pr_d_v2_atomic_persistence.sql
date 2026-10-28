@@ -8,6 +8,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_lab_results_prd_run
     WHERE params ->> 'record_type' = 'evidence'
       AND params ? 'run_id';
 
+-- A generation may freeze only one baseline. This partial index also recognizes
+-- legacy scalar baselines and baseline_frozen records.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_lab_results_prd_baseline_generation
+    ON public.lab_results (lab_id, gen)
+    WHERE status = 'PROMETE'
+      AND (
+        params ->> 'record_type' = 'baseline'
+        OR params ->> 'baseline_frozen' = 'true'
+        OR (params ? 'baseline' AND jsonb_typeof(params -> 'baseline') <> 'object')
+      );
+
 CREATE OR REPLACE FUNCTION public.rpc_insert_baseline_and_evidence(
     p_lab_id text,
     p_gen integer,
@@ -94,6 +105,14 @@ BEGIN
             '{}'::jsonb, 'PROMETE', 0, false, now()
         );
         v_baseline_created := true;
+    ELSE
+        -- The caller computed a provisional baseline before taking this lock.
+        -- If another run froze one first, do not persist evidence calculated
+        -- against a potentially different value; fail closed and require retry.
+        IF p_baseline_value IS NOT NULL THEN
+            RAISE EXCEPTION 'prd_atomic_baseline_race_retry'
+                USING ERRCODE = '40001';
+        END IF;
     END IF;
 
     SELECT COALESCE(MAX(evidence_count), 0) + 1
