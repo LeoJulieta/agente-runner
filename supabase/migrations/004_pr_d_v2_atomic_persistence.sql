@@ -187,3 +187,15 @@ $$;
 COMMENT ON FUNCTION public.rpc_insert_baseline_and_evidence(
     text, integer, jsonb, text, jsonb, jsonb, text, boolean, text
 ) IS 'PR D v2: atomically freeze baseline if absent and persist one idempotent evidence record.';
+
+-- Historical records without record_type/run_id are intentionally not rewritten.
+-- Idempotency guarantees apply to records created under the PR D v2 contract.
+-- The runner must use a server-side service_role key; never expose it to clients.
+-- Keep this SECURITY INVOKER function callable only by the trusted runner role.
+REVOKE EXECUTE ON FUNCTION public.rpc_insert_baseline_and_evidence(
+    text, integer, jsonb, text, jsonb, jsonb, text, boolean, text
+) FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.rpc_insert_baseline_and_evidence(
+    text, integer, jsonb, text, jsonb, jsonb, text, boolean, text
+) TO service_role;
