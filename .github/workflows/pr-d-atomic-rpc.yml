@@ -11,6 +11,9 @@ on:
       - "tests/test_pr_d_inference_t08_t12.py"
       - "labs/pr_d_family_ii.py"
       - "tests/test_pr_d_family_ii_t09_drift_reproducibility.py"
+      - "labs/pr_d_abort_record.py"
+      - "tests/test_pr_d_abort_record_e11.py"
+      - "tests/test_pr_d_reference_antecedent_edges.py"
       - ".github/workflows/pr-d-atomic-rpc.yml"
   workflow_dispatch:
 
@@ -50,4 +53,6 @@ jobs:
       - name: Run deterministic synthetic T08/T12 tests only
         run: python -m pytest -q tests/test_pr_d_inference_t08_t12.py
       - name: Run deterministic synthetic Family II, drift and reproducibility tests
-        run: python -m pytest -q tests/test_pr_d_family_ii_t09_drift_reproducibility.py
+        run: python -m pytest -q tests/test_pr_d_family_ii_t09_drift_reproducibility.py tests/test_pr_d_reference_antecedent_edges.py
+      - name: Run synthetic-only E11 durable abort and retry identity tests
+        run: python -m pytest -q tests/test_pr_d_abort_record_e11.py
