@@ -1,0 +1,177 @@
+name: PR D v2 - Full engine to local Supabase HTTP E2E
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "labs/lab_engine.py"
+      - "labs/pr_d_manifest.py"
+      - "labs/pr_d_single_run_gate.py"
+      - "supabase/migrations/004_pr_d_v2_atomic_persistence.sql"
+      - "tests/e2e/test_pr_d_engine_http_e2e.py"
+      - ".github/workflows/pr-d-engine-http-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  engine-to-rpc-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: supabase/setup-cli@v3
+      - name: Install engine and E2E dependencies
+        run: python -m pip install "pyyaml>=6,<7" "supabase>=2,<3" "pytest>=8,<9"
+      - name: Create disposable local Supabase stack and run real engine twice
+        shell: bash
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/pr-d-engine-e2e"
+          project="$workdir/project"
+          checkout="$workdir/checkout"
+          mkdir -p "$project" "$checkout"
+          cd "$project"
+          supabase init
+          supabase migration new create_engine_e2e_fixture
+          sleep 2
+          bootstrap="$(find supabase/migrations -maxdepth 1 -name '*_create_engine_e2e_fixture.sql' -print -quit)"
+          test -n "$bootstrap"
+          cat > "$bootstrap" <<'SQL'
+          -- Minimal disposable persistence schema required by the production RPC migration.
+          CREATE TABLE public.lab_results (
+              id bigserial PRIMARY KEY,
+              lab_id text NOT NULL,
+              gen integer NOT NULL DEFAULT 0,
+              params jsonb NOT NULL DEFAULT '{}'::jsonb,
+              metrics jsonb NOT NULL DEFAULT '{}'::jsonb,
+              status text NOT NULL,
+              evidence_count integer NOT NULL DEFAULT 0,
+              reproducible boolean NOT NULL DEFAULT false,
+              last_test timestamptz
+          );
+          GRANT ALL ON TABLE public.lab_results TO service_role;
+          GRANT USAGE, SELECT ON SEQUENCE public.lab_results_id_seq TO service_role;
+
+          CREATE OR REPLACE FUNCTION public.get_table_columns(table_name text)
+          RETURNS TABLE(column_name text)
+          LANGUAGE sql
+          SECURITY INVOKER
+          SET search_path = public, pg_temp
+          AS $function$
+              SELECT c.column_name::text
+              FROM information_schema.columns AS c
+              WHERE c.table_schema = 'public'
+                AND c.table_name = $1
+              ORDER BY c.ordinal_position;
+          $function$;
+          GRANT EXECUTE ON FUNCTION public.get_table_columns(text) TO service_role;
+
+          CREATE TABLE public.pr_d_engine_fixture (
+              id bigserial PRIMARY KEY,
+              created_at timestamptz NOT NULL,
+              hs_al_publicar_al_sync numeric NOT NULL,
+              views_primeras_3h integer NOT NULL
+          );
+          ALTER TABLE public.pr_d_engine_fixture ENABLE ROW LEVEL SECURITY;
+          GRANT ALL ON TABLE public.pr_d_engine_fixture TO service_role;
+          GRANT USAGE, SELECT ON SEQUENCE public.pr_d_engine_fixture_id_seq TO service_role;
+          INSERT INTO public.pr_d_engine_fixture (created_at, hs_al_publicar_al_sync, views_primeras_3h)
+          SELECT
+              TIMESTAMPTZ '2026-01-01 00:00:00+00' + i * INTERVAL '1 hour',
+              0,
+              (extract(hour from ((TIMESTAMPTZ '2026-01-01 00:00:00+00' + i * INTERVAL '1 hour' - INTERVAL '3 hours') AT TIME ZONE 'UTC'))::integer * 10) + 1
+          FROM generate_series(0, 23) AS series(i);
+          SQL
+          supabase migration new pr_d_v2_atomic_persistence
+          atomic_migration="$(find supabase/migrations -maxdepth 1 -name '*_pr_d_v2_atomic_persistence.sql' -print -quit)"
+          test -n "$atomic_migration"
+          cp "$GITHUB_WORKSPACE/supabase/migrations/004_pr_d_v2_atomic_persistence.sql" "$atomic_migration"
+
+          supabase start -x studio,inbucket,analytics,vector
+          trap 'supabase stop --no-backup >/dev/null 2>&1 || true' EXIT
+          supabase status -o env > "$RUNNER_TEMP/pr-d-engine-e2e.env"
+          set -a
+          source "$RUNNER_TEMP/pr-d-engine-e2e.env"
+          set +a
+          test -n "${API_URL:-}"
+          test -n "${DB_URL:-}"
+          test -n "${SERVICE_ROLE_KEY:-}"
+          test -n "${ANON_KEY:-}"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          echo "::add-mask::$ANON_KEY"
+
+          # Fail closed unless the source manifest is still the committed fixture.
+          original_status="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["execution_status"])' "$GITHUB_WORKSPACE/docs/manifest.json")"
+          test "$original_status" = "fixture"
+
+          # Work only on an ephemeral copy. The repository's checked-in manifest
+          # stays fixture; only this runner-local copy receives a test approval.
+          cp -a "$GITHUB_WORKSPACE/." "$checkout/"
+          mkdir -p "$checkout/labs/hypotheses"
+          cat > "$checkout/labs/hypotheses/H990_PRD_TEST_INIT.yaml" <<'YAML'
+          id: H990_PRD_TEST_INIT
+          description: "Disposable E2E fixture only"
+          class: A
+          gen: 990
+          dataset:
+            - pr_d_engine_fixture
+          vars:
+            independent:
+              - hora_publicacion
+            dependent:
+              - views_primeras_3h
+          var_roles:
+            hora_publicacion: actionable_pre_publicacion
+            views_primeras_3h: outcome
+          population_type: explorer
+          derive:
+            hora_publicacion:
+              source: created_at
+              subtract_hours_from_column: hs_al_publicar_al_sync
+              tz_offset_hours: -3
+              extract: hour
+          metric:
+            primary: correlation
+          baseline:
+            type: fixed
+            value: 0.0
+          comparison:
+            type: greater_than
+          sample_min: 10
+          YAML
+          python - "$checkout" <<'PY'
+          import hashlib, json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          contract = root / "docs/PR-D-DESIGN.md"
+          payload = {
+              "schema_version": "pr-d-v2-manifest/1",
+              "manifest_version": "ci-disposable-engine-e2e-only",
+              "contract_path": "docs/PR-D-DESIGN.md",
+              "contract_sha256": hashlib.sha256(contract.read_bytes()).hexdigest(),
+              "families": [{
+                  "family_id": "CI_DISPOSABLE_ENGINE_E2E",
+                  "hypothesis_ids": ["H990_PRD_TEST_INIT"],
+                  "m": 1,
+                  "outcomes": ["views_primeras_3h"],
+                  "primary_contrasts": ["fixture_hour_vs_fixture_views"],
+                  "windows": ["fixture_all_rows"],
+                  "method_version": "ci-disposable-engine-e2e/1"
+              }],
+              "execution_status": "approved"
+          }
+          (root / "docs/manifest.json").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+          PY
+          export SUPABASE_URL="$API_URL"
+          export SUPABASE_KEY="$SERVICE_ROLE_KEY"
+          export SUPABASE_ANON_KEY="$ANON_KEY"
+          export TEST_DATABASE_URL="$DB_URL"
+          export PRD_ORIGINAL_MANIFEST_STATUS="$original_status"
+          cd "$checkout"
+          python -m pytest -q tests/e2e/test_pr_d_engine_http_e2e.py
