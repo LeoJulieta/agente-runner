@@ -49,3 +49,17 @@ Before implementing a runnable E2E workflow, provision and validate a disposable
 ## Exit criteria before any production execution
 
 The isolated E2E must pass all assertions, a human audit must review the artifact, the migration-history discrepancy must be reconciled safely, and the manifest's approval transition must be separately reviewed and explicitly authorized.
+
+
+## Full engine-to-RPC E2E — PR #89 proposal
+
+The companion workflow `.github/workflows/pr-d-engine-http-e2e.yml` exercises the real `labs/lab_engine.py` process against a temporary Supabase CLI stack. It creates a synthetic dataset, runs a test-only frozen hypothesis twice, and verifies through an independent PostgREST read that baseline/evidence persistence occurs once and the retry returns the original evidence ID.
+
+Safety constraints:
+- The workflow fails before execution unless the source checkout's `docs/manifest.json` says `fixture`.
+- It copies the checkout to the runner's temporary directory and generates an approved test-only manifest only in that disposable copy. The repository manifest and `main` are never rewritten.
+- The API and database endpoints are checked for localhost by the E2E test; no hosted project is linked and no repository/production secrets are used.
+- The hypothesis ID is namespaced `H990_PRD_TEST_INIT`, generation 990, and the dataset is a disposable fixture table.
+- This workflow does not authorize a production execution, manifest approval, or migration-history reconciliation.
+
+Acceptance evidence is the PR workflow run plus its assertions. Until the workflow passes on the PR head and the results are reviewed, full engine-to-RPC E2E remains unverified.
