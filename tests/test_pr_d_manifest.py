@@ -112,6 +112,18 @@ class ManifestValidationTests(unittest.TestCase):
                 expected_hypothesis_ids={"H001"},
             )
 
+    def test_rejects_missing_execution_status(self):
+        bad = json.loads(json.dumps(self.manifest))
+        del bad["execution_status"]
+        with self.assertRaisesRegex(ManifestError, "manifest_top_level_fields_invalid"):
+            validate_manifest(bad, repository_root=self.root)
+
+    def test_rejects_invalid_execution_status(self):
+        bad = json.loads(json.dumps(self.manifest))
+        bad["execution_status"] = "pending"
+        with self.assertRaisesRegex(ManifestError, "manifest_execution_status_invalid"):
+            validate_manifest(bad, repository_root=self.root)
+
     def test_rejects_corrupt_json(self):
         self.path.write_text("{not json", encoding="utf-8")
         with self.assertRaisesRegex(ManifestError, "manifest_unreadable_or_corrupt"):
