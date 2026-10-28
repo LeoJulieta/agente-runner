@@ -644,7 +644,7 @@ Se incorpora `metrics.drift_evaluation_state` con catálogo cerrado `complete`, 
 | `d_init` no evaluable; `D_cond` evaluable y `D_cond > 0.50` | `REGIME_SHIFT_SUSPECTED` | `partial` |
 | `d_init` no evaluable; `D_cond` evaluable y `D_cond <= 0.50` | `OK` | `partial` |
 | `d_init` no evaluable; `D_cond=null` por `insufficient_positive_events` | `null` | `not_evaluable` |
-| `D_cond=null` por `scale_zero_medians_differ`, cualquiera que sea la evaluabilidad de `d_init` | `REGIME_SHIFT_SUSPECTED` | `partial` si solo un indicador es evaluable; `complete` solo si ambos lo son |
+| `D_cond=null` por `scale_zero_medians_differ`, cualquiera que sea la evaluabilidad de `d_init` | `REGIME_SHIFT_SUSPECTED` | `partial` (porque `D_cond` no es evaluable) |
 | Ambos indicadores no evaluables y no existe degeneración que active alerta | `null` | `not_evaluable` |
 
 Causas contractuales de `D_cond=null` en esta regla: `insufficient_positive_events` y `scale_zero_medians_differ`. La segunda siempre activa alerta. Si aparece otra causa, debe clasificarse conforme a las reglas de invalidez/fallo estructural; no se absorbe como evaluación parcial. Si `d_init` no es evaluable por datos inválidos, la precedencia de `INVALID` se conserva y no se emite una conclusión científica de drift.
