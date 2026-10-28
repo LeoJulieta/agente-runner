@@ -9,6 +9,8 @@ on:
       - "tests/integration/test_pr_d_atomic_rpc.py"
       - "tests/integration/test_pr_d_engine_atomic_path.py"
       - "tests/test_pr_d_inference_t08_t12.py"
+      - "labs/pr_d_family_ii.py"
+      - "tests/test_pr_d_family_ii_t09_drift_reproducibility.py"
       - ".github/workflows/pr-d-atomic-rpc.yml"
   workflow_dispatch:
 
@@ -47,3 +49,5 @@ jobs:
         run: python -m pytest -q tests/integration/test_pr_d_atomic_rpc.py tests/integration/test_pr_d_engine_atomic_path.py
       - name: Run deterministic synthetic T08/T12 tests only
         run: python -m pytest -q tests/test_pr_d_inference_t08_t12.py
+      - name: Run deterministic synthetic Family II, drift and reproducibility tests
+        run: python -m pytest -q tests/test_pr_d_family_ii_t09_drift_reproducibility.py
