@@ -236,6 +236,17 @@ class PRDFamilyIITest(unittest.TestCase):
         self.assertFalse(result["reproducible"])
         self.assertEqual(result["metrics"]["reproducible_state"], "not_evaluable")
 
+    def test_t26_rejected_b_state_cannot_be_upgraded_to_verified(self):
+        result = evaluate_reproducibility(
+            b_status="RECHAZA", b_hypothesis_id="H990_SYNTH", b_contract_sha256="abc",
+            b_method_fingerprint="method-v1", b_effect_size=0.2, b_ci_low=0.05,
+            b_ci_high=0.35, antecedent_a=None, windows_disjoint=True,
+            direction_consistent=True, drift_flag="OK", drift_evaluation_state="complete",
+            b_gates_pass=True,
+        )
+        self.assertEqual(result["status"], "RECHAZA")
+        self.assertFalse(result["reproducible"])
+
     def test_t26_precedence_invalid_and_insufficient_power_is_preserved(self):
         for status in ("INVALID", "INSUFFICIENT_POWER"):
             result = evaluate_reproducibility(
