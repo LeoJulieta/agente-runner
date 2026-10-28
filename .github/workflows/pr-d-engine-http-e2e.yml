@@ -40,6 +40,7 @@ jobs:
           cd "$project"
           supabase init
           supabase migration new create_engine_e2e_fixture
+          sleep 2
           bootstrap="$(find supabase/migrations -maxdepth 1 -name '*_create_engine_e2e_fixture.sql' -print -quit)"
           test -n "$bootstrap"
           cat > "$bootstrap" <<'SQL'
@@ -76,6 +77,10 @@ jobs:
           test -n "${ANON_KEY:-}"
           echo "::add-mask::$SERVICE_ROLE_KEY"
           echo "::add-mask::$ANON_KEY"
+
+          # Fail closed unless the source manifest is still the committed fixture.
+          original_status="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["execution_status"])' "$GITHUB_WORKSPACE/docs/manifest.json")"
+          test "$original_status" = "fixture"
 
           # Work only on an ephemeral copy. The repository's checked-in manifest
           # stays fixture; only this runner-local copy receives a test approval.
@@ -138,6 +143,6 @@ jobs:
           export SUPABASE_KEY="$SERVICE_ROLE_KEY"
           export SUPABASE_ANON_KEY="$ANON_KEY"
           export TEST_DATABASE_URL="$DB_URL"
-          export PRD_ORIGINAL_MANIFEST_STATUS="fixture"
+          export PRD_ORIGINAL_MANIFEST_STATUS="$original_status"
           cd "$checkout"
           python -m pytest -q tests/e2e/test_pr_d_engine_http_e2e.py
