@@ -2,7 +2,7 @@
 
 ## Current boundary
 
-This change is a safety prerequisite, not proof of end-to-end operation. It closes the legacy single-hypothesis workflow while `docs/manifest.json` remains `execution_status: "fixture"`. It does not invoke the engine, call Supabase, or mutate production data.
+This change is a safety prerequisite, not proof of end-to-end operation. The workflow and the engine itself must both reject execution while `docs/manifest.json` remains `execution_status: "fixture"`. The engine gate runs before reading database credentials or importing/creating the Supabase client. Supabase secrets are scoped to the workflow step that invokes the engine. No production data is touched by these checks.
 
 ## Evidence already available
 
@@ -13,16 +13,24 @@ This change is a safety prerequisite, not proof of end-to-end operation. It clos
 
 ## E2E acceptance plan — not yet executed
 
-A separate, explicitly authorized test environment must be provisioned before an end-to-end run:
+**Current infrastructure limitation:** the repository has SQL migrations and PostgreSQL-only integration tests, but no checked-in `supabase/config.toml` was found on the PR branch. The existing PostgreSQL service verifies the database function; it does not emulate Supabase Auth/PostgREST or prove the full engine-to-RPC HTTP path. Do not label that job as E2E.
 
-1. Use an isolated Supabase project or disposable local Supabase stack, with no production URL or key available to the job.
+Before implementing a runnable E2E workflow, provision and validate a disposable local Supabase stack in CI (CLI + Docker), or document a separately isolated staging project. The test workflow must fail closed unless it can prove the endpoint is local/disposable and has no production secrets. Then:
+
+1. Use a disposable local Supabase stack, with no production URL or key available to the job.
 2. Seed a clearly namespaced fixture dataset and one fixture hypothesis whose ID is frozen in a test-only manifest.
 3. Run the real GitHub Actions workflow and `labs/lab_engine.py` against that isolated environment.
 4. Verify through an independent read that the RPC creates exactly one baseline and one evidence record, both tied to the fixture ID and generation.
 5. Retry the same logical run and verify the same evidence ID is returned and row counts do not increase.
 6. Inject a failure after baseline insertion and verify the transaction leaves neither baseline nor evidence behind.
-7. Confirm the workflow fails before engine invocation when the manifest is `fixture`, corrupt, or the requested hypothesis ID is not in the frozen manifest.
+7. Confirm both the workflow and direct engine invocation fail before database client creation when the manifest is `fixture`, corrupt, or the requested hypothesis ID is not in the frozen manifest.
 8. Capture the workflow run URL, commit SHA, sanitized logs, before/after row counts, and SQL assertions as the audit artifact.
+
+## Security hardening in this PR
+
+- `labs/lab_engine.py` now validates `docs/manifest.json` itself and checks explicit approval plus frozen-ID membership before reading database credentials or importing the Supabase client.
+- `lab_run.yml` and `lab_batch.yml` expose Supabase secrets only to the step that invokes the engine, not to Gate 0 or dependency installation.
+- CI includes a direct engine invocation with the Supabase environment variables removed; it must exit 2 because the checked-in manifest is a fixture.
 
 ## Hard stops
 
