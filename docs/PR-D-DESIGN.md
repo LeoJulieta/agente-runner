@@ -592,3 +592,59 @@ Antes de implementar deberán definirse la ruta y el esquema definitivos del man
 La aceptación técnica posterior deberá incluir, como mínimo, pruebas aisladas de: manifiesto ausente/corrupto; YAML individual ausente conservando `m`; parámetro inválido `sample_min <= 0`; muestra válida con `n = 0`; códigos de salida 0/1/2 y error desconocido; workflow que no absorbe fallos estructurales; atomicidad e idempotencia; y concurrencia de baseline. Las pruebas de aceptación existentes en §14 siguen vigentes.
 
 Esta sección no autoriza cambios en el motor, workflows, hipótesis, esquema ni datos de Supabase; tampoco autoriza ejecutar pruebas de escritura en producción. Esas fases requieren revisión técnica y autorización separadas.
+
+## 16. Enmiendas contractuales E6–E11 — cierre de N1–N6
+
+Esta sección resuelve normativamente N1–N6 de la matriz de trazabilidad. Estas enmiendas son documentales: no implementan cálculos, no autorizan hipótesis reales ni habilitan escrituras en Supabase de producción.
+
+### 16.1 E6 — Elegibilidad del antecedente A (N1)
+
+Se distinguen **antecedente localizable** (misma hipótesis, identidad estable, contrato y `method_fingerprint` compatibles, estado A `PROMETE` o `VERIFICADO`) y **antecedente suficiente** (además contiene campos inferenciales obligatorios válidos y finitos, incluidos `effect_size`, `ci_low` y `ci_high` en la escala contractual). A localizable pero incompleto no puede respaldar `VERIFICADO`. Si B supera sus gates y A es incompleta, B queda `PROMETE`, `reproducible=false`, `metrics.reproducible_state="not_evaluable"` y `metrics.reproducibility_reason="antecedent_incomplete"`. No se imputan campos ni se interpreta la falta de IC como incompatibilidad estadística.
+
+### 16.2 E7 — Invariante de estado B y reproducibilidad (N2)
+
+Invariante: B con `status="VERIFICADO"` implica `reproducible=true` y `metrics.reproducible_state="reproducible"`.
+
+| Condición | Estado B | `reproducible` | `metrics.reproducible_state` |
+|---|---|---:|---|
+| Contrato/datos inválidos | `INVALID` | `false` | `not_evaluable` |
+| Información insuficiente o método no estimable según §16.3 | `INSUFFICIENT_POWER` | `false` | `not_evaluable` |
+| B supera gates, pero A no existe o no es localizable | `PROMETE` | `false` | `not_evaluable` |
+| B supera gates, pero A localizable carece de campos inferenciales obligatorios | `PROMETE` | `false` | `not_evaluable` |
+| Comparación evaluable y cumple todos los criterios, incluida dirección, IC compatibles, ventanas disjuntas y `drift_flag="OK"` | `VERIFICADO` | `true` | `reproducible` |
+| Comparación evaluable que falla criterio obligatorio de reproducibilidad | `RECHAZA` | `false` | `not_reproducible` |
+
+La precedencia de invalidez e insuficiencia se mantiene. Una comparación no evaluable no se clasifica como incompatible.
+
+### 16.3 E8 — Modelo no estimable y estado científico (N3)
+
+Con datos/parámetros válidos, si el método preregistrado no produce una estimación válida —por ejemplo, separación logística, no convergencia o modelo no estimable—, el estado individual será `INSUFFICIENT_POWER` con causa cerrada específica, incluso si `n_eff` alcanza el piso general. `RECHAZA` se reserva para una evaluación válida que no supera los gates. La hipótesis conserva su posición en la familia FDR y `p=1.0` se usa solo como entrada conservadora del ajuste BH, nunca como p-valor empírico. Fallos inesperados de software, lectura o infraestructura no se reclasifican como insuficiencia científica; se aplica §15.4 y se aborta conservadoramente si la integridad del lote no puede probarse.
+
+### 16.4 E9 — `n_required_power` y motivos cerrados de nulidad (N4)
+
+En PR D v1, `n_required_power` es informativo y nunca es gate. Solo se calcula con método de potencia preregistrado aplicable, efecto mínimo, alfa, potencia objetivo, diseño y parámetros exigidos. No se impone una fórmula universal a ambas familias ni se elige una fórmula tras observar resultados. Si no procede cálculo válido, el valor es `null` y `metrics.n_required_power_reason` debe ser uno de: `method_not_preregistered`, `missing_parameters`, `assumptions_not_met`, `unsupported_family_or_model`, `invalid_effect_specification`. Si el cálculo es válido, `metrics.n_required_power_unit` será `eligible_observations` o `positive_events`; si no, será `null`. EPV y `n_eff >= 30` no son garantías exactas de potencia. Un gate obligatorio de potencia requiere futura versión contractual.
+
+### 16.5 E10 — Tabla determinista de drift parcial (N5)
+
+Se incorpora `metrics.drift_evaluation_state` con catálogo cerrado `complete`, `partial`, `not_evaluable`.
+
+| Condición | `drift_flag` | `drift_evaluation_state` |
+|---|---|---|
+| `d_init > 0.10`, cualquiera que sea `D_cond` | `REGIME_SHIFT_SUSPECTED` | `complete` si ambos indicadores son evaluables; si no, `partial` |
+| `d_init <= 0.10` y `D_cond > 0.50` | `REGIME_SHIFT_SUSPECTED` | `complete` |
+| `d_init <= 0.10` y `D_cond` evaluable `<= 0.50` | `OK` | `complete` |
+| `d_init` evaluable y `D_cond=null` por `insufficient_positive_events`, sin alerta | `OK` | `partial` |
+| `D_cond=null` por `scale_zero_medians_differ` | `REGIME_SHIFT_SUSPECTED` | `partial` |
+| Ningún indicador evaluable | `null` | `not_evaluable` |
+
+La alerta de iniciación prevalece aunque `D_cond` sea nulo. `OK` con evaluación parcial solo significa que no se detectó drift con los indicadores disponibles. Una comparación parcial no respalda `VERIFICADO`, porque todos los criterios de reproducibilidad deben ser evaluables. Escala cero con medianas distintas siempre alerta.
+
+### 16.6 E11 — Registro operativo de aborto (N6)
+
+Un lote abortado no publica filas científicas parciales como si fueran válidas o completas. Se separan los resultados científicos de un registro operativo de fallo que puede y debe conservarse en artefacto durable del runner/CI o log operativo, fuera de la tabla científica. Campos mínimos: `batch_id`, `execution_id`, versión/hash del contrato, hash/referencia exacta del manifiesto, `failure_code` cerrado, `failure_phase`, `status="ABORTED"`, `completed=false`, marca temporal y referencia al diagnóstico/log/artifact. `execution_id` se genera antes de ejecutar; los reintentos siguen política explícita y no convierten un intento parcial en corrida completa. La idempotencia se vincula al identificador estable y la política de reintento, no solo al hash del contrato.
+
+Esta enmienda no autoriza crear tabla, migración, RPC ni escritura en Supabase. Cualquier persistencia operativa futura en base de datos requiere auditoría y autorización separadas. El registro operativo no sustituye la atomicidad de resultados científicos completos.
+
+### 16.7 Aceptación documental
+
+Antes de implementar, agregar y ejecutar en entorno aislado con fixtures sintéticos pruebas que distingan: antecedente A incompleto; tabla cruzada de estado/reproducibilidad; modelo no estimable con `n_eff` suficiente; cada motivo/unidad de `n_required_power`; todos los casos de drift y umbrales exactos/adyacentes; y aborto con registro operativo durable sin resultados científicos parciales presentados como válidos. La documentación no demuestra cobertura de código.
