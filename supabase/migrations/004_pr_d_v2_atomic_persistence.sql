@@ -64,6 +64,7 @@ BEGIN
     PERFORM 1
     FROM public.lab_results
     WHERE lab_id = p_lab_id
+      AND gen = p_gen
       AND status = 'PROMETE'
       AND (
         params ->> 'record_type' = 'baseline'
