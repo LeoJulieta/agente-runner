@@ -1,0 +1,59 @@
+name: PR D v2 manifest gate tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "labs/pr_d_manifest.py"
+      - "docs/manifest.json"
+      - "docs/pr-d-v2-manifest.schema.json"
+      - "docs/PR-D-DESIGN.md"
+      - "tests/test_pr_d_manifest.py"
+      - ".github/workflows/lab_batch.yml"
+      - ".github/workflows/pr-d-v2-manifest-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR revision
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit tests
+        run: python -m unittest -v tests.test_pr_d_manifest
+      - name: Verify corrupt manifest exits 2 and the engine wrapper is not invoked
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          printf '{broken json' > "$tmp/corrupt.json"
+          # This mirrors the fail-fast ordering: the engine marker is written only
+          # if the exact Gate 0 command succeeds.
+          set +e
+          bash -c 'python labs/pr_d_manifest.py --manifest "$1" --require-runnable --hypothesis-ids H990_PRD_TEST_INIT && touch "$2/engine_invoked"' _ "$tmp/corrupt.json" "$tmp"
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          test ! -e "$tmp/engine_invoked"
+          echo "PASS: corrupt manifest exit=$rc; engine wrapper not reached"
+      - name: Verify test-only fixture is blocked in runnable mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python labs/pr_d_manifest.py --manifest docs/manifest.json --require-runnable --hypothesis-ids H990_PRD_TEST_INIT,H991_PRD_TEST_MAG
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          echo "PASS: test-only fixture blocked in runnable mode"
+      - name: Validate checked-in fixture manifest
+        run: python labs/pr_d_manifest.py --manifest docs/manifest.json

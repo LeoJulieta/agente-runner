@@ -1,0 +1,45 @@
+{
+  "schema_version": "pr-d-v2-manifest/1",
+  "manifest_version": "test-only-gate-fixture-1",
+  "contract_path": "docs/PR-D-DESIGN.md",
+  "contract_sha256": "0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89",
+  "families": [
+    {
+      "family_id": "TEST_ONLY_FAMILY_I_INITIATION",
+      "hypothesis_ids": [
+        "H990_PRD_TEST_INIT"
+      ],
+      "m": 1,
+      "outcomes": [
+        "TEST_ONLY_views_primeras_3h_positive"
+      ],
+      "primary_contrasts": [
+        "TEST_ONLY_condition_A_vs_condition_B"
+      ],
+      "windows": [
+        "TEST_ONLY_window_A",
+        "TEST_ONLY_window_B"
+      ],
+      "method_version": "TEST_ONLY_pr-d-v2-gate-fixture/1"
+    },
+    {
+      "family_id": "TEST_ONLY_FAMILY_II_MAGNITUDE",
+      "hypothesis_ids": [
+        "H991_PRD_TEST_MAG"
+      ],
+      "m": 1,
+      "outcomes": [
+        "TEST_ONLY_views_primeras_3h_positive"
+      ],
+      "primary_contrasts": [
+        "TEST_ONLY_ln_positive_outcome_condition_A_vs_condition_B"
+      ],
+      "windows": [
+        "TEST_ONLY_window_A",
+        "TEST_ONLY_window_B"
+      ],
+      "method_version": "TEST_ONLY_pr-d-v2-gate-fixture/1"
+    }
+  ],
+  "execution_status": "fixture"
+}
