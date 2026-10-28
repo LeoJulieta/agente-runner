@@ -34,7 +34,22 @@ def call_rpc(conn, lab_id, run_id, baseline=3.5, fail_evidence=False, gen=0):
 
 def setup_database(apply_migration=True):
     with connect() as conn:
+        # Supabase roles are absent from the vanilla PostgreSQL CI service.
+        # Create minimal equivalents so the migration's explicit grants are tested.
         conn.execute("""
+            DO $roles$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                    CREATE ROLE anon NOLOGIN;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                    CREATE ROLE authenticated NOLOGIN;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+                    CREATE ROLE service_role NOLOGIN BYPASSRLS;
+                END IF;
+            END
+            $roles$;
             DROP TABLE IF EXISTS public.lab_results CASCADE;
             CREATE TABLE public.lab_results (
                 id bigserial PRIMARY KEY,
@@ -191,3 +206,25 @@ def test_migration_fails_safely_when_historical_baselines_are_duplicated():
         assert conn.execute(
             "SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname='uq_lab_results_prd_baseline_generation'"
         ).fetchone()[0] == 0
+
+
+
+def test_rpc_execute_is_restricted_to_service_role():
+    setup_database()
+    signature = (
+        "public.rpc_insert_baseline_and_evidence("
+        "text,integer,jsonb,text,jsonb,jsonb,text,boolean,text)"
+    )
+    with connect() as conn:
+        assert conn.execute(
+            "SELECT has_function_privilege('service_role', %s, 'EXECUTE')",
+            (signature,),
+        ).fetchone()[0] is True
+        assert conn.execute(
+            "SELECT has_function_privilege('anon', %s, 'EXECUTE')",
+            (signature,),
+        ).fetchone()[0] is False
+        assert conn.execute(
+            "SELECT has_function_privilege('authenticated', %s, 'EXECUTE')",
+            (signature,),
+        ).fetchone()[0] is False
