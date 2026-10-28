@@ -24,8 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       HYPOTHESIS_IDS: ${{ inputs.hypothesis_ids }}
       TIME_WINDOW: ${{ inputs.time_window }}
       CUTOFF_ROWS: ${{ inputs.dataset_rows_at_cutoff }}
@@ -46,6 +44,9 @@ jobs:
       - name: Install dependencies
         run: pip install supabase pyyaml
       - name: Ejecutar lote secuencial
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           set -euo pipefail
           for id in $(printf '%s' "$HYPOTHESIS_IDS" | tr ',' ' '); do
