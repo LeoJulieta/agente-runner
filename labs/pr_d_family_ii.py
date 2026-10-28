@@ -10,7 +10,6 @@ from typing import Any, Iterable
 
 import numpy as np
 import statsmodels.api as sm
-from scipy.stats import t as student_t
 
 METHOD_FINGERPRINT_OLS_HC3 = "ols-ln-positive-y-hc3-t-two-sided-v1"
 DRIFT_DEGENERACY_REASONS = frozenset({
@@ -190,7 +189,9 @@ def evaluate_drift(d_init_result: dict[str, Any], d_cond_result: dict[str, Any])
     if d_cond is not None:
         if isinstance(d_cond, bool) or not isinstance(d_cond, (int, float)) or not math.isfinite(float(d_cond)) or d_cond < 0:
             raise ValueError("D_cond_invalid")
-        if degeneracy is not None:
+        if degeneracy is not None and not (
+            float(d_cond) == 0.0 and degeneracy == "scale_zero_medians_equal"
+        ):
             raise ValueError("D_cond_degeneracy_conflicts_with_value")
     elif degeneracy not in DRIFT_DEGENERACY_REASONS - {"scale_zero_medians_equal"}:
         raise ValueError("D_cond_null_reason_invalid")
