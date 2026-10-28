@@ -30,6 +30,18 @@ class SingleRunGateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hypothesis_id_invalid"):
             validate_single_run(manifest("approved"), "H001; echo unsafe")
 
+    def test_engine_direct_invocation_blocks_fixture_before_credentials_or_supabase(self):
+        import os
+        env = {key: value for key, value in os.environ.items() if key not in {"SUPABASE_URL", "SUPABASE_KEY"}}
+        result = subprocess.run(
+            [sys.executable, "labs/lab_engine.py", "--hypothesis", "H990_PRD_TEST_INIT"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+        self.assertIn("execution_manifest_blocked", result.stdout)
+        self.assertNotIn("SUPABASE_URL", result.stderr + result.stdout)
+        self.assertNotIn("SUPABASE_KEY", result.stderr + result.stdout)
+
     def test_cli_blocks_checked_in_fixture_before_engine_can_run(self):
         result = subprocess.run(
             [
