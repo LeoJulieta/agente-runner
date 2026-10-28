@@ -1,6 +1,8 @@
 name: PR D v2 - Disposable Supabase HTTP RPC E2E
 
 on:
+  push:
+    branches: ["feat/pr-d-e2e-safety-gate"]
   pull_request:
     paths:
       - "supabase/migrations/004_pr_d_v2_atomic_persistence.sql"
