@@ -1,8 +1,7 @@
 """Isolated PR D statistical primitives for acceptance cases T08 and T12.
 
-This module is pure with respect to external systems: it never reads a manifest,
-opens a database connection, persists rows, or invokes the production engine.
-Callers must provide synthetic or otherwise explicitly authorized arrays.
+Pure functions only: no manifest reads, database access, persistence, or calls
+to the production engine. Inputs in this PR are synthetic fixtures.
 """
 from __future__ import annotations
 
@@ -11,12 +10,10 @@ import warnings
 from typing import Any, Callable, Iterable
 
 import numpy as np
+from scipy.optimize import linprog
 from scipy.stats import norm
 import statsmodels.api as sm
-from statsmodels.tools.sm_exceptions import (
-    ConvergenceWarning,
-    PerfectSeparationError,
-)
+from statsmodels.tools.sm_exceptions import ConvergenceWarning, PerfectSeparationError
 
 NON_ESTIMABILITY_REASONS = frozenset({
     "logistic_separation",
@@ -36,13 +33,27 @@ class ScientificNonEstimability(Exception):
 
 
 class StructuralBatchAbort(RuntimeError):
-    """Unexpected infrastructure/software failure; the family must not publish."""
+    """Unexpected software/infrastructure failure; the family must not publish."""
 
     def __init__(self, failure_code: str, failure_phase: str, completed: bool = False):
         self.failure_code = failure_code
         self.failure_phase = failure_phase
         self.completed = completed
         super().__init__(f"{failure_code}:{failure_phase}")
+
+
+def _has_complete_separation(y: np.ndarray, design: np.ndarray) -> bool:
+    """Deterministically test strict linear separation using a feasibility LP."""
+    signs = np.where(y == 1.0, 1.0, -1.0)
+    # A strict separator can be scaled to satisfy signs * X @ beta >= 1.
+    result = linprog(
+        c=np.zeros(design.shape[1], dtype=np.float64),
+        A_ub=-(signs[:, None] * design),
+        b_ub=-np.ones(y.size, dtype=np.float64),
+        bounds=[(None, None)] * design.shape[1],
+        method="highs",
+    )
+    return bool(result.success)
 
 
 def fit_logistic_mle(
@@ -53,11 +64,7 @@ def fit_logistic_mle(
     min_n_eff: int = 30,
     maxiter: int = 100,
 ) -> dict[str, Any]:
-    """Fit the preregistered logistic MLE or return a closed non-estimability result.
-
-    design_matrix must already encode the preregistered intercept and columns.
-    No alternative model or fallback estimator is attempted.
-    """
+    """Fit the preregistered logistic MLE; never substitute another estimator."""
     outcomes = np.asarray(list(y), dtype=np.float64)
     design = np.asarray(list(design_matrix), dtype=np.float64)
 
@@ -75,7 +82,6 @@ def fit_logistic_mle(
         raise ValueError("logistic_design_empty")
     if np.linalg.matrix_rank(design) < design.shape[1]:
         return _nonestimable("model_not_estimable", int(outcomes.size))
-
     if np.unique(outcomes).size < 2:
         return _nonestimable("model_not_estimable", int(outcomes.size))
 
@@ -87,23 +93,22 @@ def fit_logistic_mle(
         if any(type(item.message).__name__ == "PerfectSeparationWarning" for item in caught):
             return _nonestimable("logistic_separation", int(outcomes.size))
         if any(issubclass(item.category, ConvergenceWarning) for item in caught):
-            return _nonestimable("model_non_convergence", int(outcomes.size))
+            reason = "logistic_separation" if _has_complete_separation(outcomes, design) else "model_non_convergence"
+            return _nonestimable(reason, int(outcomes.size))
     except PerfectSeparationError:
         return _nonestimable("logistic_separation", int(outcomes.size))
-    except (np.linalg.LinAlgError, ValueError) as exc:
-        # Known singular/non-estimable numerical conditions are scientific;
-        # unexpected exception classes are intentionally not swallowed.
-        if isinstance(exc, np.linalg.LinAlgError):
-            return _nonestimable("model_not_estimable", int(outcomes.size))
+    except np.linalg.LinAlgError:
+        return _nonestimable("model_not_estimable", int(outcomes.size))
+    except ValueError as exc:
         message = str(exc).lower()
         if any(token in message for token in ("singular", "not invertible", "perfect separation")):
             reason = "logistic_separation" if "separation" in message else "model_not_estimable"
             return _nonestimable(reason, int(outcomes.size))
         raise
 
-    converged = getattr(fitted, "mle_retvals", {}).get("converged", True)
-    if not converged:
-        return _nonestimable("model_non_convergence", int(outcomes.size))
+    if not getattr(fitted, "mle_retvals", {}).get("converged", True):
+        reason = "logistic_separation" if _has_complete_separation(outcomes, design) else "model_non_convergence"
+        return _nonestimable(reason, int(outcomes.size))
 
     beta = float(fitted.params[coefficient_index])
     se = float(fitted.bse[coefficient_index])
@@ -112,12 +117,9 @@ def fit_logistic_mle(
         return _nonestimable("model_not_estimable", int(outcomes.size))
 
     z = float(norm.ppf(0.975))
-    beta_low = beta - z * se
-    beta_high = beta + z * se
+    beta_low, beta_high = beta - z * se, beta + z * se
     try:
-        odds_ratio = math.exp(beta)
-        ci_low = math.exp(beta_low)
-        ci_high = math.exp(beta_high)
+        odds_ratio, ci_low, ci_high = math.exp(beta), math.exp(beta_low), math.exp(beta_high)
     except OverflowError:
         return _nonestimable("model_not_estimable", int(outcomes.size))
     if not all(math.isfinite(v) for v in (odds_ratio, ci_low, ci_high)):
@@ -156,14 +158,13 @@ def _nonestimable(reason: str, n_eff: int) -> dict[str, Any]:
             "odds_ratio": None,
             "non_estimability_reason": reason,
         },
-        # This value is only an input to the frozen-family BH adjustment.
-        # It is deliberately not written into p_empirical.
+        # Only an adjustment input; never an empirical p-value.
         "bh_input_p": 1.0,
     }
 
 
 def adjust_bh_family(family: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Apply Benjamini-Hochberg to a frozen family without dropping members."""
+    """Apply Benjamini-Hochberg to every member of one frozen family."""
     rows = [dict(row) for row in family]
     if not rows:
         raise ValueError("fdr_family_empty")
@@ -172,20 +173,24 @@ def adjust_bh_family(family: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         raise ValueError("fdr_hypothesis_identity_invalid_or_duplicate")
 
     p_values: list[float] = []
+    metric_maps: list[dict[str, Any]] = []
     for row in rows:
+        metrics = row.get("metrics")
+        if not isinstance(metrics, dict):
+            metrics = row
+        metric_maps.append(metrics)
         status = row.get("status")
-        p_empirical = row.get("p_empirical")
+        p_empirical = metrics.get("p_empirical")
         if status == "ESTIMABLE":
             if isinstance(p_empirical, bool) or not isinstance(p_empirical, (int, float)):
                 raise ValueError("empirical_p_required")
             p = float(p_empirical)
             if not math.isfinite(p) or not 0.0 <= p <= 1.0:
                 raise ValueError("empirical_p_invalid")
-            if row.get("non_estimability_reason") not in (None, ""):
+            if metrics.get("non_estimability_reason") not in (None, ""):
                 raise ValueError("estimable_row_has_nonestimability_reason")
         elif status == "INSUFFICIENT_POWER":
-            reason = row.get("non_estimability_reason")
-            if reason not in NON_ESTIMABILITY_REASONS:
+            if metrics.get("non_estimability_reason") not in NON_ESTIMABILITY_REASONS:
                 raise ValueError("non_estimability_reason_required")
             if p_empirical is not None:
                 raise ValueError("nonestimable_empirical_p_must_be_null")
@@ -193,6 +198,7 @@ def adjust_bh_family(family: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             raise ValueError("fdr_member_status_unsupported")
         row["bh_input_p"] = p
+        metrics["bh_input_p"] = p
         p_values.append(p)
 
     m = len(rows)
@@ -208,6 +214,8 @@ def adjust_bh_family(family: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     for index, row in enumerate(rows):
         row["fdr_q"] = float(q_values[index])
         row["family_m"] = m
+        metric_maps[index]["fdr_q"] = float(q_values[index])
+        metric_maps[index]["family_m"] = m
     return rows
 
 
@@ -215,7 +223,7 @@ def evaluate_family_atomically(
     items: Iterable[Any],
     evaluator: Callable[[Any], dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Evaluate a synthetic frozen family; return nothing if a structural error occurs."""
+    """Return the complete synthetic family or raise without returning partial rows."""
     completed_rows: list[dict[str, Any]] = []
     for item in items:
         try:
@@ -229,8 +237,7 @@ def evaluate_family_atomically(
             })
             continue
         except Exception as exc:
-            # Durable operational abortion records are handled by the runner/CI
-            # layer in the separate E11 implementation.
+            # Durable E11 abortion records are a separate implementation scope.
             raise StructuralBatchAbort("UNEXPECTED_ERROR", "analysis", completed=False) from exc
         if not isinstance(result, dict):
             raise StructuralBatchAbort("UNEXPECTED_ERROR", "analysis", completed=False)
