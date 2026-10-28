@@ -32,7 +32,7 @@ def call_rpc(conn, lab_id, run_id, baseline=3.5, fail_evidence=False, gen=0):
     ).fetchone()[0]
 
 
-def setup_database():
+def setup_database(apply_migration=True):
     with connect() as conn:
         conn.execute("""
             DROP TABLE IF EXISTS public.lab_results CASCADE;
@@ -49,8 +49,9 @@ def setup_database():
                 creado_en timestamptz DEFAULT now()
             );
         """)
-        with open(MIGRATION, encoding="utf-8") as f:
-            conn.execute(f.read())
+        if apply_migration:
+            with open(MIGRATION, encoding="utf-8") as migration_file:
+                conn.execute(migration_file.read())
 
 
 def install_failure_trigger(conn):
@@ -159,3 +160,34 @@ def test_same_generation_does_not_accept_provisional_baseline_after_race():
             "SELECT count(*) FROM public.lab_results WHERE lab_id=%s AND params->>'record_type'='evidence'",
             ("H990",),
         ).fetchone()[0] == 1
+
+
+
+def test_migration_fails_safely_when_historical_baselines_are_duplicated():
+    setup_database(apply_migration=False)
+    with connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO public.lab_results (lab_id, gen, params, metrics, status)
+            VALUES
+              ('H-HIST', 0, '{"record_type":"baseline","baseline":3.5,"baseline_frozen":true}', '{}', 'PROMETE'),
+              ('H-HIST', 0, '{"record_type":"baseline","baseline":4.5,"baseline_frozen":true}', '{}', 'PROMETE')
+            """
+        )
+        conn.commit()
+
+        try:
+            with open(MIGRATION, encoding="utf-8") as migration_file:
+                conn.execute(migration_file.read())
+            raise AssertionError("Migration unexpectedly accepted duplicate historical baselines")
+        except psycopg.Error as exc:
+            assert "prd_atomic_migration_preflight_failed" in str(exc)
+        conn.rollback()
+
+        # The migration must not delete, rewrite, or partially constrain historical rows.
+        assert conn.execute(
+            "SELECT count(*) FROM public.lab_results WHERE lab_id='H-HIST'"
+        ).fetchone()[0] == 2
+        assert conn.execute(
+            "SELECT count(*) FROM pg_indexes WHERE schemaname='public' AND indexname='uq_lab_results_prd_baseline_generation'"
+        ).fetchone()[0] == 0
