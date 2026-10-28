@@ -650,7 +650,7 @@ def main():
         print(json.dumps({"lab_id": lab_id, "status": status,
                           "evidence_count": new_evidence_count,
                           "reproducible": reproducible, "metrics": metrics,
-                          "insert_ok": bool(insert_response.data)}))
+                          "insert_ok": True, "run_id": run_id, "persistence": rpc_data}))
 
     except Exception as e:
         print(json.dumps({"error": str(e), "hypothesis": args.hypothesis, "status": "ERROR"}))
