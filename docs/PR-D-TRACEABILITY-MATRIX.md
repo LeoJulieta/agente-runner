@@ -1,7 +1,7 @@
 # PR D v2 — Matriz de aceptación contractual determinista T01–T32
 
 **Estado:** borrador documental para auditoría humana; no autoriza implementación ni ejecución científica.  
-**Contrato fuente:** `docs/PR-D-DESIGN.md`, PR D v2 con enmiendas E6–E11 propuestas en §16; pendiente de revisión/fusión.  
+**Contrato fuente:** `docs/PR-D-DESIGN.md`, PR D v2 con enmiendas E6–E11 en §16; SHA-256 `e0089b6973cedeef6c4f137f6d3d414270379456ba6694a82b49ce5b784a33cd` (propuesta, pendiente de revisión/fusión).  
 **Base de auditoría de infraestructura:** `main` en `ae8314192c0f031db292844004953383b3030679` (PR #89).  
 **Seguridad:** `docs/manifest.json` permanece `execution_status: "fixture"`; no ejecutar hipótesis reales ni escribir en Supabase de producción.  
 **Alcance de esta actualización:** documentación solamente; no se implementa ningún cálculo estadístico.
