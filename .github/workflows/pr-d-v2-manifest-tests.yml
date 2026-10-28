@@ -6,6 +6,7 @@ on:
     paths:
       - "labs/pr_d_manifest.py"
       - "labs/pr_d_single_run_gate.py"
+      - "labs/lab_engine.py"
       - "docs/manifest.json"
       - "docs/pr-d-v2-manifest.schema.json"
       - "docs/PR-D-DESIGN.md"
@@ -30,6 +31,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install engine pre-gate dependency
+        run: python -m pip install pyyaml
       - name: Unit tests
         run: python -m unittest -v tests.test_pr_d_manifest tests.test_pr_d_single_run_gate
       - name: Verify corrupt manifest exits 2 and the engine wrapper is not invoked
