@@ -56,10 +56,10 @@
 1. T07–T22 y T28 aún necesitan implementación y pruebas estadísticas específicas; no existe evidencia localizada que permita marcarlas como implementadas.
 2. T01–T06, T23–T27 y T29–T31 requieren cerrar la cobertura de validación, precedencia, esquema y workflow regla por regla. La infraestructura existente es parcial y no sustituye las pruebas científicas.
 3. T08/T12 deben distinguir de forma explícita no estimabilidad científica de errores estructurales; T13/T29 deben demostrar durabilidad del registro de aborto y separación de intentos.
-3. T32 tiene evidencia de infraestructura en pruebas RPC/PostgreSQL CI y E2E local de H990, pero el alcance debe seguir acotado a ese entorno y esos invariantes.
-4. La auditoría de Supabase de producción **no se realizó**. Esta matriz no afirma conocer el esquema aplicado, políticas, datos ni estado de producción.
-5. Antes de implementar deben resolverse ambigüedades contractuales, definir el catálogo cerrado de causas y confirmar los fixtures numéricos con una implementación de referencia aislada. No se debe inventar tolerancia, redondeo o igualdad aproximada para MAD degenerada sin dejarlo especificado y revisado.
-6. La matriz es un artefacto de aceptación, no prueba de que el código satisfaga las reglas. No debe calcularse un porcentaje global de aprobación que oculte reglas estadísticas críticas ausentes.
+4. T32 tiene evidencia de infraestructura en pruebas RPC/PostgreSQL CI y E2E local de H990, pero el alcance debe seguir acotado a ese entorno y esos invariantes.
+5. La auditoría de Supabase de producción **no se realizó**. Esta matriz no afirma conocer el esquema aplicado, políticas, datos ni estado de producción.
+6. Antes de implementar deben resolverse ambigüedades contractuales, definir el catálogo cerrado de causas y confirmar los fixtures numéricos con una implementación de referencia aislada. No se debe inventar tolerancia, redondeo o igualdad aproximada para MAD degenerada sin dejarlo especificado y revisado.
+7. La matriz es un artefacto de aceptación, no prueba de que el código satisfaga las reglas. No debe calcularse un porcentaje global de aprobación que oculte reglas estadísticas críticas ausentes.
 
 ## Decisión de seguridad
 
