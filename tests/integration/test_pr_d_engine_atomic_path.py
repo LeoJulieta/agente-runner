@@ -100,9 +100,7 @@ def test_engine_sends_generation_to_atomic_rpc(monkeypatch, capsys):
     monkeypatch.setenv("SUPABASE_KEY", "fixture-key")
     monkeypatch.setattr(sys, "argv", ["lab_engine.py", "--hypothesis", "H990"])
 
-    with pytest.raises(SystemExit) as exc:
-        module.main()
-    assert exc.value.code == 0
+    module.main()
     name, payload = client.rpc_args
     assert name == "rpc_insert_baseline_and_evidence"
     assert payload["p_gen"] == 1
