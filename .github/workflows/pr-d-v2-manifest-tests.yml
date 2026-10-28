@@ -6,6 +6,7 @@ on:
     paths:
       - "labs/pr_d_manifest.py"
       - "docs/manifest.json"
+      - "docs/pr-d-v2-manifest.schema.json"
       - "docs/PR-D-DESIGN.md"
       - "tests/test_pr_d_manifest.py"
       - ".github/workflows/lab_batch.yml"
