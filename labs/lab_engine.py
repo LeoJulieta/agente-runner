@@ -292,12 +292,13 @@ def _baseline_scalar(baseline):
     return baseline if isinstance(baseline, (int, float)) else 0
 
 
-def get_existing_baseline(lab_id: str, supabase):
-    """Lee el baseline congelado sin persistir nada. Devuelve (valor, encontrado)."""
+def get_existing_baseline(lab_id: str, gen: int, supabase):
+    """Lee el baseline congelado de la generación solicitada, sin persistir."""
     response = (
         supabase.table("lab_results")
         .select("params")
         .eq("lab_id", lab_id)
+        .eq("gen", gen)
         .eq("status", "PROMETE")
         .order("id", desc=False)
         .execute()
@@ -552,7 +553,7 @@ def main():
             sys.exit(0)
 
         # 4. Baseline existente; con ventana, DEBE existir
-        baseline_value, found = get_existing_baseline(contract["id"], supabase)
+        baseline_value, found = get_existing_baseline(contract["id"], contract.get("gen", 0), supabase)
         if not found:
             if window is not None:
                 print(json.dumps({"lab_id": contract["id"], "status": "INVALID",
