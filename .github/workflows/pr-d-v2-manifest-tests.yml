@@ -5,11 +5,14 @@ on:
     branches: [main]
     paths:
       - "labs/pr_d_manifest.py"
+      - "labs/pr_d_single_run_gate.py"
       - "docs/manifest.json"
       - "docs/pr-d-v2-manifest.schema.json"
       - "docs/PR-D-DESIGN.md"
       - "tests/test_pr_d_manifest.py"
+      - "tests/test_pr_d_single_run_gate.py"
       - ".github/workflows/lab_batch.yml"
+      - ".github/workflows/lab_run.yml"
       - ".github/workflows/pr-d-v2-manifest-tests.yml"
   workflow_dispatch:
 
@@ -28,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Unit tests
-        run: python -m unittest -v tests.test_pr_d_manifest
+        run: python -m unittest -v tests.test_pr_d_manifest tests.test_pr_d_single_run_gate
       - name: Verify corrupt manifest exits 2 and the engine wrapper is not invoked
         shell: bash
         run: |
@@ -36,8 +39,6 @@ jobs:
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
           printf '{broken json' > "$tmp/corrupt.json"
-          # This mirrors the fail-fast ordering: the engine marker is written only
-          # if the exact Gate 0 command succeeds.
           set +e
           bash -c 'python labs/pr_d_manifest.py --manifest "$1" --require-runnable --hypothesis-ids H990_PRD_TEST_INIT && touch "$2/engine_invoked"' _ "$tmp/corrupt.json" "$tmp"
           rc=$?
@@ -57,3 +58,12 @@ jobs:
           echo "PASS: test-only fixture blocked in runnable mode"
       - name: Validate checked-in fixture manifest
         run: python labs/pr_d_manifest.py --manifest docs/manifest.json
+      - name: Verify single-hypothesis workflow is blocked before engine invocation
+        run: |
+          set -euo pipefail
+          set +e
+          python labs/pr_d_single_run_gate.py --manifest docs/manifest.json --hypothesis-id H990_PRD_TEST_INIT
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          echo "PASS: single-run Gate 0 blocks fixture manifest"
