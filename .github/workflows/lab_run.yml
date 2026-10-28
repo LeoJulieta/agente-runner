@@ -13,8 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
       HYPOTHESIS_ID: ${{ inputs.hypothesis_id }}
     steps:
       - name: Checkout repo
@@ -30,4 +28,7 @@ jobs:
           python -m pip install supabase pyyaml
 
       - name: Ejecutar hipótesis
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python labs/lab_engine.py --hypothesis "$HYPOTHESIS_ID"
