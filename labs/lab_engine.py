@@ -292,12 +292,13 @@ def _baseline_scalar(baseline):
     return baseline if isinstance(baseline, (int, float)) else 0
 
 
-def get_existing_baseline(lab_id: str, supabase):
-    """Lee el baseline congelado sin persistir nada. Devuelve (valor, encontrado)."""
+def get_existing_baseline(lab_id: str, gen: int, supabase):
+    """Lee el baseline congelado de la generación solicitada, sin persistir."""
     response = (
         supabase.table("lab_results")
         .select("params")
         .eq("lab_id", lab_id)
+        .eq("gen", gen)
         .eq("status", "PROMETE")
         .order("id", desc=False)
         .execute()
@@ -552,7 +553,7 @@ def main():
             sys.exit(0)
 
         # 4. Baseline existente; con ventana, DEBE existir
-        baseline_value, found = get_existing_baseline(contract["id"], supabase)
+        baseline_value, found = get_existing_baseline(contract["id"], contract.get("gen", 0), supabase)
         if not found:
             if window is not None:
                 print(json.dumps({"lab_id": contract["id"], "status": "INVALID",
@@ -561,7 +562,7 @@ def main():
                 sys.exit(0)
             # 5. Primera corrida válida: calcular y recién ahora persistir
             baseline_value, baseline_type = _compute_baseline_value(contract, supabase)
-            persist_baseline(contract, supabase, baseline_value, baseline_type)
+            # Do not persist here: baseline + evidence must be committed by one RPC.
 
         comparison = compare(measured, baseline_value, contract)
         passed = bool(comparison["passed"])
@@ -587,37 +588,70 @@ def main():
         )
         reproducible = bool(passed) and prior_independent
 
-        last_response = (
-            supabase.table("lab_results")
-            .select("evidence_count")
-            .eq("lab_id", lab_id)
-            .order("id", desc=True)
-            .limit(1)
-            .execute()
-        )
-        last_rows = last_response.data or []
-        previous_evidence_count = last_rows[0].get("evidence_count", 0) if last_rows else 0
-        new_evidence_count = previous_evidence_count + 1
-
         metrics = {**measured, **comparison, "method_fingerprint": fingerprint}
         params = dict(contract)
-        params["record_type"] = "evidence"
 
-        insert_response = supabase.table("lab_results").insert({
+        # Stable idempotency key: a retry of the same logical measurement uses
+        # the same key; a different window or measured result gets a different key.
+        run_material = {
             "lab_id": lab_id,
             "gen": contract.get("gen", 0),
-            "params": params,
+            "method_fingerprint": fingerprint,
+            "window": current_window,
             "metrics": metrics,
-            "status": status,
-            "evidence_count": new_evidence_count,
-            "reproducible": reproducible,
-            "last_test": datetime.now(timezone.utc).isoformat(),
-        }).execute()
+        }
+        run_id = hashlib.sha256(
+            json.dumps(run_material, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        ).hexdigest()
+
+        baseline_payload = None
+        baseline_type_payload = None
+        if not found:
+            baseline_payload = baseline_value
+            baseline_type_payload = baseline_type
+
+        try:
+            rpc_response = supabase.rpc("rpc_insert_baseline_and_evidence", {
+                "p_lab_id": lab_id,
+                "p_gen": contract.get("gen", 0),
+                "p_baseline_value": baseline_payload,
+                "p_baseline_type": baseline_type_payload,
+                "p_evidence_params": params,
+                "p_evidence_metrics": metrics,
+                "p_status": status,
+                "p_reproducible": reproducible,
+                "p_run_id": run_id,
+            }).execute()
+        except Exception as exc:
+            # The only supported persistence path is the atomic PostgreSQL RPC.
+            # A missing/unavailable RPC is structural, not an ordinary run error.
+            print(json.dumps({
+                "error": str(exc),
+                "hypothesis": args.hypothesis,
+                "status": "ERROR",
+                "failure_reason": "atomic_persistence_unavailable",
+                "run_id": run_id,
+            }))
+            sys.exit(2)
+
+        rpc_data = rpc_response.data
+        if isinstance(rpc_data, list):
+            rpc_data = rpc_data[0] if rpc_data else None
+        if not isinstance(rpc_data, dict) or not rpc_data.get("id"):
+            print(json.dumps({
+                "error": "RPC returned no persisted evidence identifier",
+                "hypothesis": args.hypothesis,
+                "status": "ERROR",
+                "failure_reason": "atomic_persistence_unverifiable",
+                "run_id": run_id,
+            }))
+            sys.exit(2)
+        new_evidence_count = rpc_data.get("evidence_count")
 
         print(json.dumps({"lab_id": lab_id, "status": status,
                           "evidence_count": new_evidence_count,
                           "reproducible": reproducible, "metrics": metrics,
-                          "insert_ok": bool(insert_response.data)}))
+                          "insert_ok": True, "run_id": run_id, "persistence": rpc_data}))
 
     except Exception as e:
         print(json.dumps({"error": str(e), "hypothesis": args.hypothesis, "status": "ERROR"}))
