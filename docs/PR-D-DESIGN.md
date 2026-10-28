@@ -592,3 +592,75 @@ Antes de implementar deberán definirse la ruta y el esquema definitivos del man
 La aceptación técnica posterior deberá incluir, como mínimo, pruebas aisladas de: manifiesto ausente/corrupto; YAML individual ausente conservando `m`; parámetro inválido `sample_min <= 0`; muestra válida con `n = 0`; códigos de salida 0/1/2 y error desconocido; workflow que no absorbe fallos estructurales; atomicidad e idempotencia; y concurrencia de baseline. Las pruebas de aceptación existentes en §14 siguen vigentes.
 
 Esta sección no autoriza cambios en el motor, workflows, hipótesis, esquema ni datos de Supabase; tampoco autoriza ejecutar pruebas de escritura en producción. Esas fases requieren revisión técnica y autorización separadas.
+
+## 16. Enmiendas contractuales E6–E11 — cierre de N1–N6
+
+Esta sección resuelve normativamente N1–N6 de la matriz de trazabilidad. Estas enmiendas son documentales: no implementan cálculos, no autorizan hipótesis reales ni habilitan escrituras en Supabase de producción.
+
+### 16.1 E6 — Elegibilidad del antecedente A (N1)
+
+Se distinguen **antecedente localizable** (misma hipótesis, identidad estable, contrato y `method_fingerprint` compatibles, estado A `PROMETE` o `VERIFICADO`) y **antecedente suficiente** (además contiene campos inferenciales obligatorios válidos y finitos, incluidos `effect_size`, `ci_low` y `ci_high` en la escala contractual). A localizable pero incompleto no puede respaldar `VERIFICADO`. Si B supera sus gates y A es incompleta, B queda `PROMETE`, `reproducible=false`, `metrics.reproducible_state="not_evaluable"` y `metrics.reproducibility_reason="antecedent_incomplete"`. No se imputan campos ni se interpreta la falta de IC como incompatibilidad estadística.
+
+### 16.2 E7 — Invariante de estado B y reproducibilidad (N2)
+
+Invariante: B con `status="VERIFICADO"` implica `reproducible=true` y `metrics.reproducible_state="reproducible"`.
+
+| Condición | Estado B | `reproducible` | `metrics.reproducible_state` |
+|---|---|---:|---|
+| Contrato/datos inválidos | `INVALID` | `false` | `not_evaluable` |
+| Información insuficiente o método no estimable según §16.3 | `INSUFFICIENT_POWER` | `false` | `not_evaluable` |
+| B supera gates, pero A no existe o no es localizable | `PROMETE` | `false` | `not_evaluable` |
+| B supera gates, pero A localizable carece de campos inferenciales obligatorios | `PROMETE` | `false` | `not_evaluable` |
+| Comparación evaluable y cumple todos los criterios, incluida dirección, IC compatibles, ventanas disjuntas y `drift_flag="OK"` | `VERIFICADO` | `true` | `reproducible` |
+| Comparación evaluable que falla criterio obligatorio de reproducibilidad | `RECHAZA` | `false` | `not_reproducible` |
+
+La precedencia de invalidez e insuficiencia se mantiene. Una comparación no evaluable no se clasifica como incompatible.
+
+### 16.3 E8 — Modelo no estimable y estado científico (N3)
+
+Con datos y parámetros válidos, si el método preregistrado no produce una estimación válida —por ejemplo, separación logística, no convergencia o modelo no estimable—, el estado individual será `INSUFFICIENT_POWER`, incluso si `n_eff` alcanza el piso general. `RECHAZA` se reserva para una evaluación válida que no supera los gates. La hipótesis conserva su posición en la familia FDR y `p=1.0` se usa solo como entrada conservadora del ajuste BH, nunca como p-valor empírico.
+
+Catálogo cerrado de `metrics.non_estimability_reason`: `logistic_separation`, `model_non_convergence`, `model_not_estimable`. Se usa exactamente una causa compatible con el fallo; no se generan etiquetas dinámicas. Si no puede determinarse que el fallo es no estimabilidad científica, no se asigna una de estas causas por inferencia: el error se trata como estructural. Fallos inesperados de software, lectura o infraestructura no se reclasifican como insuficiencia científica; se aplica §15.4 y se aborta conservadoramente si la integridad del lote no puede probarse.
+
+### 16.4 E9 — `n_required_power` y motivos cerrados de nulidad (N4)
+
+En PR D v1, `n_required_power` es informativo y nunca es gate. Solo se calcula con método de potencia preregistrado aplicable, efecto mínimo, alfa, potencia objetivo, diseño y parámetros exigidos. No se impone una fórmula universal a ambas familias ni se elige una fórmula tras observar resultados.
+
+Si el cálculo no procede o no es válido, `metrics.n_required_power=null`, `metrics.n_required_power_reason` debe ser exactamente uno de `method_not_preregistered`, `missing_parameters`, `assumptions_not_met`, `unsupported_family_or_model`, `invalid_effect_specification`, y `metrics.n_required_power_unit=null`. Si el cálculo es válido, `metrics.n_required_power` debe ser finito y positivo, `metrics.n_required_power_reason=null`, y `metrics.n_required_power_unit` debe ser exactamente `eligible_observations` o `positive_events`, según la unidad que el método preregistrado calcula. Un resultado válido no puede tener razón de nulidad ni unidad nula; un resultado nulo no puede carecer de motivo ni declarar una unidad. Los tests deben cubrir cada uno de los cinco motivos, cálculo válido por cada unidad aplicable y rechazo de valores no finitos/no positivos.
+
+EPV y `n_eff >= 30` no son garantías exactas de potencia. Un gate obligatorio de potencia requiere futura versión contractual.
+
+### 16.5 E10 — Tabla determinista exhaustiva de drift (N5)
+
+Se incorpora `metrics.drift_evaluation_state` con catálogo cerrado `complete`, `partial`, `not_evaluable`. `d_init` y `D_cond` son evaluables solo cuando su cálculo cumple el contrato; un valor ausente por error de datos/contrato no debe tratarse como simple falta de eventos.
+
+| Evaluabilidad y condición | `drift_flag` | `drift_evaluation_state` |
+|---|---|---|
+| `d_init` evaluable y `d_init > 0.10`; `D_cond` evaluable | `REGIME_SHIFT_SUSPECTED` | `complete` |
+| `d_init` evaluable y `d_init > 0.10`; `D_cond=null` por causa admisible | `REGIME_SHIFT_SUSPECTED` | `partial` |
+| `d_init` evaluable y `d_init <= 0.10`; `D_cond` evaluable y `D_cond > 0.50` | `REGIME_SHIFT_SUSPECTED` | `complete` |
+| `d_init` evaluable y `d_init <= 0.10`; `D_cond` evaluable y `D_cond <= 0.50` | `OK` | `complete` |
+| `d_init` evaluable y `d_init <= 0.10`; `D_cond=null` por `insufficient_positive_events` | `OK` | `partial` |
+| `d_init` no evaluable; `D_cond` evaluable y `D_cond > 0.50` | `REGIME_SHIFT_SUSPECTED` | `partial` |
+| `d_init` no evaluable; `D_cond` evaluable y `D_cond <= 0.50` | `OK` | `partial` |
+| `d_init` no evaluable; `D_cond=null` por `insufficient_positive_events` | `null` | `not_evaluable` |
+| `D_cond=null` por `scale_zero_medians_differ`, cualquiera que sea la evaluabilidad de `d_init` | `REGIME_SHIFT_SUSPECTED` | `partial` (porque `D_cond` no es evaluable) |
+
+
+Causas contractuales de `D_cond=null` en esta regla: `insufficient_positive_events` y `scale_zero_medians_differ`. La segunda siempre activa alerta. Si aparece otra causa, debe clasificarse conforme a las reglas de invalidez/fallo estructural; no se absorbe como evaluación parcial. Si `d_init` no es evaluable por datos inválidos, la precedencia de `INVALID` se conserva y no se emite una conclusión científica de drift.
+
+La alerta de iniciación prevalece aunque `D_cond` sea nulo. `OK` con evaluación parcial solo significa que no se detectó drift con los indicadores disponibles. Una comparación parcial no respalda `VERIFICADO`, porque todos los criterios de reproducibilidad deben ser evaluables. Los umbrales son estrictos: igualdad exacta a 0.10 o 0.50 no activa por sí sola la alerta correspondiente.
+
+### 16.6 E11 — Registro operativo de aborto (N6)
+
+Un lote abortado no publica filas científicas parciales como si fueran válidas o completas. Se separan los resultados científicos de un registro operativo de fallo conservado en artefacto durable del runner/CI o log operativo, fuera de la tabla científica. Esta enmienda no exige ni autoriza una tabla, migración, RPC o escritura en Supabase.
+
+Campos mínimos del registro: `batch_id`, `execution_id`, versión/hash del contrato, hash o referencia exacta del manifiesto, `failure_code`, `failure_phase`, `status="ABORTED"`, `completed=false`, marca temporal y referencia al diagnóstico/log/artifact. `execution_id` se genera antes de iniciar la ejecución. El registro debe conservarse fuera de la memoria efímera del proceso y ser recuperable tras terminar el runner; el workflow debe fallar y no presentar el lote como completo. Si no puede confirmarse la escritura durable del registro, el log de CI/runner debe contener al menos el mismo identificador, código y fase del fallo.
+
+Catálogo cerrado de `failure_code`: `SCHEMA_INCOMPATIBLE`, `WINDOW_INVALID`, `METHOD_FINGERPRINT_MISMATCH`, `DATA_READ_FAILURE`, `CONNECTION_FAILURE`, `UNEXPECTED_ERROR`. Catálogo cerrado de `failure_phase`: `preflight`, `data_read`, `validation`, `analysis`, `aggregation`, `persistence`, `finalization`. El error no clasificable se registra como `UNEXPECTED_ERROR`; no se inventan valores nuevos en ejecución.
+
+La política de reintento debe ser explícita y registrar relación con el intento previo. Cada intento conserva su propio `execution_id`; un reintento nunca cambia retrospectivamente un intento abortado a completo ni publica resultados parciales como lote válido. La idempotencia se vincula al identificador estable de lote y a la política de reintento, no solo al hash del contrato. La aceptación debe probar la persistencia durable del registro y la ausencia de publicación científica parcial en un entorno aislado.
+
+### 16.7 Aceptación documental
+
+Antes de implementar, agregar y ejecutar en entorno aislado con fixtures sintéticos pruebas que distingan: (a) A ausente, no localizable, incompatible e incompleta, probando por separado cada campo inferencial obligatorio ausente/no finito y el caso A completa; (b) tabla cruzada de estado/reproducibilidad con comparación no evaluable frente a evaluable incompatible; (c) no estimabilidad científica con `n_eff` suficiente frente a error estructural inesperado; (d) cada motivo de nulidad de potencia, cálculo válido con ambas unidades cuando aplique, y consistencia entre valor, razón y unidad; (e) todas las ramas de la tabla de drift, ambas degeneraciones, umbrales exactos y casos adyacentes; (f) aborto con códigos/fases cerrados, registro durable recuperable, `completed=false`, reintento separado y ausencia de resultados científicos parciales presentados como válidos. La documentación no demuestra cobertura de código.
