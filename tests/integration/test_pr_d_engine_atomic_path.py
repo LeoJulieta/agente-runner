@@ -67,6 +67,11 @@ def load_engine(monkeypatch, rpc_raises=False):
 
 
 def prepare_engine(monkeypatch, module, gen=1):
+    # These tests isolate RPC-path behavior. The real fail-closed manifest gate
+    # is exercised by tests/test_pr_d_single_run_gate.py; keep the checked-in
+    # manifest as fixture and do not synthesize approval in this test suite.
+    monkeypatch.setattr(module, "load_and_validate_manifest", lambda _path: {"execution_status": "fixture"})
+    monkeypatch.setattr(module, "validate_single_run", lambda _manifest, _hypothesis: None)
     contract = {
         "id": "H990",
         "gen": gen,

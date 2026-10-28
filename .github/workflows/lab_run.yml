@@ -13,15 +13,22 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      HYPOTHESIS_ID: ${{ inputs.hypothesis_id }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      # Fail closed before installing dependencies or invoking the engine.
+      # docs/manifest.json is currently fixture-only, so this workflow must block.
+      - name: Gate 0 - require approved manifest and frozen hypothesis ID
+        run: python labs/pr_d_single_run_gate.py --manifest docs/manifest.json --hypothesis-id "$HYPOTHESIS_ID"
+
       - name: Install dependencies
         run: |
-          pip install supabase pyyaml
+          python -m pip install supabase pyyaml
 
       - name: Ejecutar hipótesis
-        run: python labs/lab_engine.py --hypothesis ${{ inputs.hypothesis_id }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python labs/lab_engine.py --hypothesis "$HYPOTHESIS_ID"

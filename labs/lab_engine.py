@@ -28,7 +28,13 @@ import argparse
 import yaml
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
-from supabase import create_client
+try:
+    from labs.pr_d_single_run_gate import validate_single_run
+    from labs.pr_d_manifest import load_and_validate_manifest
+except ModuleNotFoundError:  # Direct script execution sets sys.path[0] to labs/
+    from pr_d_single_run_gate import validate_single_run
+    from pr_d_manifest import load_and_validate_manifest
+
 
 MAX_ROWS = 200
 
@@ -508,12 +514,28 @@ def main():
     parser.add_argument("--cutoff-rows", required=False, default=None, type=int)
     args = parser.parse_args()
 
+    # Defense in depth: enforce the frozen manifest inside the engine itself,
+    # before reading database credentials, creating a client, or touching data.
+    try:
+        manifest = load_and_validate_manifest("docs/manifest.json")
+        validate_single_run(manifest, args.hypothesis)
+    except Exception as exc:
+        print(json.dumps({
+            "error": "execution_manifest_blocked",
+            "hypothesis": args.hypothesis,
+            "status": "ERROR",
+            "failure_reason": type(exc).__name__,
+        }))
+        sys.exit(2)
+
     try:
         window = _parse_window(args.window)
     except ValueError as e:
-        print(json.dumps({"error": str(e), "hypothesis": args.hypothesis, "status": "ERROR"}))
+        print(json.dumps({"error": "invalid_execution_window", "hypothesis": args.hypothesis, "status": "ERROR"}))
         sys.exit(1)
 
+    # Import the DB client only after the manifest gate has passed.
+    from supabase import create_client
     supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
     try:
@@ -626,7 +648,7 @@ def main():
             # The only supported persistence path is the atomic PostgreSQL RPC.
             # A missing/unavailable RPC is structural, not an ordinary run error.
             print(json.dumps({
-                "error": str(exc),
+                "error": "atomic_persistence_unavailable",
                 "hypothesis": args.hypothesis,
                 "status": "ERROR",
                 "failure_reason": "atomic_persistence_unavailable",
@@ -654,7 +676,7 @@ def main():
                           "insert_ok": True, "run_id": run_id, "persistence": rpc_data}))
 
     except Exception as e:
-        print(json.dumps({"error": str(e), "hypothesis": args.hypothesis, "status": "ERROR"}))
+        print(json.dumps({"error": "engine_execution_failed", "hypothesis": args.hypothesis, "status": "ERROR"}))
         sys.exit(1)
 
 

@@ -1,0 +1,89 @@
+name: PR D v2 - Disposable Supabase HTTP RPC E2E
+
+on:
+  push:
+    branches: ["feat/pr-d-e2e-safety-gate"]
+  pull_request:
+    paths:
+      - "supabase/migrations/004_pr_d_v2_atomic_persistence.sql"
+      - "tests/e2e/test_pr_d_supabase_http_rpc.py"
+      - ".github/workflows/pr-d-supabase-http-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  supabase-http-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: supabase/setup-cli@v3
+      - name: Install test dependencies
+        run: python -m pip install "psycopg[binary]>=3.2,<4" "pytest>=8,<9"
+      - name: Provision isolated disposable Supabase stack and test real HTTP RPC
+        shell: bash
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/pr-d-supabase-e2e"
+          mkdir -p "$workdir"
+          cd "$workdir"
+
+          # This creates only a temporary local project in the runner. It is not
+          # linked to a hosted Supabase project and receives no repository secrets.
+          supabase init
+          supabase migration new create_e2e_lab_results
+          # Supabase CLI migration versions have one-second precision; avoid a
+          # duplicate version when generating two migrations in the same second.
+          sleep 2
+          bootstrap="$(find supabase/migrations -maxdepth 1 -name '*_create_e2e_lab_results.sql' -print -quit)"
+          test -n "$bootstrap"
+          cat > "$bootstrap" <<'SQL'
+          CREATE TABLE public.lab_results (
+              id bigserial PRIMARY KEY,
+              lab_id text NOT NULL,
+              gen integer DEFAULT 0,
+              params jsonb,
+              metrics jsonb,
+              status text CHECK (status IN ('PROMETE','VERIFICADO','STALE','CADUCADO')),
+              evidence_count integer DEFAULT 0,
+              reproducible boolean DEFAULT false,
+              last_test timestamptz,
+              creado_en timestamptz DEFAULT now()
+          );
+          ALTER TABLE public.lab_results ENABLE ROW LEVEL SECURITY;
+          GRANT ALL ON TABLE public.lab_results TO service_role;
+          GRANT USAGE, SELECT ON SEQUENCE public.lab_results_id_seq TO service_role;
+          SQL
+
+          supabase migration new pr_d_v2_atomic_persistence
+          atomic_migration="$(find supabase/migrations -maxdepth 1 -name '*_pr_d_v2_atomic_persistence.sql' -print -quit)"
+          test -n "$atomic_migration"
+          cp "$GITHUB_WORKSPACE/supabase/migrations/004_pr_d_v2_atomic_persistence.sql" "$atomic_migration"
+
+          supabase start -x studio,inbucket,analytics,vector
+          trap 'supabase stop --no-backup >/dev/null 2>&1 || true' EXIT
+
+          # Keep local credentials out of logs. The environment file is generated
+          # by the local CLI and is never uploaded as an artifact.
+          supabase status -o env > "$RUNNER_TEMP/pr-d-supabase.env"
+          set -a
+          source "$RUNNER_TEMP/pr-d-supabase.env"
+          set +a
+          test -n "${API_URL:-}"
+          test -n "${DB_URL:-}"
+          test -n "${SERVICE_ROLE_KEY:-}"
+          test -n "${ANON_KEY:-}"
+          echo "::add-mask::$SERVICE_ROLE_KEY"
+          echo "::add-mask::$ANON_KEY"
+          export SUPABASE_URL="$API_URL"
+          export SUPABASE_KEY="$SERVICE_ROLE_KEY"
+          export SUPABASE_ANON_KEY="$ANON_KEY"
+          export TEST_DATABASE_URL="$DB_URL"
+          python -m pytest -q "$GITHUB_WORKSPACE/tests/e2e/test_pr_d_supabase_http_rpc.py"
