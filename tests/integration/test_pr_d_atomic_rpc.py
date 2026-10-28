@@ -21,7 +21,7 @@ def call_rpc(conn, lab_id, run_id, baseline=3.5, fail_evidence=False, gen=0):
         (
             lab_id,
             gen,
-            "3.5" if baseline is not None else None,
+            str(baseline) if baseline is not None else None,
             "fixture",
             '{"record_type":"evidence","fixture":true}',
             '{"sample_size":10,"passed":true}',
@@ -148,6 +148,7 @@ def test_same_generation_does_not_accept_provisional_baseline_after_race():
     setup_database()
     with connect() as conn:
         call_rpc(conn, "H990", "first-run", baseline=3.5, gen=0)
+        conn.commit()  # Keep the first successful transaction when the retry fails.
         try:
             call_rpc(conn, "H990", "stale-provisional-run", baseline=9.0, gen=0)
             raise AssertionError("RPC accepted evidence computed against a provisional baseline")
