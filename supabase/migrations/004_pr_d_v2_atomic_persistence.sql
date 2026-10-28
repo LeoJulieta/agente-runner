@@ -3,6 +3,47 @@
 -- This migration is applied only through the normal reviewed migration process.
 -- It does not run against any database from CI.
 
+-- Fail safely before creating uniqueness constraints if legacy data already conflicts.
+-- No historical rows are deleted or rewritten by this migration. Resolve any reported
+-- duplicates through a separately reviewed, evidence-preserving cleanup procedure.
+DO $migration_preflight$
+DECLARE
+    v_duplicate_run_groups bigint;
+    v_duplicate_baseline_groups bigint;
+BEGIN
+    SELECT count(*) INTO v_duplicate_run_groups
+    FROM (
+        SELECT lab_id, params ->> 'run_id'
+        FROM public.lab_results
+        WHERE params ->> 'record_type' = 'evidence'
+          AND params ? 'run_id'
+        GROUP BY lab_id, params ->> 'run_id'
+        HAVING count(*) > 1
+    ) AS duplicate_runs;
+
+    SELECT count(*) INTO v_duplicate_baseline_groups
+    FROM (
+        SELECT lab_id, gen
+        FROM public.lab_results
+        WHERE status = 'PROMETE'
+          AND (
+            params ->> 'record_type' = 'baseline'
+            OR params ->> 'baseline_frozen' = 'true'
+            OR (params ? 'baseline' AND jsonb_typeof(params -> 'baseline') <> 'object')
+          )
+        GROUP BY lab_id, gen
+        HAVING count(*) > 1
+    ) AS duplicate_baselines;
+
+    IF v_duplicate_run_groups > 0 OR v_duplicate_baseline_groups > 0 THEN
+        RAISE EXCEPTION
+            'prd_atomic_migration_preflight_failed: duplicate run_id groups=%, duplicate baseline (lab_id, gen) groups=%. No rows were changed. Audit and resolve duplicates in a separately reviewed migration, then retry.',
+            v_duplicate_run_groups, v_duplicate_baseline_groups
+            USING ERRCODE = '23505';
+    END IF;
+END;
+$migration_preflight$;
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_lab_results_prd_run
     ON public.lab_results (lab_id, (params ->> 'run_id'))
     WHERE params ->> 'record_type' = 'evidence'
