@@ -261,5 +261,99 @@ class PRDFamilyIITest(unittest.TestCase):
             self.assertEqual(result["metrics"]["reproducible_state"], "not_evaluable")
 
 
+    def test_t09_numeric_hc3_matches_independent_statsmodels_reference(self):
+        x = np.tile(np.arange(12, dtype=float), 4)
+        residual = np.tile(np.array([-0.12, 0.04, 0.09, -0.03, 0.15, -0.08,
+                                     0.02, -0.05, 0.11, -0.10, 0.06, -0.01]), 4)
+        y_positive = np.exp(1.1 + 0.22 * x + residual)
+        y = np.concatenate(([0.0, 0.0], y_positive))
+        design_all = np.column_stack([np.ones(y.size), np.concatenate(([0.0, 1.0], x))])
+        keep = y > 0
+        # Independent reference path: call statsmodels directly, without the wrapper.
+        reference = __import__("statsmodels.api", fromlist=["OLS"]).OLS(
+            np.log(y[keep]), design_all[keep]
+        ).fit(cov_type="HC3", use_t=True)
+        actual = fit_ols_log_positive_hc3(y, design_all, coefficient_index=1)["metrics"]
+        self.assertAlmostEqual(actual["effect_size"], float(reference.params[1]), delta=1e-10)
+        self.assertAlmostEqual(actual["se"], float(reference.bse[1]), delta=1e-10)
+        self.assertAlmostEqual(actual["p_empirical"], float(reference.pvalues[1]), delta=1e-10)
+        ci = reference.conf_int(alpha=0.05)[1]
+        self.assertAlmostEqual(actual["ci_low"], float(ci[0]), delta=1e-10)
+        self.assertAlmostEqual(actual["ci_high"], float(ci[1]), delta=1e-10)
+
+    def test_t09_zero_is_excluded_but_negative_is_invalid_in_family_ii(self):
+        design = np.column_stack([np.ones(42), np.arange(42, dtype=float)])
+        y = np.array([0.0, 0.0, *np.exp(np.linspace(0.1, 1.5, 40))])
+        result = fit_ols_log_positive_hc3(y, design, coefficient_index=1)
+        self.assertEqual(result["status"], "ESTIMABLE")
+        self.assertEqual(result["metrics"]["n_total"], 42)
+        self.assertEqual(result["metrics"]["n_events"], 40)
+        self.assertEqual(result["metrics"]["n_eff"], 40)
+        y_with_negative = y.copy()
+        y_with_negative[0] = -0.01
+        with self.assertRaisesRegex(ValueError, "ols_outcome_negative"):
+            fit_ols_log_positive_hc3(y_with_negative, design, coefficient_index=1)
+        with self.assertRaisesRegex(ValueError, "d_cond_outcome_negative"):
+            compute_d_cond([-1, 1, 2, 3, 4, 5], [1, 2, 3, 4, 5, 6])
+
+    def test_t24_antecedent_identity_mismatch_is_not_localizable(self):
+        base_a = {
+            "hypothesis_id": "H990_SYNTH", "contract_sha256": "abc",
+            "method_fingerprint": "method-v1", "window": "A", "status": "PROMETE",
+            "effect_size": 0.2, "ci_low": 0.05, "ci_high": 0.35,
+        }
+        base_b = dict(
+            b_status="PROMETE", b_hypothesis_id="H990_SYNTH", b_contract_sha256="abc",
+            b_method_fingerprint="method-v1", b_effect_size=0.25, b_ci_low=0.1,
+            b_ci_high=0.4, windows_disjoint=True, direction_consistent=True,
+            drift_flag="OK", drift_evaluation_state="complete", b_gates_pass=True,
+        )
+        mismatches = (
+            ("hypothesis_id", "OTHER"),
+            ("contract_sha256", "different-contract"),
+            ("method_fingerprint", "different-method"),
+            ("window", "B"),
+            ("status", "RECHAZA"),
+        )
+        for field, wrong_value in mismatches:
+            with self.subTest(field=field):
+                antecedent = dict(base_a)
+                antecedent[field] = wrong_value
+                result = evaluate_reproducibility(**base_b, antecedent_a=antecedent)
+                self.assertEqual(result["status"], "PROMETE")
+                self.assertFalse(result["reproducible"])
+                self.assertEqual(result["metrics"]["reproducibility_reason"], "antecedent_not_localizable")
+
+    def test_t25_drift_alert_rejects_reproducibility_with_compatible_antecedent(self):
+        antecedent = {
+            "hypothesis_id": "H990_SYNTH", "contract_sha256": "abc",
+            "method_fingerprint": "method-v1", "window": "A", "status": "PROMETE",
+            "effect_size": 0.2, "ci_low": 0.05, "ci_high": 0.35,
+        }
+        result = evaluate_reproducibility(
+            b_status="PROMETE", b_hypothesis_id="H990_SYNTH", b_contract_sha256="abc",
+            b_method_fingerprint="method-v1", b_effect_size=0.25, b_ci_low=0.1,
+            b_ci_high=0.4, antecedent_a=antecedent, windows_disjoint=True,
+            direction_consistent=True, drift_flag="REGIME_SHIFT_SUSPECTED",
+            drift_evaluation_state="complete", b_gates_pass=True,
+        )
+        self.assertEqual(result["status"], "RECHAZA")
+        self.assertFalse(result["reproducible"])
+        self.assertEqual(result["metrics"]["reproducibility_reason"], "drift_detected")
+        self.assertEqual(result["metrics"]["reproducible_state"], "not_reproducible")
+
+    def test_t26_drift_rejection_is_not_replaced_by_promete_when_antecedent_missing(self):
+        result = evaluate_reproducibility(
+            b_status="RECHAZA", b_hypothesis_id="H990_SYNTH", b_contract_sha256="abc",
+            b_method_fingerprint="method-v1", b_effect_size=0.25, b_ci_low=0.1,
+            b_ci_high=0.4, antecedent_a=None, windows_disjoint=True,
+            direction_consistent=True, drift_flag="REGIME_SHIFT_SUSPECTED",
+            drift_evaluation_state="complete", b_gates_pass=True,
+        )
+        self.assertEqual(result["status"], "RECHAZA")
+        self.assertFalse(result["reproducible"])
+        self.assertEqual(result["metrics"]["reproducibility_reason"], "b_precedence_status")
+
+
 if __name__ == "__main__":
     unittest.main()
