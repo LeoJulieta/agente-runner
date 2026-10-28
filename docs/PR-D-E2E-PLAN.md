@@ -11,6 +11,12 @@ This change is a safety prerequisite, not proof of end-to-end operation. The wor
 - The engine-path tests currently stub the Supabase client. They prove the engine selects the RPC path and fails closed when RPC invocation errors, but they are not an E2E test of the real engine against a real PostgREST/RPC endpoint.
 - The legacy `lab_run.yml` previously accepted an arbitrary workflow input and invoked the engine without checking the frozen manifest. This PR adds Gate 0 before dependency installation and engine invocation.
 
+## Disposable Supabase HTTP RPC workflow
+
+The PR now includes `.github/workflows/pr-d-supabase-http-e2e.yml`. It creates a temporary Supabase CLI project inside the GitHub runner, with no project link and no repository/production secrets; applies the atomic RPC migration to a fresh fixture schema; and tests the real local PostgREST endpoint for baseline+evidence persistence, idempotent replay, rollback after an injected evidence failure, and denial of the anon key. The test code also fails closed unless both API and database hosts are localhost.
+
+This workflow is an HTTP/RPC integration test against a disposable Supabase stack. It is **not** evidence that the real `lab_engine.py` completed a run: the checked-in manifest remains `fixture`, and the engine must continue to reject it. Full engine-to-RPC E2E remains blocked until a separately reviewed test-only execution design can exercise the engine without changing the checked-in manifest to `approved` or touching production.
+
 ## E2E acceptance plan — not yet executed
 
 **Current infrastructure limitation:** the repository has SQL migrations and PostgreSQL-only integration tests, but no checked-in `supabase/config.toml` was found on the PR branch. The existing PostgreSQL service verifies the database function; it does not emulate Supabase Auth/PostgREST or prove the full engine-to-RPC HTTP path. Do not label that job as E2E.
