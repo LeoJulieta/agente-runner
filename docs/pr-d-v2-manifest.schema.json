@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/LeoJulieta/agente-runner/blob/main/docs/pr-d-v2-manifest.schema.json",
   "title": "PR D v2 frozen batch manifest",
-  "description": "Proposed schema for review; not yet consumed by the production workflow. Do not execute batches from this file until the manifest inventory and acceptance tests are approved.",
+  "description": "Reference JSON Schema for review; the production workflow currently runs labs/pr_d_manifest.py to validate docs/manifest.json rather than loading this schema directly. The manifest remains execution_status=fixture; do not execute batches until the manifest inventory and acceptance tests are approved.",
   "type": "object",
   "additionalProperties": false,
   "required": [
