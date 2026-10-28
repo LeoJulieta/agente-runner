@@ -243,6 +243,8 @@ def evaluate_reproducibility(
     """Apply conservative A/B reproducibility rules without persistence."""
     if b_status in {"INVALID", "INSUFFICIENT_POWER"}:
         return _repro(b_status, False, "not_evaluable", "b_precedence_status")
+    if b_status == "RECHAZA":
+        return _repro("RECHAZA", False, "not_reproducible", "b_precedence_status")
     if b_status not in {"PROMETE", "VERIFICADO", "RECHAZA"}:
         raise ValueError("b_status_invalid")
     if not b_gates_pass:
