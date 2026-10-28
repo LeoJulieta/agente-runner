@@ -531,7 +531,7 @@ def main():
     try:
         window = _parse_window(args.window)
     except ValueError as e:
-        print(json.dumps({"error": str(e), "hypothesis": args.hypothesis, "status": "ERROR"}))
+        print(json.dumps({"error": "invalid_execution_window", "hypothesis": args.hypothesis, "status": "ERROR"}))
         sys.exit(1)
 
     # Import the DB client only after the manifest gate has passed.
@@ -648,7 +648,7 @@ def main():
             # The only supported persistence path is the atomic PostgreSQL RPC.
             # A missing/unavailable RPC is structural, not an ordinary run error.
             print(json.dumps({
-                "error": str(exc),
+                "error": "atomic_persistence_unavailable",
                 "hypothesis": args.hypothesis,
                 "status": "ERROR",
                 "failure_reason": "atomic_persistence_unavailable",
@@ -676,7 +676,7 @@ def main():
                           "insert_ok": True, "run_id": run_id, "persistence": rpc_data}))
 
     except Exception as e:
-        print(json.dumps({"error": str(e), "hypothesis": args.hypothesis, "status": "ERROR"}))
+        print(json.dumps({"error": "engine_execution_failed", "hypothesis": args.hypothesis, "status": "ERROR"}))
         sys.exit(1)
 
 
