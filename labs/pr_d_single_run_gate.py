@@ -5,7 +5,10 @@ import argparse
 import re
 import sys
 
-from labs.pr_d_manifest import ManifestError, load_and_validate_manifest
+try:
+    from labs.pr_d_manifest import ManifestError, load_and_validate_manifest
+except ModuleNotFoundError:  # Direct script execution sets sys.path[0] to labs/
+    from pr_d_manifest import ManifestError, load_and_validate_manifest
 
 HYPOTHESIS_ID = re.compile(r"^H[0-9]{3,}(?:_[A-Z0-9]+)*$")
 
