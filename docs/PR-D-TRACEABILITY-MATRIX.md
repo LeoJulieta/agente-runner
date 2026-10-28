@@ -22,13 +22,13 @@ Esta primera versión es una **matriz de trabajo**, no el cierre de la auditorí
 | Gate de ejecución y pertenencia al manifiesto | `labs/pr_d_single_run_gate.py`; gate también integrado en `labs/lab_engine.py` | [⚠️ PARCIAL] |
 | Persistencia atómica e idempotencia | `supabase/migrations/004_pr_d_v2_atomic_persistence.sql`, pruebas de RPC y E2E local | [✅ IMPLEMENTADO] para el alcance de persistencia probado; no certifica estadística |
 | Recorrido motor → cliente Supabase → PostgREST/RPC local | `.github/workflows/pr-d-engine-http-e2e.yml`, `tests/e2e/test_pr_d_engine_http_e2e.py` | [✅ IMPLEMENTADO] para la prueba E2E local de H990 |
-| Regresión logística Familia I | No se identificó todavía un módulo/test específico que demuestre el método contractual | [🔎 POR VERIFICAR] |
-| OLS sobre ln(Y) con HC3 Familia II | No se identificó todavía una implementación/test que demuestre `statsmodels.OLS.fit(cov_type="HC3")` en el camino real | [🔎 POR VERIFICAR] |
-| FDR Benjamini–Hochberg por familia y ventana congeladas | La validación del manifiesto existe; falta demostrar cálculo FDR en el camino científico | [🔎 POR VERIFICAR] |
-| Ventanas A/B disjuntas y antecedente para `VERIFICADO` | Falta completar inspección de implementación y tests específicos | [🔎 POR VERIFICAR] |
-| Drift `d_init`, `D_cond`, MAD degenerada y serialización finita | Falta identificar implementación y pruebas deterministas específicas | [🔎 POR VERIFICAR] |
-| `method_fingerprint`, reproducibilidad y compatibilidad de efectos/IC | Campo contractual localizado; cumplimiento efectivo pendiente de trazabilidad | [🔎 POR VERIFICAR] |
-| Estados, precedencia, `p=1` para fallo individual y códigos de salida | Hay gates estructurales; falta demostrar todo el retorno científico de §9, §13 y §15 | [⚠️ PARCIAL] |
+| Regresión logística Familia I | Búsqueda de código statsmodels y revisión de labs/lab_engine.py: no se localizó implementación inferencial PR D en el camino del motor; el motor ejecuta medición/comparación genérica | [❌ AUSENTE en el camino inspeccionado] |
+| OLS sobre ln(Y) con HC3 Familia II | statsmodels aparece en el contrato, pero no en código de implementación localizado ni en tests del motor | [❌ AUSENTE en el camino inspeccionado] |
+| FDR Benjamini–Hochberg por familia y ventana congeladas | La búsqueda de código benjamini solo localizó el contrato; no se encontró cálculo BH implementado | [❌ AUSENTE en el código indexado inspeccionado] |
+| Ventanas A/B disjuntas y antecedente para `VERIFICADO` | El motor tiene un helper de intervalos disjuntos, pero la lógica actual compara passed, fingerprint y disjunción; no comprueba explícitamente identidad de ventana A/B ni estado A permitido del contrato PR D | [⚠️ PARCIAL / incompatibilidad de modelo] |
+| Drift `d_init`, `D_cond`, MAD degenerada y serialización finita | Búsquedas de d_init y D_cond solo localizaron el contrato; no se encontró cálculo ni tests específicos | [❌ AUSENTE en el código indexado inspeccionado] |
+| `method_fingerprint`, reproducibilidad y compatibilidad de efectos/IC | Existe fingerprint genérico del contrato legacy y cálculo booleano reproducible; no se identificó comparación contractual de IC, dirección y estados PR D ni reproducible_state | [⚠️ PARCIAL / no equivalente a PR D] |
+| Estados, precedencia, p=1 para fallo individual y códigos de salida | El motor emite estados legacy INVALID, PROMETE, VERIFICADO y sys.exit(0) en varias salidas científicas; no implementa la precedencia completa PR D ni el flujo FDR con p=1 demostrado | [⚠️ PARCIAL / incompatibilidad de modelo] |
 | `n_total`, `n_eff`, `n_events`, truncamiento y `n_required_power` | Falta trazar cálculo, persistencia y pruebas de borde | [🔎 POR VERIFICAR] |
 | Auditoría de esquema e historial de migraciones de Supabase de producción | No se realizó en esta matriz; requiere consulta separada, de solo lectura | [🔎 POR VERIFICAR] |
 
@@ -75,3 +75,31 @@ Esta primera versión es una **matriz de trabajo**, no el cierre de la auditorí
 ## Decisión
 
 **No autoriza ejecución científica. No cambia el manifiesto. No sustituye la revisión humana.** La matriz debe alcanzar cobertura verificable requisito por requisito; un porcentaje global no debe ocultar reglas críticas ausentes o parciales.
+
+## Resultados de auditoría granular — actualización 2026-10-28
+
+Esta sección reemplaza las incertidumbres iniciales donde la inspección ya permite una conclusión. El alcance de “ausente” es el camino de código y el índice de código inspeccionados en este repositorio; no es una afirmación sobre archivos externos o ramas no inspeccionadas.
+
+### Hallazgos confirmados
+
+1. **El motor existente no es todavía el motor inferencial PR D v2.** labs/lab_engine.py documenta y ejecuta el flujo legacy de medición, baseline y comparación de métricas. En el tramo revisado, la decisión se obtiene de compare(...) y se transforma en VERIFICADO o PROMETE; no hay llamada a regresión logística, OLS sobre ln(Y), HC3 ni ajuste BH.
+2. **Los métodos inferenciales no quedaron localizados en código ejecutable.** Las búsquedas de statsmodels y benjamini solo devolvieron el contrato documental. Por tanto, Familia I, Familia II y FDR no deben figurar como implementados. Para esta auditoría se clasifican como ausentes en el camino inspeccionado, pendientes de confirmar con una búsqueda exhaustiva de todo el árbol y las dependencias.
+3. **Drift tampoco quedó localizado en código ejecutable.** Las búsquedas de d_init y D_cond devolvieron el contrato, sin implementación/test específico localizado. Los casos MAD degenerada, umbrales estrictos, finitud float64 y flags de drift siguen sin evidencia de implementación.
+4. **La reproducibilidad actual es legacy y más débil que el contrato PR D.** El motor calcula un fingerprint genérico y considera evidencia previa si metrics.passed == true, fingerprint idéntico y ventana disjunta. En el tramo inspeccionado no se valida la identidad explícita A/B, antecedente con estado A permitido, compatibilidad de contrato PR D, dirección de efecto, compatibilidad de intervalos ni metrics.reproducible_state. No equivale a la regla contractual de §10/§15.3.
+5. **Los tests E2E/RPC acreditan infraestructura, no validez estadística.** tests/integration/test_pr_d_engine_atomic_path.py declara que las integraciones externas están stubbeadas y prueba el camino RPC del motor. tests/integration/test_pr_d_atomic_rpc.py prueba atomicidad, rollback, reintento idempotente, concurrencia, aislamiento por generación, fallo seguro de migración y permisos de ejecución en PostgreSQL de CI. Esto no demuestra la inferencia PR D ni la seguridad de la base de producción.
+6. **El gate de manifiesto tiene pruebas reales, pero alcance acotado.** Los tests prueban rechazo de fixture, pertenencia a manifiesto cuando approved, rechazo de IDs inválidos y bloqueo del motor antes de requerir credenciales. Los tests unitarios de validación prueban hash contractual, estructura, m, duplicados e inventario. El helper find_missing_hypothesis_specs detecta YAML ausente, pero no se localizó una ruta de lote que aplique a ese fallo p=1, mantenga el miembro en el ajuste BH y persista la causa como exige E1.
+7. **La matriz de familias no es evidencia de cálculo FDR.** Que el manifiesto congele m y que exista find_missing_hypothesis_specs no demuestra que haya un proceso de lote que compute valores p, incluya los no evaluables como 1.0 y aplique BH por familia y ventana.
+8. **No se realizó auditoría de Supabase de producción.** Todo lo afirmado sobre RPC corresponde al código y las pruebas locales/CI. No se consultaron tablas, migraciones aplicadas, políticas ni datos de producción.
+
+### Evidencia concreta y límites
+
+| Elemento | Evidencia | Conclusión permitida |
+|---|---|---|
+| Inferencia | Búsquedas de statsmodels, benjamini, d_init, D_cond; revisión del flujo de labs/lab_engine.py | No localizada en el camino de implementación inspeccionado; no marcar implementado |
+| Gate | tests/test_pr_d_single_run_gate.py, tests/test_pr_d_manifest.py | Cobertura de bloqueo/autorización y validación estructural del manifiesto, no autorización de ejecución real |
+| RPC atómica | tests/integration/test_pr_d_atomic_rpc.py | Evidencia de transacción/idempotencia/concurrencia sobre PostgreSQL de CI, no prueba estadística ni de producción |
+| Engine → HTTP local | Workflow y test E2E local de PR #89 | Evidencia de recorrido técnico con fixture H990 y Supabase descartable; no validación de hipótesis real |
+
+### Decisión revisada
+
+**PR D v2 no está implementado como motor estadístico completo.** Lo que sí existe y está probado es una capa de gate/manifiesto y una ruta de persistencia atómica con E2E local. La siguiente etapa segura es completar el inventario de reglas y casos de aceptación deterministas (T01…T32), diferenciando: (a) tests ya existentes de infraestructura, (b) tests de aceptación estadística aún ausentes, y (c) decisiones contractuales ambiguas. Esta auditoría documental no ejecuta hipótesis ni toca producción.
