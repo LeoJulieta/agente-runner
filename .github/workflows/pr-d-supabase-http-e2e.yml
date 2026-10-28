@@ -39,6 +39,9 @@ jobs:
           # linked to a hosted Supabase project and receives no repository secrets.
           supabase init
           supabase migration new create_e2e_lab_results
+          # Supabase CLI migration versions have one-second precision; avoid a
+          # duplicate version when generating two migrations in the same second.
+          sleep 2
           bootstrap="$(find supabase/migrations -maxdepth 1 -name '*_create_e2e_lab_results.sql' -print -quit)"
           test -n "$bootstrap"
           cat > "$bootstrap" <<'SQL'
