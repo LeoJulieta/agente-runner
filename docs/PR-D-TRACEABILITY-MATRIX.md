@@ -1,7 +1,7 @@
 # PR D — Matriz normativa de aceptación contractual determinista T01–T32 (candidato E6–E11)
 
 **Estado:** borrador documental para auditoría humana; no autoriza implementación ni ejecución científica.  
-**Contrato fuente:** `docs/PR-D-DESIGN.md`, base vigente PR D v2 (E1–E5) más candidato E6–E11 en §16; SHA-256 candidato `862bf1235066868a50ea0c3b41f6cff50c9430813257cff61f6cf6b213bcab8e` (propuesta, pendiente de revisión).  
+**Contrato fuente:** `docs/PR-D-DESIGN-V3-CANDIDATE.md`, base vigente PR D v2 (E1–E5) más candidato E6–E11 en §16; SHA-256 candidato `67ea3a30649d21e5f695a63498b94e7395a9d9c52ad6482d781a5b9d5c5bbf15` (propuesta, pendiente de revisión).  
 **Artefacto normativo de aceptación:** esta matriz T01–T32 es la tabla de aceptación canónica de esta candidatura; `docs/PR-D-ACCEPTANCE-TABLE-V2.md` no forma parte de esta rama y no debe citarse como artefacto existente. Cualquier sustitución o separación futura requiere cambio documental explícito y revisión.
 **Base de auditoría de infraestructura:** `main` en `ae8314192c0f031db292844004953383b3030679` (PR #89).  
 **Seguridad:** `docs/manifest.json` permanece `execution_status: "fixture"`; no ejecutar hipótesis reales ni escribir en Supabase de producción.  
@@ -72,7 +72,7 @@
 
 ## Resolución contractual N1–N6 mediante E6–E11
 
-Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DESIGN.md` §16. Esto no cambia por sí solo la cobertura de implementación: el motor estadístico y sus pruebas siguen pendientes. Esta matriz T01–T32 es el artefacto normativo de aceptación de la candidatura; no se afirma que exista `docs/PR-D-ACCEPTANCE-TABLE-V2.md` en esta rama.
+Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DESIGN-V3-CANDIDATE.md` §16. Esto no cambia por sí solo la cobertura de implementación: el motor estadístico y sus pruebas siguen pendientes. Esta matriz T01–T32 es el artefacto normativo de aceptación de la candidatura; no se afirma que exista `docs/PR-D-ACCEPTANCE-TABLE-V2.md` en esta rama.
 
 | Bloqueante | Decisión cerrada | Referencia | Aceptación pendiente |
 |---|---|---|---|
