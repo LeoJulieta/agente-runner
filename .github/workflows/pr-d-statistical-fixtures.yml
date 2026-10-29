@@ -1,0 +1,51 @@
+name: PR D candidate statistical fixtures
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/test_pr_d_statistical_fixtures.py"
+      - "tests/fixtures/pr_d_statistical_reference.json"
+      - "requirements/pr-d-statistical-fixtures-py312.txt"
+      - "docs/PR-D-STATISTICAL-FIXTURES-CANDIDATE.md"
+      - ".github/workflows/pr-d-statistical-fixtures.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-statistical-fixtures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout PR revision
+        uses: actions/checkout@v4
+      - name: Set up isolated Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Install exact fixture dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Record runtime and fixture hashes
+        run: |
+          python --version
+          python -m pip freeze
+          sha256sum tests/fixtures/pr_d_statistical_reference.json requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Run synthetic-only statistical reference tests
+        run: python -m unittest -v tests.test_pr_d_statistical_fixtures
+      - name: Confirm manifest remains fixture-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("docs/manifest.json").read_text(encoding="utf-8"))
+          assert manifest.get("execution_status") == "fixture", manifest.get("execution_status")
+          print('PASS: docs/manifest.json execution_status remains "fixture"')
+          PY
