@@ -1,0 +1,90 @@
+{
+  "schema": "pr-d-d12-synthetic-preregistration/1",
+  "status": "candidate",
+  "authority": "illustrative_not_normative",
+  "purpose": "Synthetic-only test input to exercise D12 gate logic; not an approved PR D contract and not production configuration.",
+  "version": "D12-SYNTHETIC-001",
+  "preregistered_before_synthetic_outcomes": true,
+  "execution_authorized": false,
+  "safeguards": {
+    "production_hypotheses": false,
+    "supabase_production_writes": false,
+    "official_manifest_modified": false,
+    "official_manifest_execution_status_must_remain": "fixture",
+    "contract_v2_unchanged": true,
+    "e6_e11_approval": false
+  },
+  "hypothesis": {
+    "hypothesis_id": "TEST_ONLY_D12_OR_GREATER",
+    "family_id": "TEST_ONLY_D12_FAMILY",
+    "family_membership": ["TEST_ONLY_D12_OR_GREATER"],
+    "m": 1,
+    "window": "TEST_ONLY_D12_WINDOW",
+    "contrast": "TEST_ONLY_condition_A_vs_condition_B",
+    "effect_estimand": "odds_ratio",
+    "effect_scale": "ratio",
+    "minimum_relevant_effect": 1.5,
+    "expected_direction": "greater",
+    "confidence_interval": {
+      "method": "Wald normal interval on log(OR), exponentiated",
+      "level": 0.95,
+      "gate_rule": "lower_bound > 1.0"
+    },
+    "p_value_method": "two-sided Wald normal test for logistic MLE",
+    "fdr_method": "Benjamini-Hochberg within the preregistered family and window",
+    "fdr_alpha": 0.05,
+    "operational_minima": {
+      "n_eff": 30,
+      "n_events_per_window": 5
+    },
+    "method_fingerprint": "sha256:TEST_ONLY_D12_METHOD_FINGERPRINT_V1",
+    "method_fingerprint_is_real_hash": false,
+    "notes": [
+      "All numerical values and gate semantics in this file are illustrative test inputs only.",
+      "The placeholder fingerprint is an identifier, not a cryptographic digest.",
+      "This fixture does not authorize changing the official manifest or implementing the production engine."
+    ]
+  },
+  "synthetic_cases": [
+    {
+      "case_id": "D12-POSITIVE-OR-2",
+      "observed": {
+        "odds_ratio": 2.0,
+        "ci_low": 1.6,
+        "ci_high": 2.5,
+        "p_value": 0.005,
+        "q_value": 0.005,
+        "n_eff": 40,
+        "n_events_per_window": 10
+      },
+      "expected_gate": "PROMETE",
+      "expected_checks": {
+        "effect": true,
+        "direction": true,
+        "interval": true,
+        "fdr": true,
+        "operational_minima": true
+      }
+    },
+    {
+      "case_id": "D12-NEGATIVE-OR-1-2",
+      "observed": {
+        "odds_ratio": 1.2,
+        "ci_low": 0.9,
+        "ci_high": 1.4,
+        "p_value": 0.2,
+        "q_value": 0.2,
+        "n_eff": 40,
+        "n_events_per_window": 10
+      },
+      "expected_gate": "RECHAZA",
+      "expected_checks": {
+        "effect": false,
+        "direction": true,
+        "interval": false,
+        "fdr": false,
+        "operational_minima": true
+      }
+    }
+  ]
+}
