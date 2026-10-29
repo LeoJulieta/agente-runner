@@ -13,27 +13,33 @@
     "cases": [
       {
         "id": "D08-SEPARATION",
-        "input_class": "recognized_model_non_estimability",
+        "input_class": "logistic_separation",
         "simulated_fit_outcome": "perfect_separation",
         "expected_classification": "SCIENTIFIC_NON_ESTIMABLE",
-        "expected_p_for_fdr": 1.0,
-        "abort_batch": false
+        "expected_p_for_fdr": 1,
+        "abort_batch": false,
+        "expected_contract_status": "INSUFFICIENT_POWER",
+        "expected_reason": "logistic_separation"
       },
       {
         "id": "D08-NONCONVERGENCE",
-        "input_class": "recognized_model_non_estimability",
+        "input_class": "model_non_convergence",
         "simulated_fit_outcome": "non_convergence",
         "expected_classification": "SCIENTIFIC_NON_ESTIMABLE",
-        "expected_p_for_fdr": 1.0,
-        "abort_batch": false
+        "expected_p_for_fdr": 1,
+        "abort_batch": false,
+        "expected_contract_status": "INSUFFICIENT_POWER",
+        "expected_reason": "model_non_convergence"
       },
       {
         "id": "D08-INSUFFICIENT-INFO",
-        "input_class": "recognized_model_non_estimability",
+        "input_class": "model_not_estimable",
         "simulated_fit_outcome": "insufficient_information_for_model",
         "expected_classification": "SCIENTIFIC_NON_ESTIMABLE",
-        "expected_p_for_fdr": 1.0,
-        "abort_batch": false
+        "expected_p_for_fdr": 1,
+        "abort_batch": false,
+        "expected_contract_status": "INSUFFICIENT_POWER",
+        "expected_reason": "model_not_estimable"
       },
       {
         "id": "D08-UNEXPECTED-EXCEPTION",
@@ -41,23 +47,51 @@
         "simulated_fit_outcome": "unexpected_runtime_error",
         "expected_classification": "STRUCTURAL_FAILURE",
         "expected_p_for_fdr": null,
-        "abort_batch": true
+        "abort_batch": true,
+        "expected_contract_status": null,
+        "expected_reason": null
       }
     ],
-    "note": "These are classification contract fixtures, not claims that every library/version emits the same exception for a given dataset."
+    "note": "Synthetic mapping fixtures only: recognized scientific non-estimability maps to contract status INSUFFICIENT_POWER and p=1.0 only for BH; unexpected structural failures abort. This classifier is not connected to the production engine."
   },
   "D11_non_estimable_member_in_fdr_family": {
     "family_id": "TEST_ONLY_FAMILY_D11",
     "window": "TEST_ONLY_WINDOW_A",
     "m": 5,
     "members": [
-      {"hypothesis_id": "TEST_H1", "p_for_adjustment": 0.01, "source": "estimable"},
-      {"hypothesis_id": "TEST_H2", "p_for_adjustment": 1.0, "source": "non_estimable_conservative_convention"},
-      {"hypothesis_id": "TEST_H3", "p_for_adjustment": 0.04, "source": "estimable"},
-      {"hypothesis_id": "TEST_H4", "p_for_adjustment": 0.2, "source": "estimable"},
-      {"hypothesis_id": "TEST_H5", "p_for_adjustment": 0.5, "source": "estimable"}
+      {
+        "hypothesis_id": "TEST_H1",
+        "p_for_adjustment": 0.01,
+        "source": "estimable"
+      },
+      {
+        "hypothesis_id": "TEST_H2",
+        "p_for_adjustment": 1,
+        "source": "non_estimable_conservative_convention"
+      },
+      {
+        "hypothesis_id": "TEST_H3",
+        "p_for_adjustment": 0.04,
+        "source": "estimable"
+      },
+      {
+        "hypothesis_id": "TEST_H4",
+        "p_for_adjustment": 0.2,
+        "source": "estimable"
+      },
+      {
+        "hypothesis_id": "TEST_H5",
+        "p_for_adjustment": 0.5,
+        "source": "estimable"
+      }
     ],
-    "expected_q_in_original_order": [0.05, 1.0, 0.1, 0.3333333333333333, 0.625],
+    "expected_q_in_original_order": [
+      0.05,
+      1,
+      0.1,
+      0.3333333333333333,
+      0.625
+    ],
     "expected_member_count_after_adjustment": 5,
     "expected_non_estimable_member_retained": true,
     "note": "p=1.0 is a conservative FDR adjustment convention, not an empirical p-value."
