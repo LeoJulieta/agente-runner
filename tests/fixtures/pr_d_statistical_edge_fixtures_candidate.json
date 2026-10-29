@@ -1,0 +1,89 @@
+{
+  "schema": "pr-d-statistical-edge-fixtures/1",
+  "status": "candidate",
+  "purpose": "Synthetic acceptance-design fixtures only; not normative and not an engine implementation.",
+  "safeguards": {
+    "production_hypotheses": false,
+    "supabase_production_writes": false,
+    "manifest_execution_status_must_remain": "fixture",
+    "contract_v2_unchanged": true,
+    "e6_e11_approval": false
+  },
+  "D08_non_estimability": {
+    "cases": [
+      {
+        "id": "D08-SEPARATION",
+        "input_class": "recognized_model_non_estimability",
+        "simulated_fit_outcome": "perfect_separation",
+        "expected_classification": "SCIENTIFIC_NON_ESTIMABLE",
+        "expected_p_for_fdr": 1.0,
+        "abort_batch": false
+      },
+      {
+        "id": "D08-NONCONVERGENCE",
+        "input_class": "recognized_model_non_estimability",
+        "simulated_fit_outcome": "non_convergence",
+        "expected_classification": "SCIENTIFIC_NON_ESTIMABLE",
+        "expected_p_for_fdr": 1.0,
+        "abort_batch": false
+      },
+      {
+        "id": "D08-INSUFFICIENT-INFO",
+        "input_class": "recognized_model_non_estimability",
+        "simulated_fit_outcome": "insufficient_information_for_model",
+        "expected_classification": "SCIENTIFIC_NON_ESTIMABLE",
+        "expected_p_for_fdr": 1.0,
+        "abort_batch": false
+      },
+      {
+        "id": "D08-UNEXPECTED-EXCEPTION",
+        "input_class": "unexpected_software_or_infrastructure_exception",
+        "simulated_fit_outcome": "unexpected_runtime_error",
+        "expected_classification": "STRUCTURAL_FAILURE",
+        "expected_p_for_fdr": null,
+        "abort_batch": true
+      }
+    ],
+    "note": "These are classification contract fixtures, not claims that every library/version emits the same exception for a given dataset."
+  },
+  "D11_non_estimable_member_in_fdr_family": {
+    "family_id": "TEST_ONLY_FAMILY_D11",
+    "window": "TEST_ONLY_WINDOW_A",
+    "m": 5,
+    "members": [
+      {"hypothesis_id": "TEST_H1", "p_for_adjustment": 0.01, "source": "estimable"},
+      {"hypothesis_id": "TEST_H2", "p_for_adjustment": 1.0, "source": "non_estimable_conservative_convention"},
+      {"hypothesis_id": "TEST_H3", "p_for_adjustment": 0.04, "source": "estimable"},
+      {"hypothesis_id": "TEST_H4", "p_for_adjustment": 0.2, "source": "estimable"},
+      {"hypothesis_id": "TEST_H5", "p_for_adjustment": 0.5, "source": "estimable"}
+    ],
+    "expected_q_in_original_order": [0.05, 1.0, 0.1, 0.3333333333333333, 0.625],
+    "expected_member_count_after_adjustment": 5,
+    "expected_non_estimable_member_retained": true,
+    "note": "p=1.0 is a conservative FDR adjustment convention, not an empirical p-value."
+  },
+  "D12_preregistered_gates": {
+    "status": "BLOCKED",
+    "evaluation_authorized": false,
+    "required_fields": [
+      "family_id",
+      "window",
+      "method_fingerprint",
+      "effect_estimand_and_scale",
+      "minimum_relevant_effect",
+      "expected_direction",
+      "confidence_interval_method_and_level",
+      "p_value_method",
+      "fdr_family_membership_and_m",
+      "operational_sample_and_event_minima"
+    ],
+    "observed_gap": "The current test-only manifest defines family, hypotheses, outcomes, contrasts, windows and method_version, but does not provide hypothesis-level minimum_relevant_effect, expected_direction, confidence-interval gate rule or method_fingerprint values sufficient to evaluate D12.",
+    "expected_behavior": {
+      "do_not_infer_thresholds": true,
+      "do_not_run_effect_direction_interval_gate": true,
+      "keep_execution_status": "fixture",
+      "result": "BLOCKED_PREREGISTRATION_INCOMPLETE"
+    },
+    "note": "No numerical effect threshold, direction, or interval gate is invented by this fixture. Populate these only from a separately approved, versioned hypothesis preregistration."
+  }
+}
