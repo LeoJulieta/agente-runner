@@ -1,7 +1,6 @@
-"""Contract-focused synthetic reference and antecedent edge tests for PR D."""
-import unittest
-
+"""Contract-focused deterministic HC3 reference and precedence tests for PR D."""
 import numpy as np
+import pytest
 import statsmodels.api as sm
 
 from labs.pr_d_family_ii import (
@@ -11,120 +10,163 @@ from labs.pr_d_family_ii import (
 )
 
 
-class PRDReferenceAndAntecedentEdgeTests(unittest.TestCase):
-    @staticmethod
-    def fixture():
-        x = np.tile(np.arange(12, dtype=np.float64), 4)
-        residual = np.tile(np.array([
-            -0.12, 0.04, 0.09, -0.03, 0.15, -0.08,
-            0.02, -0.05, 0.11, -0.10, 0.06, -0.01,
-        ], dtype=np.float64), 4)
-        y = np.exp(1.1 + 0.22 * x + residual)
-        design = np.column_stack((np.ones(y.size), x))
-        return y, design
+# Exact synthetic X and Y values; no generated outcomes or rounded intermediates.
+X_VALUES = np.tile(np.arange(12, dtype=np.float64), 4)
+Y_VALUES = np.tile(np.array([
+    2.6644562419294173, 3.896193301795215, 5.103874718536726,
+    5.640653908428322, 8.41486681144013, 8.331137487687693,
+    11.473040742794833, 13.329771603195779, 19.49191959603112,
+    19.6878166447624, 28.789190879242685, 33.44826778394492,
+], dtype=np.float64), 4)
+DESIGN = np.column_stack((np.ones(X_VALUES.size, dtype=np.float64), X_VALUES))
 
-    def test_t27_fixed_numeric_hc3_reference_from_raw_synthetic_fixture(self):
-        y, design = self.fixture()
-        # Versioned expected values are calculated from raw deterministic inputs.
-        # Tolerance is explicit; the independent fit below is diagnostic, not oracle.
-        expected = {
-            "effect_size": 0.2209090909090909,
-            "se": 0.0035347143650444604,
-            "ci_low": 0.21379407992025562,
-            "ci_high": 0.22802410189792616,
-        }
+
+def _complete_antecedent():
+    return {
+        "hypothesis_id": "H990_SYNTH",
+        "contract_sha256": "synthetic-contract-sha",
+        "method_fingerprint": METHOD_FINGERPRINT_OLS_HC3,
+        "window": "A",
+        "status": "PROMETE",
+        "effect_size": 0.20,
+        "ci_low": 0.05,
+        "ci_high": 0.35,
+    }
+
+
+def _base_args(antecedent=None, **overrides):
+    args = dict(
+        b_status="PROMETE",
+        b_hypothesis_id="H990_SYNTH",
+        b_contract_sha256="synthetic-contract-sha",
+        b_method_fingerprint=METHOD_FINGERPRINT_OLS_HC3,
+        b_effect_size=0.25,
+        b_ci_low=0.10,
+        b_ci_high=0.40,
+        antecedent_a=_complete_antecedent() if antecedent is None else antecedent,
+        windows_disjoint=True,
+        direction_consistent=True,
+        drift_flag="OK",
+        drift_evaluation_state="complete",
+        b_gates_pass=True,
+    )
+    args.update(overrides)
+    return args
+
+
+def test_t27_hc3_reference_includes_intermediates_and_bitwise_determinism():
+    design = DESIGN.copy()
+    y = Y_VALUES.copy()
+
+    def run_once():
         actual = fit_ols_log_positive_hc3(y, design, coefficient_index=1)["metrics"]
-        for key, value in expected.items():
-            self.assertAlmostEqual(actual[key], value, delta=1e-10, msg=key)
-        self.assertEqual(actual["covariance_type"], "HC3")
-        self.assertEqual(actual["contrast"], "two_sided_t")
-        # Cross-check against the direct statsmodels path as a second guard.
         direct = sm.OLS(np.log(y), design).fit(cov_type="HC3", use_t=True)
-        self.assertAlmostEqual(actual["effect_size"], float(direct.params[1]), delta=1e-10)
-        self.assertAlmostEqual(actual["se"], float(direct.bse[1]), delta=1e-10)
-        ci = direct.conf_int(alpha=0.05)[1]
-        self.assertAlmostEqual(actual["ci_low"], float(ci[0]), delta=1e-10)
-        self.assertAlmostEqual(actual["ci_high"], float(ci[1]), delta=1e-10)
+        return actual, direct
 
-    def base_args(self, antecedent):
-        return dict(
-            b_status="PROMETE",
-            b_hypothesis_id="H990_SYNTH",
-            b_contract_sha256="synthetic-contract-sha",
-            b_method_fingerprint=METHOD_FINGERPRINT_OLS_HC3,
-            b_effect_size=0.25,
-            b_ci_low=0.10,
-            b_ci_high=0.40,
-            antecedent_a=antecedent,
-            windows_disjoint=True,
-            direction_consistent=True,
-            drift_flag="OK",
-            drift_evaluation_state="complete",
-            b_gates_pass=True,
-        )
+    actual_1, direct_1 = run_once()
+    actual_2, direct_2 = run_once()
 
-    def complete_antecedent(self):
-        return {
-            "hypothesis_id": "H990_SYNTH",
-            "contract_sha256": "synthetic-contract-sha",
-            "method_fingerprint": METHOD_FINGERPRINT_OLS_HC3,
-            "window": "A",
-            "status": "PROMETE",
-            "effect_size": 0.20,
-            "ci_low": 0.05,
-            "ci_high": 0.35,
-        }
+    expected = {
+        "effect_size": 0.2209090909090909,
+        "se": 0.0035347143650444604,
+        "ci_low": 0.21379407992025562,
+        "ci_high": 0.22802410189792616,
+    }
+    for key, value in expected.items():
+        assert actual_1[key] == pytest.approx(value, abs=1e-10)
+        assert actual_2[key] == actual_1[key]
+    assert actual_1["covariance_type"] == "HC3"
+    assert actual_1["contrast"] == "two_sided_t"
 
-    def test_t24_each_inferential_field_missing_or_nonfinite_is_incomplete(self):
-        required = ("effect_size", "ci_low", "ci_high")
-        for field in required:
-            for bad_value in (None, float("nan"), float("inf")):
-                with self.subTest(field=field, bad_value=bad_value):
-                    antecedent = self.complete_antecedent()
-                    antecedent[field] = bad_value
-                    result = evaluate_reproducibility(**self.base_args(antecedent))
-                    self.assertEqual(result["status"], "PROMETE")
-                    self.assertFalse(result["reproducible"])
-                    self.assertEqual(result["metrics"]["reproducible_state"], "not_evaluable")
-                    self.assertEqual(result["metrics"]["reproducibility_reason"], "antecedent_incomplete")
+    # Intermediate covariance and residuals are checked against a versioned oracle.
+    expected_covariance = np.array([
+        [6.5538384388115424e-04, -7.9884417822394246e-05],
+        [-7.9884417822394246e-05, 1.2494205642451663e-05],
+    ], dtype=np.float64)
+    expected_residual_prefix = np.array([
+        -0.12166666666666781,
+        0.03742424242424125,
+        0.08651515151515032,
+        -0.03439393939394031,
+    ], dtype=np.float64)
+    np.testing.assert_allclose(direct_1.cov_params(), expected_covariance, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(direct_1.resid[:4], expected_residual_prefix, rtol=0, atol=1e-10)
+    np.testing.assert_allclose(direct_2.cov_params(), direct_1.cov_params(), rtol=0, atol=0)
+    np.testing.assert_allclose(direct_2.resid, direct_1.resid, rtol=0, atol=0)
+    assert actual_2 == actual_1
+    assert direct_2.params.tobytes() == direct_1.params.tobytes()
+    assert direct_2.cov_params().tobytes() == direct_1.cov_params().tobytes()
+    assert direct_2.resid.tobytes() == direct_1.resid.tobytes()
 
-    def test_t24_nonfinite_or_boolean_interval_is_not_localizable_as_complete(self):
-        for bad_value in (float("nan"), float("inf"), True):
-            with self.subTest(bad_value=bad_value):
-                args = self.base_args(self.complete_antecedent())
-                args["b_ci_high"] = bad_value
-                result = evaluate_reproducibility(**args)
-                self.assertEqual(result["status"], "PROMETE")
-                self.assertEqual(result["metrics"]["reproducibility_reason"], "b_inference_incomplete")
 
-    def test_t25_identity_mismatch_and_drift_gate_remain_non_verified(self):
-        for field, value in (
-            ("hypothesis_id", "H_OTHER"),
-            ("contract_sha256", "other-contract"),
-            ("method_fingerprint", "other-method"),
-            ("window", "B"),
-            ("status", "RECHAZA"),
-        ):
-            with self.subTest(field=field):
-                antecedent = self.complete_antecedent()
-                antecedent[field] = value
-                result = evaluate_reproducibility(**self.base_args(antecedent))
-                self.assertEqual(result["status"], "PROMETE")
-                self.assertFalse(result["reproducible"])
-                self.assertNotEqual(result["status"], "VERIFICADO")
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        (field, bad_value)
+        for field in ("effect_size", "ci_low", "ci_high")
+        for bad_value in (None, float("nan"), float("inf"))
+    ],
+)
+def test_t24_missing_or_nonfinite_antecedent_inference_is_not_evaluable(field, bad_value):
+    antecedent = _complete_antecedent()
+    antecedent[field] = bad_value
+    result = evaluate_reproducibility(**_base_args(antecedent))
+    assert result["status"] == "PROMETE"
+    assert result["reproducible"] is False
+    assert result["metrics"]["reproducible_state"] == "not_evaluable"
+    assert result["metrics"]["reproducibility_reason"] == "antecedent_incomplete"
 
-    def test_t26_precedence_is_preserved_even_with_complete_antecedent(self):
-        for status in ("INVALID", "INSUFFICIENT_POWER", "RECHAZA"):
-            args = self.base_args(self.complete_antecedent())
-            args["b_status"] = status
-            result = evaluate_reproducibility(**args)
-            self.assertEqual(result["status"], status)
-            self.assertFalse(result["reproducible"])
-            self.assertEqual(
-                result["metrics"]["reproducible_state"],
-                "not_evaluable" if status in ("INVALID", "INSUFFICIENT_POWER") else "not_reproducible",
-            )
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), True, None])
+def test_t24_nonfinite_or_missing_b_inference_cannot_be_promoted(bad_value):
+    result = evaluate_reproducibility(**_base_args(b_ci_high=bad_value))
+    assert result["status"] == "PROMETE"
+    assert result["reproducible"] is False
+    assert result["metrics"]["reproducibility_reason"] == "b_inference_incomplete"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("hypothesis_id", "H_OTHER"),
+        ("contract_sha256", "other-contract"),
+        ("method_fingerprint", "other-method"),
+        ("window", "B"),
+        ("status", "RECHAZA"),
+    ],
+)
+def test_t25_identity_mismatch_never_verifies(field, value):
+    antecedent = _complete_antecedent()
+    antecedent[field] = value
+    result = evaluate_reproducibility(**_base_args(antecedent))
+    assert result["status"] == "PROMETE"
+    assert result["reproducible"] is False
+    assert result["metrics"]["reproducible_state"] == "not_evaluable"
+
+
+@pytest.mark.parametrize(
+    ("b_status", "expected_state"),
+    [
+        ("INVALID", "not_evaluable"),
+        ("INSUFFICIENT_POWER", "not_evaluable"),
+        ("RECHAZA", "not_reproducible"),
+    ],
+)
+def test_t26_b_status_precedence_cannot_be_overridden(b_status, expected_state):
+    result = evaluate_reproducibility(**_base_args(b_status=b_status))
+    assert result["status"] == b_status
+    assert result["reproducible"] is False
+    assert result["metrics"]["reproducible_state"] == expected_state
+
+
+@pytest.mark.parametrize("drift_flag", ["REGIME_SHIFT_SUSPECTED", "UNKNOWN_NON_OK"])
+def test_t26_drift_flag_cannot_be_washed_into_promete_or_verificado(drift_flag):
+    result = evaluate_reproducibility(**_base_args(drift_flag=drift_flag))
+    assert result["status"] == "RECHAZA"
+    assert result["status"] not in {"PROMETE", "VERIFICADO"}
+    assert result["reproducible"] is False
+    assert result["metrics"]["reproducibility_reason"] == "drift_detected"
 
 
 if __name__ == "__main__":
-    unittest.main()
+    raise SystemExit(pytest.main([__file__]))
