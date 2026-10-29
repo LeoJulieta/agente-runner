@@ -20,7 +20,7 @@ Las huellas se calcularon sobre el contenido UTF-8 de `docs/PR-D-DESIGN.md`:
 | Referencia | SHA-256 | Estado |
 |---|---|---|
 | `main:docs/PR-D-DESIGN.md` | `0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89` | Contrato vigente E1–E5 |
-| `docs/pr-d-v2-amendments-e6-e11:docs/PR-D-DESIGN.md` | `21664b7a5c6f24e876fa7072db54e29b12446a64d0f106c9d60f702478fb9cd8` | Candidato que añade E6–E11 |
+| `docs/pr-d-v2-amendments-e6-e11:docs/PR-D-DESIGN.md` | `862bf1235066868a50ea0c3b41f6cff50c9430813257cff61f6cf6b213bcab8e` | Candidato que añade E6–E11 |
 | `main:docs/manifest.json` → `contract_sha256` | `0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89` | Coincide con el contrato vigente |
 
 La diferencia de huellas corresponde a una diferencia contractual real: el candidato añade la sección 16 (E6–E11). No es correcto describir esas enmiendas como ya aprobadas en `main`.
