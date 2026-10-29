@@ -19,7 +19,7 @@ No se calculará `n_required_power` hasta que todos los campos obligatorios de e
 
 ### 1.2 Unidad de preregistro
 
-El preregistro no es global para todo PR D. Debe identificar una combinación inequívoca de:
+El preregistro no es global para todo PR D. Debe identificar una combinación inequívoca de. Los valores de alpha y potencia objetivo ya están fijados por PR D v2 §13.6 (0.05 bilateral y 0.80); este expediente no puede modificarlos. Lo que sigue pendiente es seleccionar y justificar el método aplicable y sus parámetros para cada familia/diseño:
 
 - versión del contrato y huella del método;
 - familia estadística (Familia I o Familia II);
@@ -44,8 +44,8 @@ El siguiente registro es una plantilla vacía. Los valores deben ser aportados y
 | `hypothesis_scope` | Hipótesis/outcome/contraste primario y población | PENDIENTE |
 | `estimand` / `effect_scale` | Parámetro objetivo y escala interpretable | PENDIENTE |
 | `minimum_relevant_effect` | Valor, escala, dirección y justificación sustantiva | PENDIENTE |
-| `alpha` | Nivel nominal y unilateralidad/bilateralidad | PENDIENTE |
-| `target_power` | Potencia objetivo y justificación | PENDIENTE |
+| `alpha` | **0.05 bilateral**, heredado de PR D v2 §13.6; no editable en este expediente | FIJADO POR CONTRATO |
+| `target_power` | **0.80 (80 %)**, objetivo de diseño heredado de PR D v2 §13.6; no equivale a garantía ni gate | FIJADO POR CONTRATO |
 | `design` | Diseño, asignación, grupos, medidas repetidas y estructura de dependencia | PENDIENTE |
 | `analysis_unit` | Unidad independiente que aporta información al cálculo | PENDIENTE |
 | `parameters` | Todos los parámetros requeridos por el método, con fuente y escala | PENDIENTE |
