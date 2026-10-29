@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - "tests/test_pr_d_statistical_fixtures.py"
+      - "tests/test_pr_d_statistical_edge_fixtures_candidate.py"
       - "tests/fixtures/pr_d_statistical_reference.json"
+      - "tests/fixtures/pr_d_statistical_edge_fixtures_candidate.json"
       - "requirements/pr-d-statistical-fixtures-py312.txt"
       - "docs/PR-D-STATISTICAL-FIXTURES-CANDIDATE.md"
       - ".github/workflows/pr-d-statistical-fixtures.yml"
@@ -35,9 +37,9 @@ jobs:
         run: |
           python --version
           python -m pip freeze
-          sha256sum tests/fixtures/pr_d_statistical_reference.json requirements/pr-d-statistical-fixtures-py312.txt
+          sha256sum tests/fixtures/pr_d_statistical_reference.json tests/fixtures/pr_d_statistical_edge_fixtures_candidate.json requirements/pr-d-statistical-fixtures-py312.txt
       - name: Run synthetic-only statistical reference tests
-        run: python -m unittest -v tests.test_pr_d_statistical_fixtures
+        run: python -m unittest -v tests.test_pr_d_statistical_fixtures tests.test_pr_d_statistical_edge_fixtures_candidate
       - name: Confirm manifest remains fixture-only
         shell: bash
         run: |
