@@ -57,7 +57,14 @@ class SingleRunGateTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 2)
-        self.assertIn("manifest_not_approved", result.stderr)
+        # The CLI must fail closed for either the fixture status or a stale contract hash.
+        # On a candidate contract branch, hash validation can correctly fail before
+        # the approval-status check; neither reason may permit execution.
+        self.assertTrue(
+            "manifest_not_approved" in result.stderr
+            or "manifest_contract_hash_mismatch" in result.stderr,
+            result.stderr,
+        )
         self.assertNotIn("VALID", result.stdout)
 
 
