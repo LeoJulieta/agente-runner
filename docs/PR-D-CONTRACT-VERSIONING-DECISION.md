@@ -20,10 +20,10 @@ Las huellas se calcularon sobre el contenido UTF-8 de `docs/PR-D-DESIGN-V3-CANDI
 | Referencia | SHA-256 | Estado |
 |---|---|---|
 | `main:docs/PR-D-DESIGN.md` | `0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89` | Contrato vigente E1–E5 |
-| `docs/pr-d-v2-amendments-e6-e11:docs/PR-D-DESIGN-V3-CANDIDATE.md` | `67ea3a30649d21e5f695a63498b94e7395a9d9c52ad6482d781a5b9d5c5bbf15` | Candidato que añade E6–E11 |
+| `main:docs/PR-D-DESIGN-V3-CANDIDATE.md` | `24480aa83f33c4f168e30cc1d18bcaa0e989a42527bc0c97ecb998df9dc5bfbe` | Candidato actual que añade E6–E11; SHA-256 recalculado sobre UTF-8 del archivo en `main` |
 | `main:docs/manifest.json` → `contract_sha256` | `0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89` | Coincide con el contrato vigente |
 
-La diferencia de huellas corresponde a una diferencia contractual real: el candidato añade la sección 16 (E6–E11). No es correcto describir esas enmiendas como ya aprobadas en `main`.
+La diferencia de huellas corresponde a una diferencia contractual real: el candidato añade la sección 16 (E6–E11). El SHA-256 anterior de la rama `docs/pr-d-v2-amendments-e6-e11` (`67ea3a...`) era una referencia histórica y no coincide con el contenido candidato actual en `main`; se reemplaza por la huella recalculada del archivo actual. El SHA-256 del contenido no es el mismo dato que el Git blob SHA (`8c15cb28424355cd0da9b928a82c52f09b1a7fd3` al momento de esta auditoría). No es correcto describir estas enmiendas como aprobadas: siguen siendo candidatas.
 
 ## 3. Regla de versionado y clasificación de E6–E11
 
