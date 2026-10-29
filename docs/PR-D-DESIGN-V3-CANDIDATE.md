@@ -5,7 +5,7 @@
 
 **Fecha de congelamiento:** 2026-10-09
 
-**Estado:** contrato documental aprobado y fusionado en `main` mediante PR #75; implementación del motor aún no autorizada
+**Estado:** PR D v2 (E1–E5) es la base contractual aprobada y vigente en `main` mediante PR #75. Las enmiendas E6–E11 de este documento siguen siendo una candidatura v3.0 no aprobada ni vigente; la implementación del motor no está autorizada.
 **Alcance:** diseño estadístico y operativo previo a implementación\
 **Principio rector:** evidencia primero. Ninguna regla estadística podrá
 modificarse después de observar los resultados para favorecer una
