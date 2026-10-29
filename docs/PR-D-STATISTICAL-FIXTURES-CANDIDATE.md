@@ -124,7 +124,7 @@ Los nuevos vectores viven en `tests/fixtures/pr_d_statistical_edge_fixtures_cand
 ### D08 — distinguir no estimabilidad científica de fallo estructural
 
 Se definieron cuatro casos:
-- Separación logística reconocida → `SCIENTIFIC_NON_ESTIMABLE`, `p=1.0) exclusivamente para BH, no aborta lote.
+- Separación logística reconocida → `SCIENTIFIC_NON_ESTIMABLE`, `p=1.0` exclusivamente para BH, no aborta lote.
 - No convergencia reconocida → misma clasificación y convención conservadora.
 - Información insuficiente para estimar el modelo → misma clasificación y convención conservadora.
 - Excepción inesperada de software/infraestructura → `STRUCTURAL_FAILURE`, sin p parcial y con aborto de lote.
@@ -133,8 +133,8 @@ Se definieron cuatro casos:
 
 ### D11 — preservar la familia BH congelada
 
-La familia sintética contiene cinco miembros, incluido un miembro no estimable que aporta `p=1.0) por convención contractual. La prueba verifica:
-- `m=5) antes y después del ajuste;
+La familia sintética contiene cinco miembros, incluido un miembro no estimable que aporta `p=1.0` por convención contractual. La prueba verifica:
+- `m=5` antes y después del ajuste;
 - identidad y orden original conservados;
 - q ajustados esperados `[0.05, 1.0, 0.1, 0.3333333333333333, 0.625]`;
 - ningún miembro eliminado y ningún valor no finito.
