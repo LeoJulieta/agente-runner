@@ -1,6 +1,7 @@
 # PR-D-DESIGN.md
 
-**Versión contractual:** PR D v2 (contrato documental aprobado; incorpora E1–E5)
+**Base contractual vigente:** PR D v2 (E1–E5, congelado en `main`).  
+**Candidato de esta rama:** E6–E11; por alterar semántica de estados/reproducibilidad, se propone evaluación como versión mayor PR D v3.0, no como v2.1. La propuesta no está aprobada ni vigente.
 
 **Fecha de congelamiento:** 2026-10-09
 
@@ -271,6 +272,14 @@ con los indicadores disponibles; no demuestra estabilidad absoluta.
 
 `status` describe el resultado de la evaluación de una hipótesis en una
 ventana. El estado y la comparación temporal se mantienen separados.
+
+En la comparación temporal, `A` identifica la evaluación antecedente y `B`
+la evaluación posterior. El estado `VERIFICADO` de A es admisible únicamente
+si A ya fue verificada como ventana posterior respecto de su propio antecedente;
+no se deriva del resultado de B que se está evaluando. Para el B actual, A debe
+ser localizable, tener estado `PROMETE` o `VERIFICADO`, y satisfacer los
+requisitos de suficiencia de §16.1. La elegibilidad del estado no sustituye la
+validación de identidad, contrato, huella de método ni campos inferenciales.
 
 Precedencia: 1. Contrato o datos inválidos: `INVALID`. 2. Datos válidos
 pero requisitos mínimos de información no satisfechos:
@@ -599,7 +608,7 @@ Esta sección resuelve normativamente N1–N6 de la matriz de trazabilidad. Esta
 
 ### 16.1 E6 — Elegibilidad del antecedente A (N1)
 
-Se distinguen **antecedente localizable** (misma hipótesis, identidad estable, contrato y `method_fingerprint` compatibles, estado A `PROMETE` o `VERIFICADO`) y **antecedente suficiente** (además contiene campos inferenciales obligatorios válidos y finitos, incluidos `effect_size`, `ci_low` y `ci_high` en la escala contractual). A localizable pero incompleto no puede respaldar `VERIFICADO`. Si B supera sus gates y A es incompleta, B queda `PROMETE`, `reproducible=false`, `metrics.reproducible_state="not_evaluable"` y `metrics.reproducibility_reason="antecedent_incomplete"`. No se imputan campos ni se interpreta la falta de IC como incompatibilidad estadística.
+Se distinguen **antecedente localizable** (misma hipótesis, identidad estable, contrato y `method_fingerprint` compatibles, estado A `PROMETE` o `VERIFICADO`) y **antecedente suficiente** (además contiene campos inferenciales obligatorios válidos y finitos, incluidos `effect_size`, `ci_low` y `ci_high` en la escala contractual). La admisión de A con estado `VERIFICADO` se refiere a una evaluación A que ya fue verificada contra un antecedente anterior; no permite que el B actual se valide circularmente a sí mismo ni altera la precedencia de §9. A localizable pero incompleto no puede respaldar `VERIFICADO`. Si B supera sus gates y A es incompleta, B queda `PROMETE`, `reproducible=false`, `metrics.reproducible_state="not_evaluable"` y `metrics.reproducibility_reason="antecedent_incomplete"`. No se imputan campos ni se interpreta la falta de IC como incompatibilidad estadística.
 
 ### 16.2 E7 — Invariante de estado B y reproducibilidad (N2)
 
