@@ -3,6 +3,10 @@
 **Estado:** borrador documental para auditoría humana; no autoriza implementación ni ejecución científica.  
 **Contrato fuente:** `docs/PR-D-DESIGN.md`, PR D v2 con enmiendas E6–E11 en §16; SHA-256 `21664b7a5c6f24e876fa7072db54e29b12446a64d0f106c9d60f702478fb9cd8` (propuesta, pendiente de revisión/fusión).  
 **Base de auditoría de infraestructura:** `main` en `ae8314192c0f031db292844004953383b3030679` (PR #89).  
+
+
+**Tabla detallada de aceptación:** [`docs/PR-D-ACCEPTANCE-TABLE-V2.md`](PR-D-ACCEPTANCE-TABLE-V2.md). Es una versión formal parcial de los casos revisados; T24c continúa bloqueado y la matriz T01–T32 sigue siendo el instrumento separado de trazabilidad/cobertura.
+
 **Seguridad:** `docs/manifest.json` permanece `execution_status: "fixture"`; no ejecutar hipótesis reales ni escribir en Supabase de producción.  
 **Actualización de cobertura:** revisión documental posterior a la incorporación de las suites sintéticas de T08–T12, T09/T10, T15–T27 y E11. Los estados siguientes reflejan pruebas localizadas en esta rama; no equivalen a aceptación del motor completo ni de producción.
 
