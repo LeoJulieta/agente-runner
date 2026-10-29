@@ -117,13 +117,35 @@ Aserciones adicionales:
 - Un caso científicamente no estimable que deba aportar `p=1.0` al ajuste conserva su posición y pertenencia a `m`; ese valor es una convención de ajuste, no un p empírico.
 - Agregar en una revisión posterior casos de valores p empatados, orden original distinto y verificación de monotonía. No están cubiertos por este fixture mínimo.
 
-## 5. Casos aún no congelados: D08, D11 y D12
+## 5. D08, D11 y D12 — diseño de fixtures de borde (candidato)
 
-No se declaran completos en este documento.
+Los nuevos vectores viven en `tests/fixtures/pr_d_statistical_edge_fixtures_candidate.json` y sus aserciones en `tests/test_pr_d_statistical_edge_fixtures_candidate.py`. El workflow dedicado ejecuta estas pruebas junto con D07/D09/D10. Son fixtures de aceptación sintéticos; no son una implementación del motor ni una aprobación normativa.
 
-- **D08 — no estimabilidad:** definir por separado fixtures de separación logística, no convergencia, modelo no estimable y excepción inesperada de software/infraestructura. Los tres primeros son resultados científicos; el último es fallo estructural. No equipararlos.
-- **D11 — no estimable dentro de BH:** definir una familia fija con miembros estimables y no estimables, preservar `m`, orden y trazabilidad, y verificar que el miembro no estimable aporta `p=1.0` solo al ajuste, según contrato aplicable.
-- **D12 — gates de efecto/dirección/intervalo:** tomar efecto mínimo, dirección y criterio de intervalo únicamente del contrato preregistrado de cada fixture. No inventar un nuevo umbral ni ajustar los parámetros después de observar resultados.
+### D08 — distinguir no estimabilidad científica de fallo estructural
+
+Se definieron cuatro casos:
+- Separación logística reconocida → `SCIENTIFIC_NON_ESTIMABLE`, `p=1.0) exclusivamente para BH, no aborta lote.
+- No convergencia reconocida → misma clasificación y convención conservadora.
+- Información insuficiente para estimar el modelo → misma clasificación y convención conservadora.
+- Excepción inesperada de software/infraestructura → `STRUCTURAL_FAILURE`, sin p parcial y con aborto de lote.
+
+**Límite:** las pruebas actuales validan el clasificador de frontera a partir de clases de resultado simuladas. No demuestran todavía que un estimador real de cada versión de biblioteca sea clasificado correctamente; esa integración pertenece a una fase posterior y sigue fuera del motor de producción.
+
+### D11 — preservar la familia BH congelada
+
+La familia sintética contiene cinco miembros, incluido un miembro no estimable que aporta `p=1.0) por convención contractual. La prueba verifica:
+- `m=5) antes y después del ajuste;
+- identidad y orden original conservados;
+- q ajustados esperados `[0.05, 1.0, 0.1, 0.3333333333333333, 0.625]`;
+- ningún miembro eliminado y ningún valor no finito.
+
+Este fixture prueba una familia y una ventana de juguete; no certifica la implementación FDR completa del laboratorio ni todos los casos de empates.
+
+### D12 — gates de efecto, dirección e intervalo: BLOQUEADO
+
+La inspección de `docs/manifest.json` en `main` confirma que el manifiesto actual es explícitamente test-only y `execution_status: "fixture"`. Define familias, IDs de hipótesis, outcomes, contrastes, ventanas y `method_version`, pero no contiene parámetros por hipótesis suficientes para D12: efecto mínimo relevante, dirección esperada, regla/método de IC y `method_fingerprint`.
+
+Por esa ausencia, el fixture D12 **no calcula ni decide** los gates de efecto/dirección/intervalo. Verifica que el estado siga siendo `BLOCKED_PREREGISTRATION_INCOMPLETE` y que no se infieran umbrales. No se inventó un efecto mínimo numérico, una dirección ni una regla de IC. Para desbloquearlo hará falta una preregistración sintética versionada, revisada y coherente con el contrato vigente, con esos valores explícitos antes de observar resultados. No modificar el manifiesto actual para simular una aprobación.
 
 ## 6. Criterios para aceptar la congelación
 
