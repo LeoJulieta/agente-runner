@@ -162,3 +162,28 @@ La revisión humana puede aprobar la congelación solo cuando:
 ## 7. No incluido
 
 Este documento y la suite agregada no implementan los modelos en `labs/` ni conectan con Supabase. El workflow agregado solo ejecuta fixtures sintéticos y usa dependencias aisladas. No cambia el contrato v2, no aprueba E6–E11, no desbloquea T24c ni certifica la cobertura de toda la matriz T01–T32.
+
+
+### D12 — preregistro sintético separado y pruebas positivas/negativas (candidato)
+
+Se agregó `tests/fixtures/manifest_d12_test.json` como archivo independiente. **No reemplaza ni modifica `docs/manifest.json`**. Está marcado con `status: "candidate"`, `authority: "illustrative_not_normative"` y `execution_authorized: false`.
+
+El preregistro sintético fija antes de evaluar los resultados de prueba:
+- estimando/escala: odds ratio;
+- efecto mínimo relevante ilustrativo: OR ≥ 1,5;
+- dirección esperada ilustrativa: `greater` (OR > 1);
+- IC del 95 % ilustrativo, Wald normal sobre log(OR), exponenciado, con regla de gate `ci_low > 1.0`;
+- valor q BH ≤ 0,05 dentro de una familia/ventana sintética con m=1;
+- mínimos operativos sintéticos: n_eff ≥ 30 y al menos 5 eventos por ventana;
+- identificador de método placeholder, marcado explícitamente como **no hash criptográfico real**.
+
+Los números y las reglas de este archivo sirven exclusivamente para ejercitar el código de prueba. No son valores normativos del contrato PR D v2 ni una aprobación de E6–E11. La prueba evalúa una función auxiliar aislada, no el motor científico.
+
+Casos cubiertos:
+- **D12-POSITIVE-OR-2:** OR=2,0; IC [1,6; 2,5]; q=0,005; mínimos operativos cumplidos → todos los gates sintéticos pasan y resultado esperado `PROMETE`.
+- **D12-NEGATIVE-OR-1-2:** OR=1,2; IC [0,9; 1,4]; q=0,2; mínimos operativos cumplidos → falla el efecto mínimo, el límite inferior del IC y el gate FDR; resultado esperado `RECHAZA`.
+- **D12 incompleto:** la prueba conserva el control negativo sobre el manifiesto oficial: como no tiene los parámetros por hipótesis, permanece `BLOCKED_PREREGISTRATION_INCOMPLETE`; no se infieren valores desde el fixture sintético.
+
+El workflow registra también el hash del manifiesto sintético y ejecuta estas pruebas en el mismo entorno aislado. La comprobación final continúa verificando que `docs/manifest.json` conserve `execution_status: "fixture"`.
+
+**Límite estadístico:** esta prueba verifica la lógica de comparación con resultados resumidos ya proporcionados; no demuestra que la estimación logística real produzca dichos valores ni que el método/criterio sea normativamente correcto. Esa validación sigue fuera del alcance del PR #98.
