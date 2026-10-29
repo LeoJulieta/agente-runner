@@ -130,6 +130,67 @@ class TestPRDStatisticalReferenceFixtures(unittest.TestCase):
             with self.subTest(field=key):
                 self.assertClose(actual, expected[key])
 
+
+    def test_d09_raw_y_transform_and_independent_hc3_reference(self):
+        """Trace raw positive Y through log transform and independently recompute HC3."""
+        case = self.fixture["D09_ols_hc3"]
+        provenance = case["provenance"]
+        self.assertIn("not a reconstruction", provenance["source"])
+        self.assertIn("Y > 0", provenance["selection_rule"])
+        self.assertIn("direct NumPy matrix algebra", provenance["independent_reference"])
+
+        raw_y = np.asarray(case["raw_y"], dtype=np.float64)
+        x_values = np.asarray(case["x"], dtype=np.float64)
+        expected_ln_y = np.asarray(case["ln_y"], dtype=np.float64)
+        self.assertEqual(raw_y.size, x_values.size)
+        self.assertEqual(raw_y.size, expected_ln_y.size)
+        self.assertTrue(np.all(np.isfinite(raw_y)))
+        self.assertTrue(np.all(raw_y > 0.0))
+        ln_y = np.log(raw_y)
+        np.testing.assert_allclose(ln_y, expected_ln_y, rtol=self.rtol, atol=self.atol)
+
+        # Independent HC3 sandwich calculation using NumPy matrix algebra.
+        design = np.column_stack((np.ones(x_values.size, dtype=np.float64), x_values))
+        bread = np.linalg.inv(design.T @ design)
+        beta = bread @ design.T @ ln_y
+        residuals = ln_y - design @ beta
+        leverage = np.sum((design @ bread) * design, axis=1)
+        adjusted_sq_residuals = (residuals / (1.0 - leverage)) ** 2
+        meat = design.T @ (adjusted_sq_residuals[:, None] * design)
+        covariance = bread @ meat @ bread
+        independent_se = np.sqrt(np.diag(covariance))
+        df_resid = int(ln_y.size - design.shape[1])
+        t_stat = beta[1] / independent_se[1]
+        p_value = 2.0 * t.sf(abs(t_stat), df_resid)
+        critical = t.ppf(0.975, df_resid)
+        ci_low = beta[1] - critical * independent_se[1]
+        ci_high = beta[1] + critical * independent_se[1]
+
+        expected = case["expected"]
+        independent_values = {
+            "intercept": beta[0], "beta": beta[1], "se_hc3": independent_se[1],
+            "t": t_stat, "df_resid": df_resid, "p_two_sided_t": p_value,
+            "ci_low": ci_low, "ci_high": ci_high,
+        }
+        for key, actual in independent_values.items():
+            with self.subTest(reference="independent_numpy", field=key):
+                self.assertClose(actual, expected[key])
+
+        # Cross-check the independent calculation against the pinned statsmodels implementation.
+        model = sm.OLS(ln_y, design).fit(cov_type="HC3", use_t=True)
+        model_values = {
+            "intercept": model.params[0], "beta": model.params[1],
+            "se_hc3": model.bse[1], "t": model.params[1] / model.bse[1],
+            "df_resid": int(model.df_resid),
+            "p_two_sided_t": 2.0 * t.sf(abs(model.params[1] / model.bse[1]), int(model.df_resid)),
+            "ci_low": model.conf_int(alpha=0.05)[1, 0],
+            "ci_high": model.conf_int(alpha=0.05)[1, 1],
+        }
+        for key, actual in model_values.items():
+            with self.subTest(reference="statsmodels", field=key):
+                self.assertClose(actual, expected[key])
+                self.assertClose(actual, independent_values[key])
+
     def test_d10_bh_adjustment_and_boundary(self):
         case = self.fixture["D10_benjamini_hochberg"]
         actual = bh_adjust(case["p_values"])
