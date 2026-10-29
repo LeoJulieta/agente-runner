@@ -1,0 +1,12 @@
+# Candidate reproducibility environment; Python 3.12.x.
+# Exact direct and transitive pins for this fixture-only job.
+numpy==2.2.6
+scipy==1.15.3
+statsmodels==0.14.5
+pandas==2.2.3
+patsy==1.0.1
+packaging==24.2
+python-dateutil==2.9.0.post0
+pytz==2025.2
+six==1.17.0
+tzdata==2025.2
