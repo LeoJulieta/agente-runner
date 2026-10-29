@@ -140,3 +140,6 @@ Salidas: n_required_power=null; n_required_power_reason=assumptions_not_met; n_r
 - Mantener separados los identificadores históricos de esta tabla y los T01–T32 de la matriz de trazabilidad.
 - No iniciar implementación Python adicional ni afirmar que la Regla 13.7 está cerrada hasta que se complete la cobertura contractual, la reproducción independiente y la decisión formal sobre el alcance de congelación.
 - El manifiesto continúa en `fixture`; este documento no autoriza ejecución real, cambios de manifiesto ni escrituras en Supabase de producción.
+
+
+**Nota de control de versión:** la V2 formal de esta tabla es parcial y se revisó contra casos de la rama de auditoría. El contrato congelado en `main` (E1–E5) tiene SHA-256 `0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89`, coincidente con el manifiesto fixture. La rama de auditoría contiene un candidato ampliado con E6–E11 y SHA-256 `21664b7a5c6f24e876fa7072db54e29b12446a64d0f106c9d60f702478fb9cd8`; ese candidato no está referenciado por el manifiesto ni fusionado en `main`. Esta tabla no declara E6–E11 como contrato aprobado de `main` ni autoriza sincronizar hashes, ejecución científica o implementación de producción. T24c y la cobertura integral permanecen pendientes.
