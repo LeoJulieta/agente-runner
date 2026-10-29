@@ -25,7 +25,7 @@ Las huellas se calcularon sobre el contenido UTF-8 de `docs/PR-D-DESIGN.md`:
 
 La diferencia de huellas corresponde a una diferencia contractual real: el candidato añade la sección 16 (E6–E11). No es correcto describir esas enmiendas como ya aprobadas en `main`.
 
-## 3. Por qué se propone una enmienda menor y no reemplazar v2
+## 3. Regla de versionado y clasificación de E6–E11
 
 E6–E11 se presentan para cerrar ambigüedades detectadas en la matriz, pero varias cambian resultados observables: estados de B, semántica de reproducibilidad, clasificación de no estimabilidad y reglas de drift/aceptación. Por ello, no es prudente etiquetarlas como versión menor. Regla de versionado propuesta: **patch** solo para cambios editoriales sin efecto contractual; **minor** para extensiones compatibles que no cambian estados, gates, estimandos, inferencia, criterios de reproducibilidad ni campos obligatorios; **major** para cambios que alteren cualquiera de esos elementos, la interpretación de resultados o el `method_fingerprint`. Bajo esta regla, E6–E11 deben auditarse como candidato mayor PR D v3.0. Esta clasificación es propuesta y no aprueba el método ni la implementación.
 
