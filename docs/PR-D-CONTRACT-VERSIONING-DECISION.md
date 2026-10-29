@@ -15,12 +15,12 @@
 
 ## 2. Evidencia de control de versiones
 
-Las huellas se calcularon sobre el contenido UTF-8 de `docs/PR-D-DESIGN.md`:
+Las huellas se calcularon sobre el contenido UTF-8 de `docs/PR-D-DESIGN-V3-CANDIDATE.md`:
 
 | Referencia | SHA-256 | Estado |
 |---|---|---|
 | `main:docs/PR-D-DESIGN.md` | `0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89` | Contrato vigente E1–E5 |
-| `docs/pr-d-v2-amendments-e6-e11:docs/PR-D-DESIGN.md` | `862bf1235066868a50ea0c3b41f6cff50c9430813257cff61f6cf6b213bcab8e` | Candidato que añade E6–E11 |
+| `docs/pr-d-v2-amendments-e6-e11:docs/PR-D-DESIGN-V3-CANDIDATE.md` | `67ea3a30649d21e5f695a63498b94e7395a9d9c52ad6482d781a5b9d5c5bbf15` | Candidato que añade E6–E11 |
 | `main:docs/manifest.json` → `contract_sha256` | `0ca1aa8c452b4d2bb974070f71f7ea315e5f4a156b98bc1d9a01f5e3fd019f89` | Coincide con el contrato vigente |
 
 La diferencia de huellas corresponde a una diferencia contractual real: el candidato añade la sección 16 (E6–E11). No es correcto describir esas enmiendas como ya aprobadas en `main`.
