@@ -8,7 +8,7 @@
 ## 1. Decisión propuesta
 
 1. Mantener **PR D v2 (E1–E5)** como contrato vigente y congelado en `main`.
-2. Tratar E6–E11 como **candidato de enmienda PR D v2.1**, exclusivamente para revisión. La etiqueta `v2.1` es una propuesta de versionado, no una aprobación ni una declaración de compatibilidad ya demostrada.
+2. Tratar E6–E11 como **candidato de revisión PR D v3.0**, exclusivamente para revisión. No es una aprobación ni una declaración de compatibilidad ya demostrada.
 3. No sobrescribir el contrato vigente ni modificar `docs/manifest.json` en esta etapa.
 4. Si la auditoría humana y externa aprueba E6–E11, integrar la versión candidata mediante un cambio coordinado y revisable: contrato versionado, huella SHA-256 actualizada en el manifiesto de fixture y pruebas de consistencia documental. La actualización del manifiesto será un cambio separado o una etapa explícita posterior, con su propia revisión.
 5. Mantener `execution_status: "fixture"`. Esta decisión no autoriza activar ejecuciones, modificar datos ni fusionar el PR de trazabilidad (#90).
@@ -27,7 +27,7 @@ La diferencia de huellas corresponde a una diferencia contractual real: el candi
 
 ## 3. Por qué se propone una enmienda menor y no reemplazar v2
 
-E6–E11 se presentan como especificaciones adicionales para cerrar ambigüedades detectadas en la matriz; no deben borrar el historial ni cambiar silenciosamente el texto congelado. La propuesta de versión menor conserva la trazabilidad entre la base aprobada y el conjunto aditivo de cambios. **Esto no presume que las enmiendas sean estadísticamente correctas o implementables**: cada regla y su tabla de aceptación requieren auditoría independiente, y cualquier cambio que altere el método o la semántica de estados deberá evaluarse como potencial cambio mayor antes de aprobar la versión.
+E6–E11 se presentan para cerrar ambigüedades detectadas en la matriz, pero varias cambian resultados observables: estados de B, semántica de reproducibilidad, clasificación de no estimabilidad y reglas de drift/aceptación. Por ello, no es prudente etiquetarlas como versión menor. Regla de versionado propuesta: **patch** solo para cambios editoriales sin efecto contractual; **minor** para extensiones compatibles que no cambian estados, gates, estimandos, inferencia, criterios de reproducibilidad ni campos obligatorios; **major** para cambios que alteren cualquiera de esos elementos, la interpretación de resultados o el `method_fingerprint`. Bajo esta regla, E6–E11 deben auditarse como candidato mayor PR D v3.0. Esta clasificación es propuesta y no aprueba el método ni la implementación.
 
 ## 4. Condiciones obligatorias antes de promover el candidato
 
@@ -47,7 +47,7 @@ Esta propuesta no modifica `main`, el contrato vigente ni `docs/manifest.json`; 
 Confirmar o rechazar explícitamente:
 
 1. Mantener E1–E5 como PR D v2 vigente.
-2. Adoptar **PR D v2.1** como identificador provisional del candidato E6–E11, sujeto a revisión.
+2. Adoptar **PR D v3.0** como identificador provisional del candidato E6–E11, sujeto a revisión; no promocionar como v2.1 porque las enmiendas afectan semántica observable.
 3. Requerir aprobación separada y sincronización de hash/manifiesto antes de promoverlo a vigente.
 4. Mantener bloqueado cualquier cambio de implementación o ejecución hasta cerrar la tabla de aceptación y los bloqueos técnicos.
 
