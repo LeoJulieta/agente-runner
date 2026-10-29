@@ -1,0 +1,93 @@
+{
+  "schema": "pr-d-power-result-fixtures-candidate/1",
+  "status": "candidate",
+  "authority": "illustrative_not_normative",
+  "purpose": "Synthetic output-shape and value/reason/unit consistency tests only; no power formula or engine integration.",
+  "safeguards": {
+    "calculation_performed": false,
+    "power_method_preregistered": false,
+    "production_hypotheses": false,
+    "supabase_production_writes": false,
+    "manifest_execution_status_must_remain": "fixture",
+    "e6_e11_approval": false
+  },
+  "allowed_units": [
+    "eligible_observations",
+    "positive_events"
+  ],
+  "allowed_null_reasons": [
+    "method_not_preregistered",
+    "missing_parameters",
+    "assumptions_not_met",
+    "unsupported_family_or_model",
+    "invalid_effect_specification"
+  ],
+  "illustrative_valid_outputs": [
+    {
+      "id": "T28-VALID-ELIGIBLE-OBSERVATIONS",
+      "result": {
+        "value": 42,
+        "reason": null,
+        "unit": "eligible_observations"
+      },
+      "expected": "VALID_SHAPE"
+    },
+    {
+      "id": "T28-VALID-POSITIVE-EVENTS",
+      "result": {
+        "value": 18,
+        "reason": null,
+        "unit": "positive_events"
+      },
+      "expected": "VALID_SHAPE"
+    }
+  ],
+  "illustrative_null_outputs": [
+    {
+      "id": "T28-NULL-METHOD-NOT-PREREGISTERED",
+      "result": {
+        "value": null,
+        "reason": "method_not_preregistered",
+        "unit": null
+      },
+      "expected": "VALID_NULL_SHAPE"
+    },
+    {
+      "id": "T28-NULL-MISSING-PARAMETERS",
+      "result": {
+        "value": null,
+        "reason": "missing_parameters",
+        "unit": null
+      },
+      "expected": "VALID_NULL_SHAPE"
+    },
+    {
+      "id": "T28-NULL-ASSUMPTIONS-NOT-MET",
+      "result": {
+        "value": null,
+        "reason": "assumptions_not_met",
+        "unit": null
+      },
+      "expected": "VALID_NULL_SHAPE"
+    },
+    {
+      "id": "T28-NULL-UNSUPPORTED-FAMILY",
+      "result": {
+        "value": null,
+        "reason": "unsupported_family_or_model",
+        "unit": null
+      },
+      "expected": "VALID_NULL_SHAPE"
+    },
+    {
+      "id": "T28-NULL-INVALID-EFFECT-SPECIFICATION",
+      "result": {
+        "value": null,
+        "reason": "invalid_effect_specification",
+        "unit": null
+      },
+      "expected": "VALID_NULL_SHAPE"
+    }
+  ],
+  "note": "Numbers 42 and 18 are illustrative schema fixtures, not calculated required sample sizes, power estimates, recommendations, or approved thresholds. T24c remains blocked until a power method and its assumptions are separately preregistered and independently reviewed."
+}
