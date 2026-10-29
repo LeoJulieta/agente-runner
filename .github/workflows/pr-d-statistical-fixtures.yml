@@ -6,6 +6,9 @@ on:
     paths:
       - "tests/test_pr_d_statistical_fixtures.py"
       - "tests/test_pr_d_statistical_edge_fixtures_candidate.py"
+      - "tests/test_pr_d_power_result_fixtures_candidate.py"
+      - "tests/fixtures/pr_d_power_result_fixtures_candidate.json"
+      - "docs/PR-D-T28-POWER-RESULT-FIXTURES-CANDIDATE.md"
       - "tests/fixtures/pr_d_statistical_reference.json"
       - "tests/fixtures/pr_d_statistical_edge_fixtures_candidate.json"
       - "tests/fixtures/manifest_d12_test.json"
@@ -38,9 +41,9 @@ jobs:
         run: |
           python --version
           python -m pip freeze
-          sha256sum tests/fixtures/pr_d_statistical_reference.json tests/fixtures/pr_d_statistical_edge_fixtures_candidate.json tests/fixtures/manifest_d12_test.json requirements/pr-d-statistical-fixtures-py312.txt
+          sha256sum tests/fixtures/pr_d_statistical_reference.json tests/fixtures/pr_d_statistical_edge_fixtures_candidate.json tests/fixtures/pr_d_power_result_fixtures_candidate.json tests/fixtures/manifest_d12_test.json requirements/pr-d-statistical-fixtures-py312.txt
       - name: Run synthetic-only statistical reference tests
-        run: python -m unittest -v tests.test_pr_d_statistical_fixtures tests.test_pr_d_statistical_edge_fixtures_candidate
+        run: python -m unittest -v tests.test_pr_d_statistical_fixtures tests.test_pr_d_statistical_edge_fixtures_candidate tests.test_pr_d_power_result_fixtures_candidate
       - name: Confirm manifest remains fixture-only
         shell: bash
         run: |
