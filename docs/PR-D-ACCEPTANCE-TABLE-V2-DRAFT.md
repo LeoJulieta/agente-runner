@@ -1,5 +1,11 @@
 # PR D v2 — Tabla de aceptación determinista v2 (borrador para auditoría)
 
+> **Documento reemplazado como referencia principal:** la versión formal parcial está en [`PR-D-ACCEPTANCE-TABLE-V2.md`](PR-D-ACCEPTANCE-TABLE-V2.md). Este archivo se conserva como historial del borrador previo a la revisión de Qwen; no usarlo como fuente vigente.
+
+---
+
+# PR D v2 — Tabla de aceptación determinista v2 (borrador para auditoría)
+
 **Estado:** BORRADOR. No congelada; requiere revisión humana y de Qwen antes de usarla como autorización de implementación.  
 **Propósito:** corregir los casos numéricos y de borde señalados para la Regla 13.7. Esta tabla es el conjunto de aceptación detallado previo a implementación; **no sustituye** la matriz de trazabilidad T01–T32 de PR-D-TRACEABILITY-MATRIX.md. Los identificadores T01/T08/T21 aquí pertenecen a la tabla de aceptación histórica y no deben confundirse con los de la matriz T01–T32.  
 **Límites:** solo fixtures sintéticos. No se autoriza implementar más código Python, ejecutar hipótesis reales, cambiar docs/manifest.json, cambiar execution_status=fixture ni escribir en Supabase de producción.
