@@ -1,8 +1,8 @@
 """Candidate acceptance fixtures for PR D D08, D11 and D12.
 
 Synthetic contract-design checks only. This module does not invoke the lab
-engine or connect to Supabase. D12 remains blocked where preregistration is
-missing; no scientific threshold is inferred here.
+engine or connect to Supabase. D12 evaluates only a separate, explicitly
+non-normative synthetic preregistration; the official manifest remains fixture.
 """
 import json
 import math
@@ -14,6 +14,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 EDGE_PATH = ROOT / "tests" / "fixtures" / "pr_d_statistical_edge_fixtures_candidate.json"
 MANIFEST_PATH = ROOT / "docs" / "manifest.json"
+D12_MANIFEST_PATH = ROOT / "tests" / "fixtures" / "manifest_d12_test.json"
 
 
 def read_json(path):
@@ -45,10 +46,36 @@ def classify_fit_outcome(input_class):
     raise ValueError("unrecognized fit outcome class")
 
 
+def evaluate_d12(preregistration, observed):
+    """Evaluate illustrative gates only; never called by the lab engine."""
+    hypothesis = preregistration["hypothesis"]
+    ci = hypothesis["confidence_interval"]
+    checks = {
+        "effect": observed["odds_ratio"] >= hypothesis["minimum_relevant_effect"],
+        "direction": (
+            observed["odds_ratio"] > 1.0
+            if hypothesis["expected_direction"] == "greater"
+            else observed["odds_ratio"] < 1.0
+        ),
+        "interval": (
+            observed["ci_low"] > 1.0
+            if ci["gate_rule"] == "lower_bound > 1.0"
+            else False
+        ),
+        "fdr": observed["q_value"] <= hypothesis["fdr_alpha"],
+        "operational_minima": (
+            observed["n_eff"] >= hypothesis["operational_minima"]["n_eff"]
+            and observed["n_events_per_window"] >= hypothesis["operational_minima"]["n_events_per_window"]
+        ),
+    }
+    return {"checks": checks, "gate": "PROMETE" if all(checks.values()) else "RECHAZA"}
+
+
 class TestPRDStatisticalEdgeFixturesCandidate(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.edge = read_json(EDGE_PATH)
+        cls.d12 = read_json(D12_MANIFEST_PATH)
 
     def test_fixture_is_candidate_and_safe(self):
         self.assertEqual(self.edge["status"], "candidate")
@@ -90,27 +117,62 @@ class TestPRDStatisticalEdgeFixturesCandidate(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(q_values)))
         self.assertTrue(np.all((q_values >= 0.0) & (q_values <= 1.0)))
 
-    def test_d12_stays_blocked_when_preregistration_is_missing(self):
+    def test_d12_stays_blocked_when_official_preregistration_is_missing(self):
         case = self.edge["D12_preregistered_gates"]
-        manifest = read_json(MANIFEST_PATH)
+        official_manifest = read_json(MANIFEST_PATH)
         self.assertEqual(case["status"], "BLOCKED")
         self.assertFalse(case["evaluation_authorized"])
         self.assertEqual(case["expected_behavior"]["result"], "BLOCKED_PREREGISTRATION_INCOMPLETE")
         self.assertTrue(case["expected_behavior"]["do_not_infer_thresholds"])
-        self.assertEqual(manifest.get("execution_status"), "fixture")
+        self.assertEqual(official_manifest.get("execution_status"), "fixture")
 
         required = set(case["required_fields"])
-        # This test-only manifest deliberately lacks hypothesis-level gate
-        # parameters; do not synthesize defaults from the observed outcomes.
-        manifest_fields = set(manifest.keys())
-        for family in manifest["families"]:
+        manifest_fields = set(official_manifest.keys())
+        for family in official_manifest["families"]:
             manifest_fields.update(family.keys())
         missing = required - manifest_fields
         self.assertIn("minimum_relevant_effect", missing)
         self.assertIn("expected_direction", missing)
         self.assertIn("confidence_interval_method_and_level", missing)
         self.assertIn("method_fingerprint", missing)
-        self.assertTrue(math.isfinite(float(manifest["families"][0]["m"])))
+        self.assertTrue(math.isfinite(float(official_manifest["families"][0]["m"])))
+
+    def test_d12_synthetic_preregistration_is_explicit_and_non_normative(self):
+        prereg = self.d12
+        self.assertEqual(prereg["status"], "candidate")
+        self.assertEqual(prereg["authority"], "illustrative_not_normative")
+        self.assertFalse(prereg["execution_authorized"])
+        self.assertTrue(prereg["preregistered_before_synthetic_outcomes"])
+        self.assertFalse(prereg["safeguards"]["official_manifest_modified"])
+        self.assertEqual(prereg["safeguards"]["official_manifest_execution_status_must_remain"], "fixture")
+        hypothesis = prereg["hypothesis"]
+        self.assertEqual(hypothesis["effect_estimand"], "odds_ratio")
+        self.assertEqual(hypothesis["minimum_relevant_effect"], 1.5)
+        self.assertEqual(hypothesis["expected_direction"], "greater")
+        self.assertEqual(hypothesis["confidence_interval"]["level"], 0.95)
+        self.assertEqual(hypothesis["confidence_interval"]["gate_rule"], "lower_bound > 1.0")
+        self.assertFalse(hypothesis["method_fingerprint_is_real_hash"])
+        self.assertEqual(len(hypothesis["family_membership"]), hypothesis["m"])
+
+    def test_d12_positive_case_passes_all_preregistered_synthetic_gates(self):
+        case = next(c for c in self.d12["synthetic_cases"] if c["case_id"] == "D12-POSITIVE-OR-2")
+        actual = evaluate_d12(self.d12, case["observed"])
+        self.assertEqual(actual["gate"], case["expected_gate"])
+        self.assertEqual(actual["gate"], "PROMETE")
+        self.assertEqual(actual["checks"], case["expected_checks"])
+        self.assertTrue(all(actual["checks"].values()))
+
+    def test_d12_negative_case_rejects_without_changing_thresholds(self):
+        case = next(c for c in self.d12["synthetic_cases"] if c["case_id"] == "D12-NEGATIVE-OR-1-2")
+        actual = evaluate_d12(self.d12, case["observed"])
+        self.assertEqual(actual["gate"], case["expected_gate"])
+        self.assertEqual(actual["gate"], "RECHAZA")
+        self.assertEqual(actual["checks"], case["expected_checks"])
+        self.assertFalse(actual["checks"]["effect"])
+        self.assertFalse(actual["checks"]["interval"])
+        self.assertFalse(actual["checks"]["fdr"])
+        self.assertEqual(self.d12["hypothesis"]["minimum_relevant_effect"], 1.5)
+        self.assertEqual(self.d12["hypothesis"]["expected_direction"], "greater")
 
     def test_fdr_helper_rejects_nonfinite_and_out_of_range_p_values(self):
         for values in ([], [float("nan")], [float("inf")], [-0.1], [1.1]):
