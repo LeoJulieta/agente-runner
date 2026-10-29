@@ -17,7 +17,7 @@ Los valores de esta versión se calcularon en el siguiente entorno local:
 | statsmodels | 0.14.6 |
 | pandas | 2.2.3 |
 
-**Importante:** estas versiones describen el entorno de cálculo observado, no dependencias fijadas por el repositorio. El workflow actual de gates utiliza Python 3.12 e instala `pyyaml`; no demuestra que el entorno estadístico esté fijado. Por tanto, los valores siguientes son referencias candidatas, no aún una referencia normativa congelada. Antes de aprobarlos, ejecutar el mismo fixture en un entorno aislado con versiones exactas fijadas y comprobar compatibilidad con Python 3.12 o decidir documentalmente otra versión de referencia.
+**Importante:** la tabla anterior conserva el entorno original donde se calcularon los valores iniciales. Después se añadió una reproducción aislada para Python 3.12 en `requirements/pr-d-statistical-fixtures-py312.txt`, con versiones exactas, y un workflow dedicado. GitHub Actions run [40902480659](https://github.com/LeoJulieta/agente-runner/actions/runs/40902480659) terminó en `success`: instalación, registro de versiones y hashes, pruebas D07/D09/D10 y comprobación de `execution_status: "fixture"` pasaron. El entorno reproducible usa NumPy 2.2.6, SciPy 1.15.3, statsmodels 0.14.5 y pandas 2.2.3. Por tanto, la compatibilidad con Python 3.12 y la reproducción de estos fixtures sí se verificaron en CI; aun así, los valores siguen siendo referencias candidatas hasta revisión humana y no son todavía referencias normativas congeladas.
 
 No usar rangos de versiones abiertos. La futura referencia debe incluir archivo de dependencias con versiones exactas, versión de Python, comando reproducible, y hash del archivo de fixture. Toda actualización del entorno debe requerir revisión de los cambios numéricos.
 
@@ -128,14 +128,15 @@ No se declaran completos en este documento.
 ## 6. Criterios para aceptar la congelación
 
 La revisión humana puede aprobar la congelación solo cuando:
-1. Un entorno aislado instala versiones exactas y registra la versión de Python.
-2. Los fixtures se ejecutan desde cero en ese entorno y los valores coinciden dentro de tolerancias documentadas.
+1. El entorno aislado con Python 3.12 y versiones exactas se reproduce desde cero; **cumplido en CI run 40902480659**.
+2. Los fixtures D07/D09/D10 coinciden dentro de las tolerancias documentadas; **cumplido en CI run 40902480659**.
 3. El método, la distribución del contraste, el nivel del intervalo y la convención de ajuste están explícitos.
-4. Se guardan hashes de los fixtures y del archivo de dependencias.
-5. El CI valida estos fixtures sintéticos sin invocar el motor científico ni acceder a Supabase de producción.
+4. El CI registra los hashes de los fixtures y del archivo de dependencias; **cumplido en CI run 40902480659**.
+5. El CI valida estos fixtures sintéticos sin invocar el motor científico ni acceder a Supabase de producción; **cumplido por alcance del workflow**.
 6. D08, D11 y D12 siguen marcados como pendientes hasta que tengan datos, resultados y aserciones verificables.
-7. No se cambia `execution_status: "fixture"` ni se habilita ejecución de hipótesis reales.
+7. No se cambia `execution_status: "fixture"` ni se habilita ejecución de hipótesis reales; el workflow confirmó que el manifiesto conserva ese estado.
+8. La revisión humana aprueba explícitamente las referencias y tolerancias antes de considerarlas normativas.
 
 ## 7. No incluido
 
-Este documento no implementa los modelos en `labs/`, no agrega dependencias al workflow, no cambia el contrato v2, no aprueba E6–E11, no desbloquea T24c ni certifica la cobertura de toda la matriz T01–T32.
+Este documento y la suite agregada no implementan los modelos en `labs/` ni conectan con Supabase. El workflow agregado solo ejecuta fixtures sintéticos y usa dependencias aisladas. No cambia el contrato v2, no aprueba E6–E11, no desbloquea T24c ni certifica la cobertura de toda la matriz T01–T32.
