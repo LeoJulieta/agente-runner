@@ -3,7 +3,7 @@
 **Estado:** borrador documental para auditoría humana; no autoriza implementación ni ejecución científica.  
 **Contrato fuente:** `docs/PR-D-DESIGN-V3-CANDIDATE.md`, base vigente PR D v2 (E1–E5) más candidato E6–E11 en §16; SHA-256 candidato `24480aa83f33c4f168e30cc1d18bcaa0e989a42527bc0c97ecb998df9dc5bfbe` (propuesta, pendiente de revisión).  
 **Artefacto normativo de aceptación:** esta matriz T01–T32 es la tabla de aceptación canónica de esta candidatura; `docs/PR-D-ACCEPTANCE-TABLE-V2.md` no forma parte de esta rama y no debe citarse como artefacto existente. Cualquier sustitución o separación futura requiere cambio documental explícito y revisión.
-**Base de auditoría de infraestructura:** `main` en `ae8314192c0f031db292844004953383b3030679` (PR #89).  
+**Base de auditoría de infraestructura (pre-PR):** `main` en `433e8c2482c7f42db1694a87040ed6724014a5c1` (HEAD verificado el 2026-10-29 antes de esta actualización). Esta referencia fija la base inspeccionada; no implica que la matriz haya sido auditada íntegramente contra cada commit anterior.  
 **Seguridad:** `docs/manifest.json` permanece `execution_status: "fixture"`; no ejecutar hipótesis reales ni escribir en Supabase de producción.  
 **Alcance de esta actualización:** documentación solamente; no se implementa ningún cálculo estadístico.
 
@@ -91,7 +91,17 @@ Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DES
 - PR #90 permanece abierto y sin fusionar; este PR se apila sobre su rama para mantener sincronizadas la matriz y el contrato.
 
 
-## Precisión de la validación numérica T27
+## T27 — procedencia numérica pendiente de reconciliación
 
-La aceptación numérica debe comprobar tanto los valores finales como la cadena de cálculo desde los datos crudos. En el fixture de referencia ya discutido, los valores finales reportados para `β₁`, `SE_HC3`, `ci_low` y `ci_high` fueron aproximadamente `0.266869`, `0.053627`, `0.143206` y `0.390532`, con tolerancia final de `1e-6`. Esa tolerancia **no** valida una derivación si los valores intermedios son erróneos o si se calcularon a partir de listas `ln(Y)` redondeadas/residuos transcritos. El test de referencia debe recalcular desde los valores `Y` crudos, mantener precisión completa en los pasos intermedios y verificar los intermediarios relevantes (media de `ln(Y)`, sumas/productos cruzados, residuos y numerador HC3), además de los resultados finales. Los datos sintéticos exactos y la tabla completa de valores esperados deben estar versionados junto al test; no reconstruirlos manualmente a partir de números redondeados.
+La referencia D09 actualmente versionada en `tests/fixtures/pr_d_statistical_reference.json` toma **12 valores de `ln(Y)` como entrada** y espera `β₁ ≈ 0.6000000000000003`, `SE_HC3 ≈ 0.11832159566199241` e IC95% `[0.3363630556765045, 0.8636369443234961]`. Esos valores son reproducibles para ese fixture, pero **no demuestran T27**, que exige reconstruir la transformación y la cadena de cálculo desde los valores crudos de `Y`.
 
+Los valores citados anteriormente para T27 (`β₁ ≈ 0.266869`, `SE_HC3 ≈ 0.053627`, IC95% `[0.143206, 0.390532]`) no tienen un fixture de entrada cruda enlazado de forma inequívoca en esta matriz. Se retiran como criterios de aceptación verificados: su procedencia queda **no verificada**, no se declara que sean matemáticamente incorrectos ni se los sustituye por valores inventados.
+
+Para cerrar T27, una revisión posterior debe versionar en el mismo cambio: (1) valores crudos exactos de `Y` y `X`; (2) regla exacta de selección `Y > 0` y transformación `ln(Y)`; (3) cálculo independiente de valores esperados; (4) valores intermedios de precisión completa; (5) método de covarianza HC3 y contraste t con grados de libertad; (6) tolerancias; y (7) test que deriva desde los datos crudos hasta coeficiente, error estándar e IC. Hasta entonces, T27 sigue sin cobertura numérica demostrada.
+
+## Bloqueos conservados tras la auditoría (2026-10-29)
+
+- **T24c:** continúa `BLOQUEADO`; falta preregistrar método de potencia, efecto mínimo, alfa, potencia objetivo, diseño/parámetros, unidad de análisis y referencia independiente. No se deduce potencia de `n_eff` ni de EPV.
+- **T28:** continúa sin evidencia de cálculo informativo de potencia ni de sus cinco motivos cerrados de nulidad, unidades aplicables y coherencia entre valor/razón/unidad.
+- **T32:** continúa sin evidencia de registro durable y recuperable de aborto, `completed=false`, `execution_id` distinto por intento y garantía de que no se publiquen resultados científicos parciales.
+- La ampliación de fixtures de esta rama es sintética y aislada. No conecta los clasificadores auxiliares con el motor, no implementa potencia ni persistencia durable, no modifica el manifiesto oficial y no certifica la matriz completa.
