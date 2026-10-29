@@ -38,11 +38,28 @@ def bh_adjust(p_values):
 
 
 def classify_fit_outcome(input_class):
-    """Candidate boundary classifier; not wired to the production engine."""
-    if input_class == "recognized_model_non_estimability":
-        return {"classification": "SCIENTIFIC_NON_ESTIMABLE", "p_for_fdr": 1.0, "abort_batch": False}
+    """Candidate contract mapping; not wired to the production engine."""
+    scientific_reasons = {
+        "logistic_separation",
+        "model_non_convergence",
+        "model_not_estimable",
+    }
+    if input_class in scientific_reasons:
+        return {
+            "classification": "SCIENTIFIC_NON_ESTIMABLE",
+            "contract_status": "INSUFFICIENT_POWER",
+            "non_estimability_reason": input_class,
+            "p_for_fdr": 1.0,
+            "abort_batch": False,
+        }
     if input_class == "unexpected_software_or_infrastructure_exception":
-        return {"classification": "STRUCTURAL_FAILURE", "p_for_fdr": None, "abort_batch": True}
+        return {
+            "classification": "STRUCTURAL_FAILURE",
+            "contract_status": None,
+            "non_estimability_reason": None,
+            "p_for_fdr": None,
+            "abort_batch": True,
+        }
     raise ValueError("unrecognized fit outcome class")
 
 
@@ -50,22 +67,42 @@ def evaluate_d12(preregistration, observed):
     """Evaluate illustrative gates only; never called by the lab engine."""
     hypothesis = preregistration["hypothesis"]
     ci = hypothesis["confidence_interval"]
+    required = {"odds_ratio", "ci_low", "ci_high", "p_value", "q_value", "n_eff", "n_events_per_window"}
+    missing = required - set(observed)
+    if missing:
+        raise ValueError(f"observed fields missing: {sorted(missing)}")
+    if hypothesis["expected_direction"] not in {"greater", "less"}:
+        raise ValueError("expected_direction must be 'greater' or 'less'")
+    if ci["gate_rule"] != "lower_bound > 1.0":
+        raise ValueError("unsupported confidence-interval gate rule")
+    numeric = {key: float(observed[key]) for key in required}
+    if not all(math.isfinite(value) for value in numeric.values()):
+        raise ValueError("observed numeric fields must be finite")
+    if numeric["odds_ratio"] <= 0 or numeric["ci_low"] <= 0 or numeric["ci_high"] <= 0:
+        raise ValueError("odds ratio and interval limits must be positive")
+    if numeric["ci_low"] > numeric["ci_high"]:
+        raise ValueError("confidence interval limits are reversed")
+    if not 0 <= numeric["p_value"] <= 1 or not 0 <= numeric["q_value"] <= 1:
+        raise ValueError("p_value and q_value must be in [0, 1]")
+    if numeric["n_eff"] < 0 or numeric["n_events_per_window"] < 0:
+        raise ValueError("sample and event counts must be non-negative")
+    if not math.isfinite(float(hypothesis["minimum_relevant_effect"])) or hypothesis["minimum_relevant_effect"] <= 0:
+        raise ValueError("minimum_relevant_effect must be finite and positive")
+    if not 0 <= float(hypothesis["fdr_alpha"]) <= 1:
+        raise ValueError("fdr_alpha must be in [0, 1]")
+
     checks = {
-        "effect": observed["odds_ratio"] >= hypothesis["minimum_relevant_effect"],
+        "effect": numeric["odds_ratio"] >= hypothesis["minimum_relevant_effect"],
         "direction": (
-            observed["odds_ratio"] > 1.0
+            numeric["odds_ratio"] > 1.0
             if hypothesis["expected_direction"] == "greater"
-            else observed["odds_ratio"] < 1.0
+            else numeric["odds_ratio"] < 1.0
         ),
-        "interval": (
-            observed["ci_low"] > 1.0
-            if ci["gate_rule"] == "lower_bound > 1.0"
-            else False
-        ),
-        "fdr": observed["q_value"] <= hypothesis["fdr_alpha"],
+        "interval": numeric["ci_low"] > 1.0,
+        "fdr": numeric["q_value"] <= hypothesis["fdr_alpha"],
         "operational_minima": (
-            observed["n_eff"] >= hypothesis["operational_minima"]["n_eff"]
-            and observed["n_events_per_window"] >= hypothesis["operational_minima"]["n_events_per_window"]
+            numeric["n_eff"] >= hypothesis["operational_minima"]["n_eff"]
+            and numeric["n_events_per_window"] >= hypothesis["operational_minima"]["n_events_per_window"]
         ),
     }
     return {"checks": checks, "gate": "PROMETE" if all(checks.values()) else "RECHAZA"}
@@ -94,11 +131,18 @@ class TestPRDStatisticalEdgeFixturesCandidate(unittest.TestCase):
                 self.assertEqual(actual["classification"], case["expected_classification"])
                 self.assertEqual(actual["p_for_fdr"], case["expected_p_for_fdr"])
                 self.assertEqual(actual["abort_batch"], case["abort_batch"])
+                self.assertEqual(actual["contract_status"], case["expected_contract_status"])
+                self.assertEqual(actual["non_estimability_reason"], case["expected_reason"])
         scientific = [c for c in cases if c["expected_classification"] == "SCIENTIFIC_NON_ESTIMABLE"]
         structural = [c for c in cases if c["expected_classification"] == "STRUCTURAL_FAILURE"]
         self.assertEqual(len(scientific), 3)
         self.assertEqual(len(structural), 1)
         self.assertTrue(all(c["expected_p_for_fdr"] == 1.0 for c in scientific))
+        self.assertTrue(all(c["expected_contract_status"] == "INSUFFICIENT_POWER" for c in scientific))
+        self.assertEqual(
+            {c["expected_reason"] for c in scientific},
+            {"logistic_separation", "model_non_convergence", "model_not_estimable"},
+        )
         self.assertIsNone(structural[0]["expected_p_for_fdr"])
         self.assertTrue(structural[0]["abort_batch"])
 
@@ -173,6 +217,61 @@ class TestPRDStatisticalEdgeFixturesCandidate(unittest.TestCase):
         self.assertFalse(actual["checks"]["fdr"])
         self.assertEqual(self.d12["hypothesis"]["minimum_relevant_effect"], 1.5)
         self.assertEqual(self.d12["hypothesis"]["expected_direction"], "greater")
+
+    def test_bh_ties_are_stable_and_return_to_original_order(self):
+        first_order = bh_adjust([0.01, 0.01, 0.04, 1.0])
+        shuffled_order = bh_adjust([0.04, 0.01, 1.0, 0.01])
+        expected_first = np.array([0.02, 0.02, 0.05333333333333334, 1.0])
+        expected_shuffled = np.array([0.05333333333333334, 0.02, 1.0, 0.02])
+        np.testing.assert_allclose(first_order, expected_first, rtol=1e-12, atol=1e-12)
+        np.testing.assert_allclose(shuffled_order, expected_shuffled, rtol=1e-12, atol=1e-12)
+        self.assertEqual(first_order[0], first_order[1])
+        self.assertEqual(shuffled_order[1], shuffled_order[3])
+
+    def test_d12_strict_interval_boundary_and_inclusive_fdr_boundary(self):
+        case = next(c for c in self.d12["synthetic_cases"] if c["case_id"] == "D12-POSITIVE-OR-2")
+        observed = dict(case["observed"])
+        observed.update({
+            "odds_ratio": 1.5,
+            "ci_low": 1.0,
+            "ci_high": 2.0,
+            "q_value": 0.05,
+            "n_eff": 30,
+            "n_events_per_window": 5,
+        })
+        actual = evaluate_d12(self.d12, observed)
+        self.assertEqual(actual["checks"], {
+            "effect": True,
+            "direction": True,
+            "interval": False,
+            "fdr": True,
+            "operational_minima": True,
+        })
+        self.assertEqual(actual["gate"], "RECHAZA")
+
+    def test_d12_rejects_invalid_observed_schema_and_direction(self):
+        case = next(c for c in self.d12["synthetic_cases"] if c["case_id"] == "D12-POSITIVE-OR-2")
+        observed = dict(case["observed"])
+        missing = dict(observed)
+        del missing["odds_ratio"]
+        with self.assertRaises(ValueError):
+            evaluate_d12(self.d12, missing)
+        nonfinite = dict(observed)
+        nonfinite["q_value"] = float("nan")
+        with self.assertRaises(ValueError):
+            evaluate_d12(self.d12, nonfinite)
+        reversed_ci = dict(observed)
+        reversed_ci["ci_low"], reversed_ci["ci_high"] = 2.6, 2.5
+        with self.assertRaises(ValueError):
+            evaluate_d12(self.d12, reversed_ci)
+        invalid_p = dict(observed)
+        invalid_p["p_value"] = 1.1
+        with self.assertRaises(ValueError):
+            evaluate_d12(self.d12, invalid_p)
+        bad_direction = json.loads(json.dumps(self.d12))
+        bad_direction["hypothesis"]["expected_direction"] = "sideways"
+        with self.assertRaises(ValueError):
+            evaluate_d12(bad_direction, observed)
 
     def test_fdr_helper_rejects_nonfinite_and_out_of_range_p_values(self):
         for values in ([], [float("nan")], [float("inf")], [-0.1], [1.1]):
