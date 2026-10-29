@@ -19,7 +19,7 @@ No se calculará `n_required_power` hasta que todos los campos obligatorios de e
 
 ### 1.2 Unidad de preregistro
 
-El preregistro no es global para todo PR D. Debe identificar una combinación inequívoca de. Los valores de alpha y potencia objetivo ya están fijados por PR D v2 §13.6 (0.05 bilateral y 0.80); este expediente no puede modificarlos. Lo que sigue pendiente es seleccionar y justificar el método aplicable y sus parámetros para cada familia/diseño:
+El preregistro no es global para todo PR D. Debe identificar una combinación inequívoca de los siguientes elementos. Los valores de alpha y potencia objetivo ya están fijados por PR D v2 §13.6 (0.05 bilateral y 0.80); este expediente no puede modificarlos. Lo que sigue pendiente es seleccionar y justificar el método aplicable y sus parámetros para cada familia/diseño:
 
 - versión del contrato y huella del método;
 - familia estadística (Familia I o Familia II);
