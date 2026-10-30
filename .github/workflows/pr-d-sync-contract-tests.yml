@@ -7,7 +7,7 @@ on:
       - "labs/pr_d_sync_contract.py"
       - "labs/pr_d_cohort_builder.py"
       - "labs/pr_d_family_ii.py"
-      - "tests/test_pr_d_sync_full_pipeline.py"
+      - "tests/test_pr_d_sync_full_pipeline.py"\n      - "tests/test_pr_d_family_ii_contract.py"
       - "docs/PR-D-VERSION-GOVERNANCE.md"
       - "docs/PR-D-DESIGN-V3-CANDIDATE.md"
       - "docs/PR-D-TRACEABILITY-MATRIX.md"
