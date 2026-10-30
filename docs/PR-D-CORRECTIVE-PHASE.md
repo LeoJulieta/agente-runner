@@ -27,7 +27,7 @@ Resolver la divergencia de versionado entre las líneas documentales (#90/#107/#
 
 ## Aceptación verificable
 - Tests temporales y de exclusiones pasan (21 tests).
-- Tests sintéticos E6/E7/E10 pasan (20 tests); cobertura parcial, no cierre contractual.
+- Tests sintéticos E6/E7/E10 pasan (40 tests); cobertura parcial, no cierre contractual.
 - E2E suficiente devuelve `ESTIMABLE` con HC3 y conteos esperados; el outcome procede del `statistics.viewCount` del video esperado.
 - E2E insuficiente devuelve `INSUFFICIENT_POWER` y `bh_input_p=1.0`.
 - PostgreSQL efímero demuestra un solo escritor confirmado.
