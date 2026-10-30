@@ -1,11 +1,11 @@
 # PR-D-DESIGN-V3-CANDIDATE.md — PR D v3.0 (candidato no aprobado)
 
 **Base contractual vigente:** PR D v2 (E1–E5, congelado en `main`).  
-**Candidato de esta rama:** E6–E11; por alterar semántica de estados/reproducibilidad, se propone evaluación como versión mayor PR D v3.0, no como v2.1. La propuesta no está aprobada ni vigente.
+**Candidato de esta rama:** E6–E12; por alterar semántica de estados/reproducibilidad, se propone evaluación como versión mayor PR D v3.0, no como v2.1. La propuesta no está aprobada ni vigente.
 
 **Fecha de congelamiento:** 2026-10-09
 
-**Estado:** PR D v2 (E1–E5) es la base contractual aprobada y vigente en `main` mediante PR #75. Las enmiendas E6–E11 de este documento siguen siendo una candidatura v3.0 no aprobada ni vigente; la implementación del motor no está autorizada.
+**Estado:** PR D v2 (E1–E5) es la base contractual aprobada y vigente en `main` mediante PR #75. Las enmiendas E6–E12 de este documento siguen siendo una candidatura v3.0 no aprobada ni vigente; la implementación del motor no está autorizada.
 **Alcance:** diseño estadístico y operativo previo a implementación\
 **Principio rector:** evidencia primero. Ninguna regla estadística podrá
 modificarse después de observar los resultados para favorecer una
@@ -673,3 +673,90 @@ La política de reintento debe ser explícita y registrar relación con el inten
 ### 16.7 Aceptación documental
 
 Antes de implementar, agregar y ejecutar en entorno aislado con fixtures sintéticos pruebas que distingan: (a) A ausente, no localizable, incompatible e incompleta, probando por separado cada campo inferencial obligatorio ausente/no finito y el caso A completa; (b) tabla cruzada de estado/reproducibilidad con comparación no evaluable frente a evaluable incompatible; (c) no estimabilidad científica con `n_eff` suficiente frente a error estructural inesperado; (d) cada motivo de nulidad de potencia, cálculo válido con ambas unidades cuando aplique, y consistencia entre valor, razón y unidad; (e) todas las ramas de la tabla de drift, ambas degeneraciones, umbrales exactos y casos adyacentes; (f) aborto con códigos/fases cerrados, registro durable recuperable, `completed=false`, reintento separado y ausencia de resultados científicos parciales presentados como válidos. La documentación no demuestra cobertura de código.
+ 
+
+## 17. E12 — Procedencia temporal y captura de métricas del productor (candidata v3.0)
+
+Esta sección define la semántica temporal necesaria para que la elegibilidad de una observación sea verificable. Es una propuesta de v3.0; no modifica retrospectivamente datos ni autoriza cambios en el productor, workflows, esquema o Supabase.
+
+### 17.1 Fuente de publicación y separación de eventos
+
+- `published_at` será el timestamp UTC de publicación efectiva obtenido de `snippet.publishedAt` mediante YouTube Data API `videos.list` solicitando `part=snippet`.
+- La respuesta deberá corresponder al video esperado y su estado deberá ser compatible con el uso contractual como publicación pública. La implementación deberá validar el valor y no asumir que la mera presencia de un `video_id` demuestra publicación efectiva.
+- `created_at` conserva exclusivamente el significado de timestamp de inserción/registro en Supabase. No es sustituto ni aproximación de `published_at`.
+- Un fallo de transporte, autenticación, cuota, respuesta truncada/incompleta o ausencia inesperada del recurso en la respuesta API es un fallo de lectura/operativo que debe clasificarse y registrarse como tal. No se convertirá en un timestamp faltante de una observación ni se rellenará con `created_at`.
+- Si se recibió un recurso completo y válido para el video, pero `snippet.publishedAt` está ausente, nulo o malformado, la observación se excluye con una causa individual estable: `MISSING_PUBLICATION_TIMESTAMP` o `INVALID_PUBLICATION_TIMESTAMP`, respectivamente.
+
+### 17.2 Captura, ventana y semántica del outcome
+
+- `sync_captured_at` registra el instante UTC real en que se observaron las estadísticas del video.
+- La duración de elegibilidad se calcula en segundos como `elapsed_seconds = sync_captured_at - published_at`. Cualquier campo de duración heredado, incluido `hs_al_publicar_al_sync`, es derivado y no puede sustituir ni reconstruir los timestamps fuente.
+- La ventana contractual es cerrada en ambos extremos: `3 hours <= elapsed <= 6 hours`. Los límites se evalúan sobre duración exacta, sin redondear previamente a horas decimales.
+- Menos de 3 horas o más de 6 horas produce exclusión individual con causa `OUTSIDE_SYNC_WINDOW`.
+- `views_primeras_3h` significa el conteo de vistas observado en la primera captura válida aceptada atómicamente dentro de la ventana 3–6 h. No significa un conteo observado exactamente al cumplirse 3 horas.
+- `published_at`, `sync_captured_at` y `views_primeras_3h` deben conservar una correspondencia auditable. La captura y el conteo se aceptan o rechazan como una sola unidad lógica.
+
+### 17.3 Regla contractual de primera escritura atómica válida
+
+La política es **primera escritura atómica válida gana**:
+
+1. Una captura solo es candidata si ambos timestamps son válidos, el elapsed exacto pertenece a [3 h, 6 h] y las estadísticas corresponden al video esperado.
+2. La operación persistente debe condicionar la escritura a que `views_primeras_3h IS NULL` y debe guardar el conteo y `sync_captured_at` en la misma operación atómica.
+3. Entre operaciones concurrentes, la primera operación válida que consiga confirmar la escritura es la ganadora. La operación posterior debe observar que el campo ya no es nulo, no modificar ningún valor de la captura aceptada y registrar que perdió la condición de escritura única.
+4. La garantía se verifica por el resultado de la operación de base de datos (una fila modificada frente a cero filas modificadas), no por una comprobación previa en Python.
+5. Esta política no afirma que se seleccione la captura cronológicamente más temprana posible; define de forma explícita al primer escritor válido confirmado por la base de datos.
+6. La concurrencia de GitHub Actions puede reducir solapamientos, pero es defensa secundaria y no sustituye la atomicidad en la base de datos.
+
+No se permite que un reintento posterior sobrescriba silenciosamente una captura ya aceptada. Si la escritura de los campos asociados no puede ser atómica, la captura no se presenta como completa ni elegible.
+
+### 17.4 Missing, inválidos y causas de exclusión
+
+- Timestamp de publicación ausente: `MISSING_PUBLICATION_TIMESTAMP`.
+- Timestamp de publicación malformado/no parseable: `INVALID_PUBLICATION_TIMESTAMP`.
+- Timestamp de captura ausente: `MISSING_SYNC_TIMESTAMP`.
+- Timestamp de captura malformado/no parseable: `INVALID_SYNC_TIMESTAMP`.
+- Duración fuera de la ventana cerrada: `OUTSIDE_SYNC_WINDOW`.
+- Una observación individual excluida no invalida por sí sola el lote si el esquema y la lectura global siguen íntegros; se conserva su identidad y causa.
+- Una configuración de ventana ausente, contradictoria o imposible de interpretar es un fallo estructural/configuracional y recibe `INVALID` en el alcance de corrida definido por el contrato.
+- Los errores de API, cuota, autenticación, transporte o integridad de respuesta no se degradan a causas de timestamp faltante; se clasifican según las reglas operativas de lote de §13.1 y E11.
+- Las observaciones excluidas no se imputan ni se completan mediante aproximaciones. `n_total` conserva los candidatos recuperados y `n_eff` solo incluye las observaciones que superan todos los filtros preregistrados.
+
+### 17.5 Zona horaria y derivaciones
+
+- Los timestamps fuente se almacenan/interpretan como instantes UTC.
+- Toda variable de hora civil local derivada de la publicación se calcula desde `published_at` convertido con la zona IANA `America/Argentina/Ushuaia`.
+- No se reconstruye `published_at` restando `hs_al_publicar_al_sync` a `created_at`, ni aplicando un offset fijo a una duración.
+- H001/H002 solo podrán interpretar `hora_publicacion` como hora efectiva de publicación cuando su fuente sea `published_at` validado.
+- Las filas históricas producidas con la derivación anterior quedan temporalmente no verificadas hasta que exista una fuente histórica independiente y verificable. No se recalculan, imputan ni sobrescriben en esta fase.
+
+### 17.6 Pruebas de aceptación de la candidatura
+
+La suite de sincronización utiliza el espacio de nombres `SYNC-` para evitar colisiones con T01–T32, que ya están asignados en la matriz existente. Se conservan los nombres de casos solicitados por la revisión adversarial como sufijos de los identificadores namespaced:
+
+| ID | Caso | Criterio de aceptación |
+|---|---|---|
+| SYNC-T26 | Fuente temporal | Extraer `snippet.publishedAt` del recurso correcto; `created_at` no puede sustituirlo. |
+| SYNC-T26b | API sin timestamp | Recurso válido con `publishedAt` nulo/ausente se excluye con `MISSING_PUBLICATION_TIMESTAMP`; valor malformado con `INVALID_PUBLICATION_TIMESTAMP`. Un fallo de API no se etiqueta como missing individual. |
+| SYNC-T27 | Separación de eventos | `created_at` permanece como registro Supabase; publicación y registro pueden diferir sin alterar el ancla. |
+| SYNC-T28 | Límite inferior | Elapsed exactamente 3 h es elegible. |
+| SYNC-T29 | Límite superior | Elapsed exactamente 6 h es elegible. |
+| SYNC-T30 | Fuera de ventana | Valores inmediatamente inferiores a 3 h y superiores a 6 h se excluyen; no redondear antes de comparar. |
+| SYNC-T31 | Timestamp de captura | `sync_captured_at` y vistas se persisten como unidad lógica; la duración se reproduce desde ambos timestamps. |
+| SYNC-T32 | Primera escritura válida | La primera operación atómica confirmada dentro de ventana gana; una captura posterior no sobrescribe los valores. |
+| SYNC-T32b | Zona Ushuaia | Convertir UTC a `America/Argentina/Ushuaia` correctamente, incluyendo cambio de fecha local y offsets representados por la zona IANA. |
+| SYNC-T33 | Carrera concurrente | Dos escritores simultáneos sobre un valor nulo producen exactamente un ganador y un perdedor sin sobrescritura. |
+| SYNC-T34 | Exclusiones individuales | Missing/invalid timestamps y captura inválida conservan ID y causa; no se inventan timestamps ni se invalida el lote sin causa estructural. |
+| SYNC-T35 | Histórico H001/H002 | Solo se deriva hora desde `published_at` verificable; datos históricos sin fuente fiable quedan no verificados y no se imputan. |
+
+Los identificadores SYNC-T26b y SYNC-T32b son subcasos explícitos; no reutilizan los T26 ni T32 de la matriz general.
+
+### 17.7 Pruebas E2E sintéticas requeridas
+
+- **SYNC-E2E-A — cohorte suficiente:** fixtures sintéticos atraviesan la validación temporal, construcción de cohorte y ruta de inferencia Familia II; se obtiene una estimación válida solo si todos los gates preregistrados se satisfacen.
+- **SYNC-E2E-B — cohorte insuficiente:** fixtures sintéticos válidos pero por debajo de los mínimos aplicables terminan en `INSUFFICIENT_POWER`, conservan las causas y no generan una conclusión favorable.
+- Ambas pruebas operan exclusivamente con fixtures sintéticos y entorno aislado. No leen filas reales, no escriben Supabase, no publican videos ni ejecutan workflows de producción.
+- La existencia de estas pruebas no certifica el productor privado ni la integración de producción. La adopción de E12 requiere auditoría del código y de las garantías de persistencia por separado.
+
+### 17.8 Límites de adopción
+
+E12 permanece candidata hasta que se revisen el diff contractual, la matriz, las pruebas deterministas y las dos E2E sintéticas. La evidencia de origen es la auditoría estática del productor y sincronizador documentada en [PR #90 — informe de auditoría](https://github.com/LeoJulieta/agente-runner/blob/audit/pr-d-traceability-matrix/docs/PR-D-SYNC-PRODUCER-AUDIT.md). La aprobación de esta sección no autoriza migraciones, backfills, modificaciones de `agente-autonomo`, workflows productivos, esquema/RPC de Supabase ni ejecución de hipótesis reales.
