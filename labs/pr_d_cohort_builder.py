@@ -1,14 +1,14 @@
 """Pure, deterministic PR D cohort construction for synthetic fixtures.
 
-This module does not read manifests, databases, environment variables, or
-production data. It does not calculate timestamps: callers must supply a
-preregistered elapsed-time field whose temporal anchor and derivation are
-defined outside this module.
+No manifest, database, environment, or production-data access occurs here.
+Elapsed seconds must already be derived from the preregistered temporal
+anchor; this module never infers a timestamp reference.
 
 The frozen PR D contract requires a 3--6 hour synchronization filter but
-does not itself specify the source timestamp, temporal anchor, endpoint
-inclusivity, or null policy. Therefore every such choice is mandatory input
-to SyncWindow; there are deliberately no contractual defaults here.
+does not specify its source timestamp, temporal anchor, endpoint
+inclusivity, or null policy. Those choices are mandatory configuration,
+never defaults. Additional preregistered eligibility masks are combined
+with the synchronization mask before n_eff is calculated.
 """
 from __future__ import annotations
 
@@ -67,6 +67,25 @@ def _inside_window(value: float, window: SyncWindow) -> bool:
     return lower_ok and upper_ok
 
 
+def _normalize_preregistered_masks(
+    masks: Mapping[str, Iterable[bool]], n_total: int
+) -> dict[str, list[bool]]:
+    if not isinstance(masks, Mapping):
+        raise CohortInputError("preregistered_masks_required")
+    normalized: dict[str, list[bool]] = {}
+    for name in sorted(masks):
+        if not isinstance(name, str) or not name.strip():
+            raise CohortInputError("preregistered_filter_name_invalid")
+        try:
+            values = list(masks[name])
+        except TypeError as exc:
+            raise CohortInputError("preregistered_filter_mask_invalid") from exc
+        if len(values) != n_total or any(type(value) is not bool for value in values):
+            raise CohortInputError("preregistered_filter_mask_alignment_invalid")
+        normalized[name] = values
+    return normalized
+
+
 def build_preregistered_cohort(
     candidate_rows: Iterable[Mapping[str, Any]],
     *,
@@ -75,17 +94,21 @@ def build_preregistered_cohort(
     predictor_fields: Sequence[str],
     sync_elapsed_seconds_field: str,
     sync_window: SyncWindow,
+    preregistered_masks: Mapping[str, Iterable[bool]],
 ) -> dict[str, Any]:
-    """Build aligned candidate arrays, one eligibility mask, and auditable counts.
+    """Build candidate arrays, combined eligibility mask, provenance and counts.
 
     The supplied elapsed-seconds value must already represent the
-    preregistered interval from the preregistered temporal anchor. This
-    function intentionally does not infer that anchor from timestamp names.
+    preregistered interval from the preregistered temporal anchor.
 
-    Missing elapsed values are either excluded with an explicit
-    missing_sync_elapsed reason or rejected, according to the required
-    preregistered policy. Exclusion is a row-level cohort decision; it does
-    not itself assign an INVALID hypothesis status.
+    Every other preregistered filter must be supplied as a candidate-aligned
+    boolean mask. An explicit empty mapping means no other such filters apply.
+    The function ANDs all masks with the synchronization decision, retaining
+    original candidate order in outcomes, design_matrix, and eligible_mask.
+
+    Missing elapsed values are either excluded with a recorded reason or
+    rejected, according to the required preregistered policy. A row-level
+    exclusion does not itself assign an INVALID hypothesis status.
     """
     for name, value in (
         ("candidate_id_field", candidate_id_field),
@@ -107,11 +130,12 @@ def build_preregistered_cohort(
         raise CohortInputError("sync_window_required")
 
     rows = list(candidate_rows)
+    other_masks = _normalize_preregistered_masks(preregistered_masks, len(rows))
     candidate_ids: list[str | int] = []
     outcomes: list[float] = []
     design_matrix: list[list[float]] = []
-    eligible_mask: list[bool] = []
-    excluded: list[dict[str, str | int]] = []
+    sync_mask: list[bool] = []
+    sync_exclusion_reasons: list[str | None] = []
     seen_ids: set[str | int] = set()
 
     for row in rows:
@@ -147,18 +171,34 @@ def build_preregistered_cohort(
         if elapsed_raw is None:
             if sync_window.missing_policy == MISSING_RAISE:
                 raise CohortInputError("sync_elapsed_missing")
-            eligible_mask.append(False)
-            excluded.append({"candidate_id": candidate_id, "reason": "missing_sync_elapsed"})
+            sync_mask.append(False)
+            sync_exclusion_reasons.append("missing_sync_elapsed")
             continue
 
         elapsed = _numeric(elapsed_raw, "sync_elapsed_invalid")
         if elapsed < 0:
             raise CohortInputError("sync_elapsed_negative")
         if _inside_window(elapsed, sync_window):
-            eligible_mask.append(True)
+            sync_mask.append(True)
+            sync_exclusion_reasons.append(None)
         else:
-            eligible_mask.append(False)
-            excluded.append({"candidate_id": candidate_id, "reason": "outside_sync_window"})
+            sync_mask.append(False)
+            sync_exclusion_reasons.append("outside_sync_window")
+
+    eligible_mask = [
+        sync_mask[index] and all(mask[index] for mask in other_masks.values())
+        for index in range(len(rows))
+    ]
+    excluded: list[dict[str, Any]] = []
+    for index, candidate_id in enumerate(candidate_ids):
+        reasons: list[str] = []
+        if sync_exclusion_reasons[index] is not None:
+            reasons.append(sync_exclusion_reasons[index])
+        for name, mask in other_masks.items():
+            if not mask[index]:
+                reasons.append(f"preregistered_filter:{name}")
+        if reasons:
+            excluded.append({"candidate_id": candidate_id, "reasons": reasons})
 
     n_total = len(rows)
     n_eff = sum(eligible_mask)
@@ -190,5 +230,6 @@ def build_preregistered_cohort(
             "upper_inclusive": sync_window.upper_inclusive,
             "missing_policy": sync_window.missing_policy,
             "temporal_anchor": "externally_preregistered_not_inferred",
+            "additional_preregistered_filters": list(other_masks),
         },
     }
