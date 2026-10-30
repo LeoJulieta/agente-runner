@@ -52,23 +52,25 @@ def fit_ols_log_positive_hc3(
     positive = y_all > 0
     y_positive = y_all[positive]
     design = design_all[positive]
-    n_total, n_events, n_eff = int(y_all.size), int(positive.sum()), int(positive.sum())
+    n_total, n_events, n_eff = int(y_all.size), int(positive.sum()), int(y_all.size)
     base = {
         "n_total": n_total,
         "n_events": n_events,
         "n_eff": n_eff,
         "method_fingerprint": METHOD_FINGERPRINT_OLS_HC3,
     }
-    if n_eff < min_n_eff:
+    if n_eff < min_n_eff or n_events < 5:
+        reason = "n_eff_below_minimum" if n_eff < min_n_eff else "n_events_below_minimum"
         return {
             "status": "INSUFFICIENT_POWER",
             "metrics": {
                 **base, "effect_size": None, "se": None, "p_empirical": None,
                 "ci_low": None, "ci_high": None, "non_estimability_reason": None,
+                "insufficient_power_reason": reason,
             },
             "bh_input_p": 1.0,
         }
-    if n_eff <= design.shape[1] or np.linalg.matrix_rank(design) < design.shape[1]:
+    if n_events <= design.shape[1] or np.linalg.matrix_rank(design) < design.shape[1]:
         return _ols_nonestimable(base, "model_not_estimable")
 
     try:
@@ -90,6 +92,7 @@ def fit_ols_log_positive_hc3(
         "metrics": {
             **base, "effect_size": beta, "se": se, "p_empirical": p_value,
             "ci_low": ci_low, "ci_high": ci_high, "non_estimability_reason": None,
+            "insufficient_power_reason": None,
             "covariance_type": "HC3", "contrast": "two_sided_t",
         },
         "bh_input_p": p_value,
