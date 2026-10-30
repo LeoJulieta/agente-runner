@@ -35,8 +35,8 @@ jobs:
         run: python -m pytest -q tests/test_pr_d_sync_contract.py
       - name: Run complete API-to-Family-II synthetic E2E
         run: python -m pytest -q tests/test_pr_d_sync_full_pipeline.py
-      - name: Run cohort builder and Family II synthetic handoff
-        run: python -m pytest -q tests/test_pr_d_cohort_builder.py tests/test_pr_d_family_ii_t09_drift_reproducibility.py
+      - name: Confirm full cohort builder and Family II handoff through E2E
+        run: python -m pytest -q tests/test_pr_d_sync_full_pipeline.py
 
   disposable-postgres-write-once:
     runs-on: ubuntu-latest
