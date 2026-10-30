@@ -7,7 +7,8 @@ on:
       - "labs/pr_d_sync_contract.py"
       - "labs/pr_d_cohort_builder.py"
       - "labs/pr_d_family_ii.py"
-      - "tests/test_pr_d_sync_full_pipeline.py"\n      - "tests/test_pr_d_family_ii_contract.py"
+      - "tests/test_pr_d_sync_full_pipeline.py"
+      - "tests/test_pr_d_family_ii_contract.py"
       - "docs/PR-D-VERSION-GOVERNANCE.md"
       - "docs/PR-D-DESIGN-V3-CANDIDATE.md"
       - "docs/PR-D-TRACEABILITY-MATRIX.md"
@@ -33,7 +34,9 @@ jobs:
         run: python -c 'import json; p=json.load(open("docs/manifest.json", encoding="utf-8")); assert p["execution_status"] == "fixture"'
       - name: Run temporal provenance, boundary, missing-data and timezone tests
         run: python -m pytest -q tests/test_pr_d_sync_contract.py
-      - name: Run complete API-to-Family-II synthetic E2E
+      - name: Run candidate E6, E7 and E10 deterministic decision-table tests
+        run: python -m pytest -q tests/test_pr_d_family_ii_contract.py
+      - name: Run complete API viewCount-to-Family-II synthetic E2E
         run: python -m pytest -q tests/test_pr_d_sync_full_pipeline.py
       - name: Confirm full cohort builder and Family II handoff through E2E
         run: python -m pytest -q tests/test_pr_d_sync_full_pipeline.py
