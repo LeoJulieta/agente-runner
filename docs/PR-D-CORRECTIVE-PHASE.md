@@ -19,6 +19,11 @@ Resolver la divergencia de versionado entre las líneas documentales (#90/#107/#
 5. E2E sintético: recurso YouTube simulado → `snippet.publishedAt` y `statistics.viewCount` asociados al `video_id` exacto → captura → ventana 3–6h → cohorte → Familia II. El fixture incluye un recurso señuelo para verificar la asociación por identidad.
 6. Mantener prueba PostgreSQL efímera para compare-and-set y concurrencia.\n7. Añadir tests deterministas parciales E6/E7/E10 para antecedentes A, precedencia de estados y tabla de drift. E8, E9 y E11/T13 permanecen expresamente pendientes.
 
+
+7. Endurecer `evaluate_reproducibility()`: los tres indicadores de control deben ser booleanos exactos; añadir pruebas negativas para cadenas, enteros y nulos.
+8. Añadir pruebas directas de `compute_d_init()` para límites, proporciones extremas, datos faltantes y entradas inválidas; corregir la descripción de cobertura de la matriz.
+9. Ajustar los filtros de paths del workflow para incluir este documento y el manifiesto, y eliminar la ejecución duplicada del mismo E2E.
+
 ## Aceptación verificable
 - Tests temporales y de exclusiones pasan (21 tests).\n- Tests sintéticos E6/E7/E10 pasan (20 tests); cobertura parcial, no cierre contractual.
 - E2E suficiente devuelve `ESTIMABLE` con HC3 y conteos esperados; el outcome procede del `statistics.viewCount` del video esperado.
