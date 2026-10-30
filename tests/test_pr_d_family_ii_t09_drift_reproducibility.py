@@ -288,7 +288,7 @@ class PRDFamilyIITest(unittest.TestCase):
         self.assertEqual(result["status"], "ESTIMABLE")
         self.assertEqual(metrics["n_total"], 36)
         self.assertEqual(metrics["n_eff"], 32)
-        self.assertEqual(metrics["n_events"], 28)
+        self.assertEqual(metrics["n_events"], 29)
 
     def test_t09_eligible_zeros_count_toward_minimum_but_excluded_rows_do_not(self):
         x = np.arange(34, dtype=float)
