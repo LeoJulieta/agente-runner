@@ -150,9 +150,15 @@ class PRDCohortBuilderTests(unittest.TestCase):
             )
 
     def test_n_eff_and_n_events_are_counted_at_contractual_floor_edges(self):
-        rows = [candidate(f"row-{i}", 10800, 1 if i < 5 else 0, i) for i in range(31)]
-        below = build_preregistered_cohort(
-            rows,
+        rows_four_events = [
+            candidate(f"row-{i}", 10800, 1 if i < 4 else 0, i) for i in range(31)
+        ]
+        rows_five_events = [
+            candidate(f"row-{i}", 10800, 1 if i < 5 else 0, i) for i in range(31)
+        ]
+
+        below_n_eff = build_preregistered_cohort(
+            rows_four_events,
             candidate_id_field="candidate_id",
             outcome_field="outcome",
             predictor_fields=("predictor",),
@@ -160,8 +166,8 @@ class PRDCohortBuilderTests(unittest.TestCase):
             sync_window=inclusive_example_window(),
             preregistered_masks={"candidate_window": [True] * 29 + [False, False]},
         )
-        at_floor = build_preregistered_cohort(
-            rows,
+        at_n_eff_floor = build_preregistered_cohort(
+            rows_four_events,
             candidate_id_field="candidate_id",
             outcome_field="outcome",
             predictor_fields=("predictor",),
@@ -169,8 +175,18 @@ class PRDCohortBuilderTests(unittest.TestCase):
             sync_window=inclusive_example_window(),
             preregistered_masks={"candidate_window": [True] * 30 + [False]},
         )
-        self.assertEqual((below["n_total"], below["n_eff"], below["n_events"]), (31, 29, 5))
-        self.assertEqual((at_floor["n_total"], at_floor["n_eff"], at_floor["n_events"]), (31, 30, 5))
+        at_event_floor = build_preregistered_cohort(
+            rows_five_events,
+            candidate_id_field="candidate_id",
+            outcome_field="outcome",
+            predictor_fields=("predictor",),
+            sync_elapsed_seconds_field="sync_elapsed_seconds",
+            sync_window=inclusive_example_window(),
+            preregistered_masks={"candidate_window": [True] * 30 + [False]},
+        )
+        self.assertEqual((below_n_eff["n_total"], below_n_eff["n_eff"], below_n_eff["n_events"]), (31, 29, 4))
+        self.assertEqual((at_n_eff_floor["n_total"], at_n_eff_floor["n_eff"], at_n_eff_floor["n_events"]), (31, 30, 4))
+        self.assertEqual((at_event_floor["n_total"], at_event_floor["n_eff"], at_event_floor["n_events"]), (31, 30, 5))
 
     def test_cohort_counts_and_mask_feed_family_ii_without_reordering(self):
         rows = [
