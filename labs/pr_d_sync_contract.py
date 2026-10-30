@@ -138,3 +138,14 @@ def publication_datetime_ushuaia(published_at: Any) -> datetime:
     except ZoneInfoNotFoundError as exc:
         raise RuntimeError("ushuaia_timezone_database_unavailable") from exc
     return published.astimezone(zone)
+
+
+def exclusion_record(candidate_id: str | int, exclusion: ObservationExcluded) -> dict[str, Any]:
+    """Preserve a row identity and its stable exclusion code for cohort audit."""
+    if isinstance(candidate_id, bool) or not isinstance(candidate_id, (str, int)):
+        raise ValueError("candidate_id_invalid")
+    if isinstance(candidate_id, str) and not candidate_id.strip():
+        raise ValueError("candidate_id_invalid")
+    if not isinstance(exclusion, ObservationExcluded):
+        raise TypeError("observation_exclusion_required")
+    return {"candidate_id": candidate_id, "reasons": [exclusion.code]}
