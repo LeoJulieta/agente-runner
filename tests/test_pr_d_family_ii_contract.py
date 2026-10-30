@@ -70,6 +70,8 @@ def test_e7_incompatible_direction_is_rechaza_not_not_evaluable():
     result = evaluate_reproducibility(**_b(
         direction_consistent=False,
         b_effect_size=-0.20,
+        b_ci_low=-0.30,
+        b_ci_high=0.10,
     ))
     assert result["status"] == "RECHAZA"
     assert result["reproducible"] is False
