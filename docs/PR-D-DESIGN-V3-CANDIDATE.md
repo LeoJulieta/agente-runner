@@ -681,7 +681,7 @@ Esta sección define la semántica temporal necesaria para que la elegibilidad d
 
 ### 17.1 Fuente de publicación y separación de eventos
 
-- `published_at` será el timestamp UTC de publicación efectiva obtenido de `snippet.publishedAt` mediante YouTube Data API `videos.list` solicitando `part=snippet`.
+- `published_at` será el timestamp UTC de publicación efectiva obtenido de `snippet.publishedAt` mediante YouTube Data API `videos.list` solicitando `part=snippet,statistics,status`, para obtener en la misma respuesta `snippet.publishedAt`, las estadísticas y `status.privacyStatus`.
 - La respuesta deberá corresponder al video esperado y su estado deberá ser compatible con el uso contractual como publicación pública. La implementación deberá validar el valor y no asumir que la mera presencia de un `video_id` demuestra publicación efectiva.
 - `created_at` conserva exclusivamente el significado de timestamp de inserción/registro en Supabase. No es sustituto ni aproximación de `published_at`.
 - Un fallo de transporte, autenticación, cuota, respuesta truncada/incompleta o ausencia inesperada del recurso en la respuesta API es un fallo de lectura/operativo que debe clasificarse y registrarse como tal. No se convertirá en un timestamp faltante de una observación ni se rellenará con `created_at`.
