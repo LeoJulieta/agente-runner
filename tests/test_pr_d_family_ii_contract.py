@@ -3,6 +3,7 @@ import pytest
 
 from labs.pr_d_family_ii import (
     compute_d_cond,
+    compute_d_init,
     evaluate_drift,
     evaluate_reproducibility,
 )
@@ -143,3 +144,59 @@ def test_e10_insufficient_positive_events_is_partial_not_structural_error():
     result = compute_d_cond([0, 0, 1, 2], [0, 3, 4, 5])
     assert result["D_cond"] is None
     assert result["drift_degeneracy"] == "insufficient_positive_events"
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        ("windows_disjoint", "false"),
+        ("windows_disjoint", 0),
+        ("windows_disjoint", None),
+        ("direction_consistent", "false"),
+        ("direction_consistent", 0),
+        ("direction_consistent", None),
+        ("b_gates_pass", "false"),
+        ("b_gates_pass", 0),
+        ("b_gates_pass", None),
+    ],
+)
+def test_reproducibility_rejects_non_boolean_flags(field, bad_value):
+    with pytest.raises(ValueError, match="reproducibility_flags_must_be_booleans"):
+        evaluate_reproducibility(**_b(**{field: bad_value}))
+
+
+@pytest.mark.parametrize(
+    ("counts", "expected"),
+    [
+        ((0, 10, 0, 10), 0.0),
+        ((5, 10, 8, 10), 0.3),
+        ((10, 10, 0, 10), 1.0),
+        ((1, 4, 3, 4), 0.5),
+    ],
+)
+def test_e10_compute_d_init_valid_counts_and_boundaries(counts, expected):
+    result = compute_d_init(*counts)
+    assert result == {"d_init": expected, "d_init_reason": None}
+
+
+def test_e10_compute_d_init_missing_comparable_count_is_not_estimable():
+    assert compute_d_init(1, 4, None, 4) == {
+        "d_init": None,
+        "d_init_reason": "insufficient_data",
+    }
+
+
+@pytest.mark.parametrize(
+    ("counts", "message"),
+    [
+        ((True, 10, 1, 10), "d_init_counts_must_be_integers"),
+        ((1.0, 10, 1, 10), "d_init_counts_must_be_integers"),
+        ((-1, 10, 1, 10), "d_init_positive_count_out_of_range"),
+        ((11, 10, 1, 10), "d_init_positive_count_out_of_range"),
+        ((1, 0, 1, 10), "d_init_total_must_be_positive"),
+        ((1, 10, 1, -2), "d_init_total_must_be_positive"),
+    ],
+)
+def test_e10_compute_d_init_rejects_invalid_counts(counts, message):
+    with pytest.raises(ValueError, match=message):
+        compute_d_init(*counts)
