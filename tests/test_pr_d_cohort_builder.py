@@ -149,6 +149,29 @@ class PRDCohortBuilderTests(unittest.TestCase):
                 preregistered_masks={"population": [True]},
             )
 
+    def test_n_eff_and_n_events_are_counted_at_contractual_floor_edges(self):
+        rows = [candidate(f"row-{i}", 10800, 1 if i < 5 else 0, i) for i in range(31)]
+        below = build_preregistered_cohort(
+            rows,
+            candidate_id_field="candidate_id",
+            outcome_field="outcome",
+            predictor_fields=("predictor",),
+            sync_elapsed_seconds_field="sync_elapsed_seconds",
+            sync_window=inclusive_example_window(),
+            preregistered_masks={"candidate_window": [True] * 29 + [False, False]},
+        )
+        at_floor = build_preregistered_cohort(
+            rows,
+            candidate_id_field="candidate_id",
+            outcome_field="outcome",
+            predictor_fields=("predictor",),
+            sync_elapsed_seconds_field="sync_elapsed_seconds",
+            sync_window=inclusive_example_window(),
+            preregistered_masks={"candidate_window": [True] * 30 + [False]},
+        )
+        self.assertEqual((below["n_total"], below["n_eff"], below["n_events"]), (31, 29, 5))
+        self.assertEqual((at_floor["n_total"], at_floor["n_eff"], at_floor["n_events"]), (31, 30, 5))
+
     def test_cohort_counts_and_mask_feed_family_ii_without_reordering(self):
         rows = [
             candidate("excluded-a", 10799, 8, 0),
