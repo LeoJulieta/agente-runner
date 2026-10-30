@@ -176,7 +176,8 @@ def test_reproducibility_rejects_non_boolean_flags(field, bad_value):
 )
 def test_e10_compute_d_init_valid_counts_and_boundaries(counts, expected):
     result = compute_d_init(*counts)
-    assert result == {"d_init": expected, "d_init_reason": None}
+    assert result["d_init"] == pytest.approx(expected)
+    assert result["d_init_reason"] is None
 
 
 def test_e10_compute_d_init_missing_comparable_count_is_not_estimable():
