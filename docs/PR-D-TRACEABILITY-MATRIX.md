@@ -1,8 +1,9 @@
-# PR D — Matriz normativa de aceptación contractual determinista T01–T32 (candidato E6–E11)
+# PR D — Matriz de trazabilidad y aceptación candidata T01–T32 (E6–E11)
 
-**Estado:** borrador documental para auditoría humana; no autoriza implementación ni ejecución científica.  
-**Contrato fuente:** `docs/PR-D-DESIGN-V3-CANDIDATE.md`, base vigente PR D v2 (E1–E5) más candidato E6–E11 en §16; SHA-256 candidato `24480aa83f33c4f168e30cc1d18bcaa0e989a42527bc0c97ecb998df9dc5bfbe` (propuesta, pendiente de revisión).  
-**Artefacto normativo de aceptación:** esta matriz T01–T32 es la tabla de aceptación canónica de esta candidatura; `docs/PR-D-ACCEPTANCE-TABLE-V2.md` no forma parte de esta rama y no debe citarse como artefacto existente. Cualquier sustitución o separación futura requiere cambio documental explícito y revisión.
+**Estado:** borrador para auditoría humana; no autoriza implementación, ejecución científica ni adopción contractual de E6–E11.  
+**Contrato normativo vigente:** `docs/PR-D-DESIGN.md` — PR D v2 (E1–E5), aprobado y congelado.  
+**Documento candidato:** `docs/PR-D-DESIGN-V3-CANDIDATE.md` — propuesta PR D v3.0 (E6–E11), no aprobada ni vigente. La matriz evalúa esa candidatura y no modifica el contrato v2.  
+**Función de esta matriz:** tabla de aceptación propuesta T01–T32 para revisar la candidatura; sus reglas y estados no son requisitos normativos vigentes hasta la aprobación formal de una nueva versión contractual.
 **Base de auditoría:** `main` inspeccionado para este PR documental; el SHA exacto de base queda fijado por el `base.sha` del PR en GitHub. No se reutiliza el HEAD histórico `433e8c2` como si fuera el estado actual.  
 **Seguridad:** `docs/manifest.json` permanece `execution_status: "fixture"`; no ejecutar hipótesis reales ni escribir en Supabase de producción.  
 **Estado de PRs verificado (2026-10-29):** PR #91–#95 y PR #97, #98, #103, #104 y #105 aparecen fusionados; PR #90 continúa abierto. La fusión de documentos candidatos o fixtures no convierte E6–E11 en normativa aprobada ni certifica la matriz completa. Los PRs citados son historial de cambios, no sustituyen la inspección de archivos y pruebas presentes en `main`.  
@@ -73,7 +74,7 @@
 
 ## Resolución contractual N1–N6 mediante E6–E11
 
-Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DESIGN-V3-CANDIDATE.md` §16. Esto no cambia por sí solo la cobertura de implementación: el motor estadístico y sus pruebas siguen pendientes. Esta matriz T01–T32 es el artefacto normativo de aceptación de la candidatura; no se afirma que exista `docs/PR-D-ACCEPTANCE-TABLE-V2.md` en esta rama.
+Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DESIGN-V3-CANDIDATE.md` §16. Esto no cambia por sí solo la cobertura de implementación: el motor estadístico y sus pruebas siguen pendientes. Esta matriz T01–T32 es el artefacto de aceptación propuesto para la candidatura; no sustituye ni modifica el contrato normativo PR D v2.
 
 | Bloqueante | Decisión cerrada | Referencia | Aceptación pendiente |
 |---|---|---|---|
