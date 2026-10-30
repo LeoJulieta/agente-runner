@@ -199,3 +199,56 @@ def test_sync_t34_non_public_video_is_excluded_with_identity_and_cause():
         "candidate_id": "fixture-row-2",
         "reasons": ["VIDEO_NOT_PUBLIC"],
     }
+
+
+def test_sync_t34_missing_capture_exclusion_keeps_candidate_identity():
+    with pytest.raises(ObservationExcluded) as exc:
+        parse_sync_captured_at(None)
+    assert exclusion_record("historic-candidate-17", exc.value) == {
+        "candidate_id": "historic-candidate-17",
+        "reasons": ["MISSING_SYNC_TIMESTAMP"],
+    }
+
+
+def test_sync_t34_builder_keeps_missing_elapsed_row_and_reason_without_counting_it():
+    rows = [{
+        "candidate_id": "missing-capture-row",
+        "sync_elapsed_seconds": None,
+        "outcome": 7,
+        "intercept": 1,
+        "condition": 0,
+    }]
+    cohort = build_preregistered_cohort(
+        rows,
+        candidate_id_field="candidate_id",
+        outcome_field="outcome",
+        predictor_fields=("intercept", "condition"),
+        sync_elapsed_seconds_field="sync_elapsed_seconds",
+        sync_window=SyncWindow(
+            lower_seconds=LOWER_SYNC_SECONDS,
+            upper_seconds=UPPER_SYNC_SECONDS,
+            lower_inclusive=True,
+            upper_inclusive=True,
+            missing_policy=MISSING_EXCLUDE,
+        ),
+        preregistered_masks={},
+    )
+    assert cohort["n_total"] == 1
+    assert cohort["n_eff"] == 0
+    assert cohort["excluded"] == [{
+        "candidate_id": "missing-capture-row",
+        "reasons": ["missing_sync_elapsed"],
+    }]
+
+
+def test_sync_t35_historical_created_at_and_duration_are_not_publication_fallbacks():
+    # Legacy fields are intentionally present, but only a verified API
+    # publishedAt can establish the historical publication anchor.
+    historical = {
+        "created_at": "2026-10-30T02:31:00Z",
+        "hs_al_publicar_al_sync": 4.0,
+    }
+    with pytest.raises(ObservationExcluded) as exc:
+        extract_published_at(youtube_resource(None), expected_video_id=VIDEO_ID)
+    assert exc.value.code == "MISSING_PUBLICATION_TIMESTAMP"
+    assert "created_at" in historical and "hs_al_publicar_al_sync" in historical
