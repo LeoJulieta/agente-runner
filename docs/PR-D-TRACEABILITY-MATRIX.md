@@ -113,7 +113,7 @@ La fixture `tests/fixtures/pr_d_statistical_reference.json` ahora incluye una se
 
 - **T24c:** continúa `BLOQUEADO`; falta preregistrar método de potencia, efecto mínimo, alfa, potencia objetivo, diseño/parámetros, unidad de análisis y referencia independiente. No se deduce potencia de `n_eff` ni de EPV.
 - **T28:** continúa sin evidencia de cálculo informativo de potencia ni de sus cinco motivos cerrados de nulidad, unidades aplicables y coherencia entre valor/razón/unidad.
-- **T32:** continúa sin evidencia de registro durable y recuperable de aborto, `completed=false`, `execution_id` distinto por intento y garantía de que no se publiquen resultados científicos parciales.
+- **T13 / E11:** continúa sin evidencia suficiente de registro durable y recuperable de aborto, `completed=false`, `execution_id` distinto por intento y garantía de que no se publiquen resultados científicos parciales. T32 corresponde exclusivamente a persistencia científica RPC.
 - La ampliación de fixtures es sintética y aislada. El nuevo caso D09 valida únicamente una cadena de referencia cruda→transformación→inferencia; no conecta los cálculos al motor, no implementa potencia ni persistencia durable, no modifica el manifiesto oficial y no certifica la matriz completa.
 
 
