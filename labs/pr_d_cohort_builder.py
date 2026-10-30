@@ -72,10 +72,11 @@ def _normalize_preregistered_masks(
 ) -> dict[str, list[bool]]:
     if not isinstance(masks, Mapping):
         raise CohortInputError("preregistered_masks_required")
+    names = list(masks.keys())
+    if any(not isinstance(name, str) or not name.strip() for name in names):
+        raise CohortInputError("preregistered_filter_name_invalid")
     normalized: dict[str, list[bool]] = {}
-    for name in sorted(masks):
-        if not isinstance(name, str) or not name.strip():
-            raise CohortInputError("preregistered_filter_name_invalid")
+    for name in sorted(names):
         try:
             values = list(masks[name])
         except TypeError as exc:
