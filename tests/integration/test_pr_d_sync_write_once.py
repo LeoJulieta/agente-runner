@@ -48,10 +48,13 @@ def conditional_write(video_id, views, captured_at, barrier=None):
             f"""
             UPDATE {TABLE}
             SET views_primeras_3h = %s, sync_captured_at = %s
-            WHERE video_id = %s AND views_primeras_3h IS NULL
+            WHERE video_id = %s
+              AND views_primeras_3h IS NULL
+              AND %s >= published_at + INTERVAL '3 hours'
+              AND %s <= published_at + INTERVAL '6 hours'
             RETURNING video_id
             """,
-            (views, captured_at, video_id),
+            (views, captured_at, video_id, captured_at, captured_at),
         ).fetchone()
         return row is not None
 
@@ -89,3 +92,13 @@ def test_sync_t33_concurrent_writers_produce_exactly_one_winner_and_one_atomic_p
     assert sorted(results) == [False, True]
     stored = read_capture("fixture-video")
     assert stored in {(201, first_time), (202, second_time)}
+
+
+def test_sync_t34_database_guard_rejects_out_of_window_capture_even_when_unwritten():
+    setup_database()
+    too_early = datetime(2026, 10, 30, 5, 29, 59, tzinfo=timezone.utc)
+    too_late = datetime(2026, 10, 30, 8, 30, 1, tzinfo=timezone.utc)
+
+    assert conditional_write("fixture-video", 301, too_early) is False
+    assert conditional_write("fixture-video", 302, too_late) is False
+    assert read_capture("fixture-video") == (None, None)
