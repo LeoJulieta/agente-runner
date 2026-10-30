@@ -20,6 +20,7 @@ NON_ESTIMABILITY_REASONS = frozenset({
     "model_non_convergence",
     "model_not_estimable",
 })
+INVALID_FDR_REASONS = frozenset({"hypothesis_spec_missing"})
 
 
 class ScientificNonEstimability(Exception):
@@ -132,8 +133,10 @@ def fit_logistic_mle(
             "effect_size": beta,
             "se": se,
             "p_empirical": p_value,
-            "ci_low": ci_low,
-            "ci_high": ci_high,
+            "ci_low": beta_low,
+            "ci_high": beta_high,
+            "odds_ratio_ci_low": ci_low,
+            "odds_ratio_ci_high": ci_high,
             "coefficient_ci_low": beta_low,
             "coefficient_ci_high": beta_high,
             "odds_ratio": odds_ratio,
@@ -156,6 +159,8 @@ def _nonestimable(reason: str, n_eff: int) -> dict[str, Any]:
             "ci_low": None,
             "ci_high": None,
             "odds_ratio": None,
+            "odds_ratio_ci_low": None,
+            "odds_ratio_ci_high": None,
             "non_estimability_reason": reason,
         },
         # Only an adjustment input; never an empirical p-value.
@@ -194,6 +199,13 @@ def adjust_bh_family(family: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
                 raise ValueError("non_estimability_reason_required")
             if p_empirical is not None:
                 raise ValueError("nonestimable_empirical_p_must_be_null")
+            p = 1.0
+        elif status == "INVALID":
+            invalid_reason = metrics.get("invalid_reason", row.get("invalid_reason"))
+            if invalid_reason not in INVALID_FDR_REASONS:
+                raise ValueError("invalid_fdr_reason_required_or_unsupported")
+            if p_empirical is not None:
+                raise ValueError("invalid_empirical_p_must_be_null")
             p = 1.0
         else:
             raise ValueError("fdr_member_status_unsupported")
