@@ -99,7 +99,7 @@ Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DES
 - **T13 = E11:** fallo estructural de lote y registro operacional durable/recuperable del aborto. El diseño candidato asociado se clasifica como diseño de **T13/E11**, sin cambiar los identificadores de la matriz.
 - **T32 = §15.3/§15.6:** persistencia científica atómica e idempotente mediante RPC, con rollback, reintento y concurrencia. Su evidencia son las pruebas RPC y la ruta del motor enumeradas en la fila T32.
 - Una transacción secundaria en la misma base comparte el dominio de fallo de esa base y no satisface por sí sola la independencia. La escritura local con fsync del PR #94 mejora la evidencia de fixture, pero no demuestra recuperación frente a pérdida del runner, del host o del almacenamiento primario.
-- La corrección es de trazabilidad documental. No cambia PR D v2, no promueve E6–E11 a normativa y no certifica T13 ni T32 como IMPLEMENTADOS.
+- La corrección es de trazabilidad documental. No cambia PR D v2, no promueve E6–E12 a normativa y no certifica T13 ni T32 como IMPLEMENTADOS.
 
 ## T27 — procedencia numérica pendiente de reconciliación
 
