@@ -305,6 +305,25 @@ class PRDFamilyIITest(unittest.TestCase):
         self.assertEqual(result["metrics"]["n_eff"], 30)
         self.assertEqual(result["metrics"]["n_events"], 27)
 
+    def test_t09_filtered_candidates_below_n_eff_floor_are_insufficient(self):
+        x = np.arange(34, dtype=float)
+        y = np.exp(0.2 + 0.02 * x)
+        eligible = np.ones(34, dtype=bool)
+        eligible[-5:] = False  # 29 eligible rows, despite 34 candidates
+        design = np.column_stack([np.ones(34), x])
+        result = fit_ols_log_positive_hc3(
+            y, design, coefficient_index=1, eligible_mask=eligible
+        )
+        self.assertEqual(result["status"], "INSUFFICIENT_POWER")
+        self.assertEqual(result["metrics"]["n_total"], 34)
+        self.assertEqual(result["metrics"]["n_eff"], 29)
+        self.assertEqual(result["metrics"]["n_events"], 29)
+        self.assertEqual(
+            result["metrics"]["insufficient_power_reason"], "n_eff_below_minimum"
+        )
+        self.assertIsNone(result["metrics"]["p_empirical"])
+        self.assertEqual(result["bh_input_p"], 1.0)
+
     def test_t09_mask_shape_and_type_are_validated(self):
         y = np.exp(np.linspace(0.1, 1.0, 32))
         design = np.column_stack([np.ones(32), np.arange(32, dtype=float)])
