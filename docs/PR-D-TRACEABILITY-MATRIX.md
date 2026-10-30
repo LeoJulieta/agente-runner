@@ -68,7 +68,7 @@
 ## Decisión de seguridad
 
 - No se modifica `docs/manifest.json`; `execution_status` permanece `"fixture"`.
-- No se escribe código estadístico ni se ejecutan hipótesis reales.
+- Los módulos estadísticos existentes en esta rama son fixtures sintéticos aislados: no se conectan al motor real ni ejecutan hipótesis reales.
 - No se consulta ni escribe en Supabase de producción.
 - PR #90 permanece abierto y sin fusionar; la matriz queda pendiente de revisión humana.
 
@@ -88,9 +88,9 @@ Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DES
 ### Límites de esta resolución
 
 - Cerrar ambigüedades documentales no equivale a implementar ni aprobar pruebas.
-- No se escribe código estadístico, no se ejecutan hipótesis reales y no se consulta ni escribe en Supabase de producción.
+- Los módulos estadísticos de esta rama permanecen aislados y sintéticos; no se conectan al motor real. No se ejecutan hipótesis reales ni se consulta/escribe Supabase de producción.
 - `docs/manifest.json` no se modifica y conserva `execution_status="fixture"`. Su `contract_sha256` seguirá apuntando a la versión anterior hasta una actualización autorizada por separado. No debe habilitarse ejecución mientras persista esa diferencia.
-- PR #90 permanece abierto y sin fusionar; este PR se apila sobre su rama para mantener sincronizadas la matriz y el contrato.
+- PR #90 permanece abierto y sin fusionar. Este PR correctivo parte directamente de `main` (base SHA registrado en la metadata del PR); no se apila sobre #90 y no hereda su alteración documental del contrato v2.
 
 
 
@@ -136,15 +136,15 @@ La fixture `tests/fixtures/pr_d_statistical_reference.json` ahora incluye una se
 | SYNC-T32b | §17.5 | UTC cerca de medianoche y conversión a zona IANA Ushuaia | Hora/fecha local correctas | Casos de cambio de fecha y offset calculado por zona IANA | Offset fijo hardcodeado como regla general  [IMPLEMENTADO] IANA Ushuaia y rollover |
 | SYNC-T33 | §17.3 | Dos escritores concurrentes parten de `views_primeras_3h IS NULL` | Exactamente uno confirma; el otro no actualiza | Prueba concurrente aislada con resultado 1/0 | Confiar solo en prelectura Python o cron concurrency  [IMPLEMENTADO] PostgreSQL efímero: carrera 1 ganador/1 rechazado |
 | SYNC-T34 | §17.4 | Publicación/captura missing o inválida a nivel individual | Exclusión trazable; `n_total` y `n_eff` conservan semántica | ID, causa cerrada, contadores antes/después | Imputar timestamps o abortar lote sin fallo estructural  [IMPLEMENTADO] identidad, causa y conteos de exclusión |
-| SYNC-T35 | §17.5 | Históricos sin `published_at` fiable y control con fuente fiable | No verificados/excluidos cuando no hay fuente; derivación desde `published_at` cuando sí la hay | Procedencia documentada por fila | Reconstruir desde `created_at - hs_al_publicar_al_sync`  [IMPLEMENTADO] no fallback desde created_at/duración histórica |
+| SYNC-T35 | §17.5 | Históricos sin `published_at` fiable y control con fuente fiable | No verificados/excluidos cuando no hay fuente; derivación desde `published_at` cuando sí la hay | Procedencia documentada y estado histórico persistido por fila | Reconstruir desde `created_at - hs_al_publicar_al_sync`  [PARCIAL] el test demuestra que no se usa fallback, pero no persiste ni verifica el estado histórico |
 
 ### E2E sintéticas de la suite de sincronización
 
 | ID | Flujo | Resultado esperado | Límites |
 |---|---|---|---|
-| SYNC-E2E-A | Fixtures con timestamps válidos dentro de 3–6 h → cohort builder → Familia II | Estimación sintética válida si se satisfacen todos los gates | Sin API real, Supabase, publicación ni datos productivos  [IMPLEMENTADO] API fixture→parser→ventana→cohorte→Familia II |
-| SYNC-E2E-B | Fixtures temporalmente válidos pero cohorte insuficiente → cohort builder → Familia II | `INSUFFICIENT_POWER`, sin conclusión favorable | Sin API real, Supabase, publicación ni datos productivos  [IMPLEMENTADO] mismo flujo; cohorte insuficiente |
+| SYNC-E2E-A | Fixture de API con video_id esperado y `statistics.viewCount` → parser de `publishedAt` + extracción del outcome del mismo recurso → ventana 3–6 h → cohort builder → Familia II | Estimación sintética válida si se satisfacen todos los gates; el outcome debe ser exactamente el viewCount del video esperado | Sin API real, Supabase, publicación ni datos productivos  [IMPLEMENTADO] fixture API→publishedAt + viewCount asociado por video_id→ventana→cohorte→Familia II |
+| SYNC-E2E-B | Mismo flujo API/outcome asociado por video_id, con cohorte insuficiente → cohort builder → Familia II | `INSUFFICIENT_POWER`, sin conclusión favorable | Sin API real, Supabase, publicación ni datos productivos  [IMPLEMENTADO] mismo flujo; outcome tomado de `statistics.viewCount` |
 
-**Estado de cobertura:** los casos SYNC marcados IMPLEMENTADO/PARCIAL tienen pruebas sintéticas en `tests/test_pr_d_sync_contract.py`, `tests/test_pr_d_sync_full_pipeline.py` y `tests/integration/test_pr_d_sync_write_once.py`. La ejecución y conclusión CI se consultan en los checks del PR; no se infieren de la mera presencia del test. SYNC-T31 permanece PARCIAL: el SQL efímero no integra captura del productor ni persistencia Supabase. Estas pruebas no certifican producción.
+**Estado de cobertura:** los casos SYNC marcados IMPLEMENTADO/PARCIAL tienen pruebas sintéticas en `tests/test_pr_d_sync_contract.py`, `tests/test_pr_d_sync_full_pipeline.py` y `tests/integration/test_pr_d_sync_write_once.py`. La ejecución y conclusión CI se consultan en los checks del PR; no se infieren de la mera presencia del test. SYNC-T31 y SYNC-T35 permanecen PARCIALES: el SQL efímero no integra captura del productor ni persistencia Supabase; T35 tampoco persiste un estado histórico no verificado. Estas pruebas no certifican producción.
 
 **Bloqueos de alcance:** `docs/manifest.json` permanece sin cambios y `execution_status="fixture"`; PR #90, #107 y #109 no se fusionan por este trabajo; no se modifica el productor privado, workflows productivos, motor real, migraciones, RPC ni Supabase de producción.
