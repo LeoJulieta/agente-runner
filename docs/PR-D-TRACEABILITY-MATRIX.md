@@ -109,6 +109,10 @@ Los valores citados anteriormente para T27 (`β₁ ≈ 0.266869`, `SE_HC3 ≈ 0.
 
 La fixture `tests/fixtures/pr_d_statistical_reference.json` ahora incluye una serie sintética explícita de `Y` crudo, la regla `Y > 0`, la transformación `ln(Y)`, `X`, tolerancias, y la referencia de inferencia OLS/HC3 con t bilateral e IC95%. `tests/test_pr_d_statistical_fixtures.py` deriva desde `Y` crudo, calcula HC3 mediante álgebra matricial NumPy independiente y contrasta los resultados con statsmodels fijado en CI. Esto demuestra una cadena reproducible para **este nuevo caso sintético D09**, pero no valida los valores esperados antiguos (`β₁ ≈ 0.266869`, `SE_HC3 ≈ 0.053627`, IC95% `[0.143206, 0.390532]`), cuya procedencia sigue no verificada. Por tanto, T27 mejora a cobertura parcial de procedencia para D09; el objetivo numérico histórico continúa abierto hasta recuperar sus datos de entrada originales o retirarlo explícitamente mediante revisión contractual.
 
+## Aclaración de cobertura E10 — `compute_d_init()` (2026-10-30)
+
+La función `compute_d_init()` sí existe en `labs/pr_d_family_ii.py`; la observación de auditoría se refiere a la ausencia de pruebas directas, no a la ausencia del cálculo. La suite `tests/test_pr_d_family_ii_contract.py` incorpora ahora casos directos de proporciones iguales y extremas, límites válidos, datos faltantes y entradas inválidas. Esta ampliación sigue siendo cobertura sintética parcial de E10; no cierra la tabla contractual completa ni certifica el motor productivo.
+
 ## Bloqueos conservados tras la auditoría (2026-10-29)
 
 - **T24c:** continúa `BLOQUEADO`; falta preregistrar método de potencia, efecto mínimo, alfa, potencia objetivo, diseño/parámetros, unidad de análisis y referencia independiente. No se deduce potencia de `n_eff` ni de EPV.
