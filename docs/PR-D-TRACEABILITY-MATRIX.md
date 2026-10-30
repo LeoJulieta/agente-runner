@@ -1,4 +1,4 @@
-# PR D v2 — Matriz de aceptación contractual determinista T01–T32
+# PR D — Matriz de trazabilidad y aceptación (T01–T32; SYNC-T26–SYNC-T35 candidata v3.0)
 
 **Estado:** borrador documental para auditoría humana; no autoriza implementación ni ejecución científica.  
 **Contrato fuente:** `docs/PR-D-DESIGN.md`, PR D v2 con enmiendas E6–E11 en §16; SHA-256 `21664b7a5c6f24e876fa7072db54e29b12446a64d0f106c9d60f702478fb9cd8` (propuesta, pendiente de revisión/fusión).  
@@ -97,3 +97,36 @@ Las ambigüedades N1–N6 se resuelven documentalmente en `docs/PR-D-DESIGN.md` 
 
 La referencia T27 incorporada en PR #94 usa arrays sintéticos fijos `X_VALUES`/`Y_VALUES`, recalcula desde `Y` crudos y compara con statsmodels: `effect_size`, `SE_HC3`, IC95%, covarianza y prefijo de residuos con tolerancia `1e-10`, además de igualdad bitwise entre ejecuciones. T09 también compara el p-value contra statsmodels. Límite restante: el test T27 no aserta explícitamente el p-value ni fija todos los intermediarios enumerados en la matriz (por ejemplo, la cadena completa de productos/sumas HC3); por eso T27 sigue `[PARCIAL]`, no certificado como cadena numérica completa. No se debe reutilizar el antiguo conjunto aproximado de valores redondeados como oracle.
 
+
+
+## Suite candidata de sincronización del productor — SYNC-T26–SYNC-T35
+
+**Autoridad:** propuesta de aceptación para E12 en `docs/PR-D-DESIGN-V3-CANDIDATE.md`; no es norma vigente ni certificación de implementación.
+
+**Regla de identificadores:** T01–T32 ya están asignados en esta matriz. Para evitar colisiones y conservar su trazabilidad histórica, los casos nuevos usan el prefijo `SYNC-`. Los refinamientos solicitados como T26b y T32b se conservan como subcasos namespaced. No se renumeran ni reemplazan los T26–T32 existentes.
+
+| ID | Referencia candidata | Fixture / estímulo | Resultado esperado | Evidencia exigida | No permitido |
+|---|---|---|---|---|---|
+| SYNC-T26 | §17.1 | Recurso YouTube válido del video esperado con `snippet.publishedAt` | `published_at` se deriva de ese campo | Valor UTC parseado y correspondencia con video ID | Usar `created_at` como sustituto |
+| SYNC-T26b | §17.1, §17.4 | Recurso completo con `publishedAt` ausente/nulo y recurso con valor malformado; caso separado de API fallida | Causas individuales missing/invalid; fallo API clasificado como error de lectura/operativo | Causa estable por observación o fase de fallo API | Convertir 401/403/cuota/transporte/respuesta incompleta en timestamp missing |
+| SYNC-T27 | §17.1–§17.2 | `created_at` y `published_at` deliberadamente distintos | Solo `published_at` ancla la ventana | Timestamps independientes preservados | Inferir publicación desde hora de inserción |
+| SYNC-T28 | §17.2 | Captura exactamente a 3 h | Elegible | Comparación exacta de segundos inclusiva | Redondear antes de comparar |
+| SYNC-T29 | §17.2 | Captura exactamente a 6 h | Elegible | Comparación exacta de segundos inclusiva | Convertir límite superior en exclusivo |
+| SYNC-T30 | §17.2, §17.4 | Casos inmediatamente menores que 3 h y mayores que 6 h | Exclusión `OUTSIDE_SYNC_WINDOW` | Elapsed exacto y causa | Aceptar fuera de ventana por redondeo |
+| SYNC-T31 | §17.2–§17.3 | Captura válida con vistas y timestamp de captura | `sync_captured_at` y conteo se confirman como unidad; elapsed reproducible | Mismos timestamps y conteo tras lectura del fixture | Persistir solo duración derivada |
+| SYNC-T32 | §17.3 | Primera captura válida confirmada y segundo intento posterior | Primera escritura atómica gana; segunda no modifica campos | Resultado de filas afectadas y valores inmutables | Presentar “primer escritor” como “captura cronológicamente más temprana” |
+| SYNC-T32b | §17.5 | UTC cerca de medianoche y conversión a zona IANA Ushuaia | Hora/fecha local correctas | Casos de cambio de fecha y offset calculado por zona IANA | Offset fijo hardcodeado como regla general |
+| SYNC-T33 | §17.3 | Dos escritores concurrentes parten de `views_primeras_3h IS NULL` | Exactamente uno confirma; el otro no actualiza | Prueba concurrente aislada con resultado 1/0 | Confiar solo en prelectura Python o cron concurrency |
+| SYNC-T34 | §17.4 | Publicación/captura missing o inválida a nivel individual | Exclusión trazable; `n_total` y `n_eff` conservan semántica | ID, causa cerrada, contadores antes/después | Imputar timestamps o abortar lote sin fallo estructural |
+| SYNC-T35 | §17.5 | Históricos sin `published_at` fiable y control con fuente fiable | No verificados/excluidos cuando no hay fuente; derivación desde `published_at` cuando sí la hay | Procedencia documentada por fila | Reconstruir desde `created_at - hs_al_publicar_al_sync` |
+
+### E2E sintéticas de la suite de sincronización
+
+| ID | Flujo | Resultado esperado | Límites |
+|---|---|---|---|
+| SYNC-E2E-A | Fixtures con timestamps válidos dentro de 3–6 h → cohort builder → Familia II | Estimación sintética válida si se satisfacen todos los gates | Sin API real, Supabase, publicación ni datos productivos |
+| SYNC-E2E-B | Fixtures temporalmente válidos pero cohorte insuficiente → cohort builder → Familia II | `INSUFFICIENT_POWER`, sin conclusión favorable | Sin API real, Supabase, publicación ni datos productivos |
+
+**Estado inicial de cobertura:** [PENDIENTE]. La incorporación de esta tabla define aceptación; no afirma que las pruebas estén implementadas o ejecutadas.
+
+**Bloqueos de alcance:** `docs/manifest.json` permanece sin cambios y `execution_status="fixture"`; PR #90, #107 y #109 no se fusionan por este trabajo; no se modifica el productor privado, workflows productivos, motor real, migraciones, RPC ni Supabase de producción.
