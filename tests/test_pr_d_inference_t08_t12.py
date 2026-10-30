@@ -75,6 +75,11 @@ class PRDInferenceT08T12Tests(unittest.TestCase):
         self.assertGreaterEqual(metrics["p_empirical"], 0.0)
         self.assertLessEqual(metrics["p_empirical"], 1.0)
         self.assertLess(metrics["ci_low"], metrics["ci_high"])
+        self.assertLess(metrics["coefficient_ci_low"], metrics["coefficient_ci_high"])
+        self.assertAlmostEqual(metrics["ci_low"], metrics["coefficient_ci_low"], places=15)
+        self.assertAlmostEqual(metrics["ci_high"], metrics["coefficient_ci_high"], places=15)
+        self.assertLess(metrics["odds_ratio_ci_low"], metrics["odds_ratio_ci_high"])
+        self.assertAlmostEqual(metrics["odds_ratio"], np.exp(metrics["effect_size"]), places=12)
         self.assertAlmostEqual(result["bh_input_p"], metrics["p_empirical"], places=15)
 
     def test_bh_preserves_family_m_and_uses_one_only_as_adjustment_input(self):
@@ -116,6 +121,44 @@ class PRDInferenceT08T12Tests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "non_estimability_reason_required"):
             adjust_bh_family(family)
+
+
+    def test_invalid_hypothesis_keeps_its_fdr_slot_with_adjustment_only_p_one(self):
+        family = [
+            {"hypothesis_id": "H990_A", "status": "ESTIMABLE", "p_empirical": 0.01},
+            {
+                "hypothesis_id": "H991_MISSING",
+                "status": "INVALID",
+                "p_empirical": None,
+                "invalid_reason": "hypothesis_spec_missing",
+            },
+            {"hypothesis_id": "H992_C", "status": "ESTIMABLE", "p_empirical": 0.04},
+        ]
+        adjusted = adjust_bh_family(family)
+        invalid = next(row for row in adjusted if row["hypothesis_id"] == "H991_MISSING")
+        self.assertEqual(len(adjusted), 3)
+        self.assertEqual(invalid["bh_input_p"], 1.0)
+        self.assertIsNone(invalid["p_empirical"])
+        self.assertEqual(invalid["family_m"], 3)
+        self.assertEqual(invalid["fdr_q"], 1.0)
+
+    def test_invalid_hypothesis_requires_closed_reason_and_null_empirical_p(self):
+        invalid_reason = {
+            "hypothesis_id": "H991_BAD",
+            "status": "INVALID",
+            "p_empirical": None,
+            "invalid_reason": "unknown_reason",
+        }
+        with self.assertRaisesRegex(ValueError, "invalid_fdr_reason_required_or_unsupported"):
+            adjust_bh_family([invalid_reason])
+        fabricated_p = {
+            "hypothesis_id": "H992_BAD",
+            "status": "INVALID",
+            "p_empirical": 0.5,
+            "invalid_reason": "hypothesis_spec_missing",
+        }
+        with self.assertRaisesRegex(ValueError, "invalid_empirical_p_must_be_null"):
+            adjust_bh_family([fabricated_p])
 
     def test_structural_exception_aborts_without_returning_partial_family(self):
         def evaluate(item):
