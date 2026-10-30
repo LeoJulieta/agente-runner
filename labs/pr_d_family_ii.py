@@ -27,12 +27,17 @@ def fit_ols_log_positive_hc3(
     design_matrix: Iterable[Iterable[float]],
     *,
     coefficient_index: int,
+    eligible_mask: Iterable[bool] | None = None,
     min_n_eff: int = 30,
 ) -> dict[str, Any]:
-    """Fit OLS on ln(Y) for Y>0 with the contract-fixed HC3 covariance.
+    """Fit OLS on ln(Y) for eligible rows with Y>0 using contract-fixed HC3.
 
-    Zero outcomes remain counted in n_total but are excluded from the
-    conditional model. No alternate covariance or estimator is substituted.
+    outcomes and design_matrix must contain the same candidate rows before
+    preregistered eligibility filters. eligible_mask marks rows retained by
+    all such filters; omitted means every supplied row is eligible (valid only
+    when no candidate was filtered upstream). Zeros count toward n_eff but
+    are excluded from the conditional log-positive fit. Therefore n_total is
+    candidate count, n_eff eligible-row count, and n_events eligible Y>0 count.
     """
     y_all = np.asarray(list(outcomes), dtype=np.float64)
     design_all = np.asarray(list(design_matrix), dtype=np.float64)
@@ -42,6 +47,17 @@ def fit_ols_log_positive_hc3(
         raise ValueError("ols_input_nonfinite_or_empty")
     if np.any(y_all < 0):
         raise ValueError("ols_outcome_negative")
+    if eligible_mask is None:
+        eligible = np.ones(y_all.size, dtype=bool)
+    else:
+        eligible = np.asarray(list(eligible_mask))
+        if eligible.ndim != 1 or eligible.size != y_all.size or not np.isin(eligible, [True, False]).all():
+            raise ValueError("ols_eligibility_mask_invalid")
+        eligible = eligible.astype(bool, copy=False)
+    y_eligible = y_all[eligible]
+    design_eligible = design_all[eligible]
+    if y_eligible.size == 0:
+        raise ValueError("ols_no_eligible_observations")
     if type(min_n_eff) is not int or min_n_eff < 1:
         raise ValueError("min_n_eff_invalid")
     if type(coefficient_index) is not int or not 0 <= coefficient_index < design_all.shape[1]:
@@ -49,10 +65,10 @@ def fit_ols_log_positive_hc3(
     if design_all.shape[1] == 0:
         raise ValueError("ols_design_empty")
 
-    positive = y_all > 0
-    y_positive = y_all[positive]
-    design = design_all[positive]
-    n_total, n_events, n_eff = int(y_all.size), int(positive.sum()), int(y_all.size)
+    positive = y_eligible > 0
+    y_positive = y_eligible[positive]
+    design = design_eligible[positive]
+    n_total, n_events, n_eff = int(y_all.size), int(positive.sum()), int(y_eligible.size)
     base = {
         "n_total": n_total,
         "n_events": n_events,
