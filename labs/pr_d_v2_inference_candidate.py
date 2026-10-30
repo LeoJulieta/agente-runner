@@ -66,7 +66,7 @@ def fit_ols_log_positive_hc3_v2(outcomes: Iterable[float], design_matrix: Iterab
     if type(coefficient_index) is not int or not 0<=coefficient_index<xx.shape[1]:
         raise ValueError("coefficient_index_invalid")
     n_eff=int(yy.size); positive=yy>0; n_events=int(positive.sum())
-    base={"n_total":n_eff,"n_eff":n_eff,"n_events":n_events,
+    base={"n_eff":n_eff,"n_events":n_events,
           "method_fingerprint":"ols-ln-positive-y-hc3-t-two-sided-v2"}
     if n_eff<min_n_eff: return {**_insufficient_result(n_eff,"n_eff_below_minimum"),"metrics":{
         **base,"effect_size":None,"se":None,"p_empirical":None,"ci_low":None,"ci_high":None,
