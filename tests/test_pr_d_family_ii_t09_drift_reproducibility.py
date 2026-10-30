@@ -273,6 +273,50 @@ class PRDFamilyIITest(unittest.TestCase):
             self.assertEqual(result["metrics"]["reproducible_state"], "not_evaluable")
 
 
+    def test_t09_candidate_count_is_separate_from_eligible_rows_and_events(self):
+        # 36 candidate rows: 4 are excluded by the preregistered filter.
+        x = np.arange(36, dtype=float)
+        y = np.exp(0.1 + 0.03 * x)
+        y[[2, 7, 19, 31]] = 0.0  # eligible zeros remain in n_eff, not n_events
+        eligible = np.ones(36, dtype=bool)
+        eligible[[0, 1, 2, 3]] = False
+        design = np.column_stack([np.ones(36), x])
+        result = fit_ols_log_positive_hc3(
+            y, design, coefficient_index=1, eligible_mask=eligible
+        )
+        metrics = result["metrics"]
+        self.assertEqual(result["status"], "ESTIMABLE")
+        self.assertEqual(metrics["n_total"], 36)
+        self.assertEqual(metrics["n_eff"], 32)
+        self.assertEqual(metrics["n_events"], 28)
+
+    def test_t09_eligible_zeros_count_toward_minimum_but_excluded_rows_do_not(self):
+        x = np.arange(34, dtype=float)
+        y = np.exp(0.2 + 0.02 * x)
+        y[:3] = 0.0
+        eligible = np.ones(34, dtype=bool)
+        eligible[-4:] = False
+        design = np.column_stack([np.ones(34), x])
+        result = fit_ols_log_positive_hc3(
+            y, design, coefficient_index=1, eligible_mask=eligible
+        )
+        self.assertEqual(result["status"], "ESTIMABLE")
+        self.assertEqual(result["metrics"]["n_total"], 34)
+        self.assertEqual(result["metrics"]["n_eff"], 30)
+        self.assertEqual(result["metrics"]["n_events"], 27)
+
+    def test_t09_mask_shape_and_type_are_validated(self):
+        y = np.exp(np.linspace(0.1, 1.0, 32))
+        design = np.column_stack([np.ones(32), np.arange(32, dtype=float)])
+        with self.assertRaisesRegex(ValueError, "ols_eligibility_mask_invalid"):
+            fit_ols_log_positive_hc3(
+                y, design, coefficient_index=1, eligible_mask=[True] * 31
+            )
+        with self.assertRaisesRegex(ValueError, "ols_eligibility_mask_invalid"):
+            fit_ols_log_positive_hc3(
+                y, design, coefficient_index=1, eligible_mask=[1] * 32
+            )
+
     def test_t09_numeric_hc3_matches_independent_statsmodels_reference(self):
         x = np.tile(np.arange(12, dtype=float), 4)
         residual = np.tile(np.array([-0.12, 0.04, 0.09, -0.03, 0.15, -0.08,
