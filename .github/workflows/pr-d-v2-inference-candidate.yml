@@ -1,0 +1,47 @@
+name: PR D v2 inference correction candidate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "labs/pr_d_v2_inference_candidate.py"
+      - "tests/test_pr_d_v2_inference_candidate.py"
+      - "docs/PR-D-V2-INFERENCE-CORRECTIONS-CANDIDATE.md"
+      - ".github/workflows/pr-d-v2-inference-candidate.yml"
+      - "requirements/pr-d-statistical-fixtures-py312.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-inference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Install exact fixture dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Record environment
+        run: |
+          python --version
+          python -m pip freeze
+          sha256sum requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Run isolated synthetic inference tests
+        run: python -m unittest -v tests.test_pr_d_v2_inference_candidate
+      - name: Assert official manifest remains fixture-only
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          manifest = json.loads(Path("docs/manifest.json").read_text(encoding="utf-8"))
+          assert manifest.get("execution_status") == "fixture"
+          print('PASS: execution_status remains "fixture"')
+          PY
