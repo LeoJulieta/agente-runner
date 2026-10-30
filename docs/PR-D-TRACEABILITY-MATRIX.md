@@ -1,8 +1,9 @@
-# PR D — Matriz normativa de aceptación contractual determinista T01–T32 (candidato E6–E11)
+# PR D — Matriz de trazabilidad y aceptación candidata T01–T32 (E6–E11) + SYNC-T26–SYNC-T35 (E12)
 
-**Estado:** borrador documental para auditoría humana; no autoriza implementación ni ejecución científica.  
-**Contrato fuente:** `docs/PR-D-DESIGN-V3-CANDIDATE.md`, base vigente PR D v2 (E1–E5) más candidato E6–E11 en §16; SHA-256 candidato `24480aa83f33c4f168e30cc1d18bcaa0e989a42527bc0c97ecb998df9dc5bfbe` (propuesta, pendiente de revisión).  
-**Artefacto normativo de aceptación:** esta matriz T01–T32 es la tabla de aceptación canónica de esta candidatura; `docs/PR-D-ACCEPTANCE-TABLE-V2.md` no forma parte de esta rama y no debe citarse como artefacto existente. Cualquier sustitución o separación futura requiere cambio documental explícito y revisión.
+**Estado:** borrador para auditoría humana; no autoriza implementación, ejecución científica ni adopción contractual de E6–E11.  
+**Contrato normativo vigente:** `docs/PR-D-DESIGN.md` — PR D v2 (E1–E5), aprobado y congelado.  
+**Documento candidato:** `docs/PR-D-DESIGN-V3-CANDIDATE.md` — propuesta PR D v3.0 (E6–E12), no aprobada ni vigente. La matriz evalúa esa candidatura y no modifica el contrato v2.  
+**Función de esta matriz:** tabla de aceptación propuesta T01–T32 para revisar la candidatura; sus reglas y estados no son requisitos normativos vigentes hasta la aprobación formal de una nueva versión contractual.
 **Base de auditoría:** `main` inspeccionado para este PR documental; el SHA exacto de base queda fijado por el `base.sha` del PR en GitHub. No se reutiliza el HEAD histórico `433e8c2` como si fuera el estado actual.  
 **Seguridad:** `docs/manifest.json` permanece `execution_status: "fixture"`; no ejecutar hipótesis reales ni escribir en Supabase de producción.  
 **Estado de PRs verificado (2026-10-29):** PR #91–#95 y PR #97, #98, #103, #104 y #105 aparecen fusionados; PR #90 continúa abierto. La fusión de documentos candidatos o fixtures no convierte E6–E11 en normativa aprobada ni certifica la matriz completa. Los PRs citados son historial de cambios, no sustituyen la inspección de archivos y pruebas presentes en `main`.  
@@ -73,7 +74,7 @@
 
 ## Resolución contractual N1–N6 mediante E6–E11
 
-Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DESIGN-V3-CANDIDATE.md` §16. Esto no cambia por sí solo la cobertura de implementación: el motor estadístico y sus pruebas siguen pendientes. Esta matriz T01–T32 es el artefacto normativo de aceptación de la candidatura; no se afirma que exista `docs/PR-D-ACCEPTANCE-TABLE-V2.md` en esta rama.
+Las ambigüedades N1–N6 se proponen resolver documentalmente en `docs/PR-D-DESIGN-V3-CANDIDATE.md` §16. Esto no cambia por sí solo la cobertura de implementación: el motor estadístico y sus pruebas siguen pendientes. Esta matriz T01–T32 es el artefacto de aceptación propuesto para la candidatura; no sustituye ni modifica el contrato normativo PR D v2.
 
 | Bloqueante | Decisión cerrada | Referencia | Aceptación pendiente |
 |---|---|---|---|
@@ -114,3 +115,36 @@ La fixture `tests/fixtures/pr_d_statistical_reference.json` ahora incluye una se
 - **T28:** continúa sin evidencia de cálculo informativo de potencia ni de sus cinco motivos cerrados de nulidad, unidades aplicables y coherencia entre valor/razón/unidad.
 - **T32:** continúa sin evidencia de registro durable y recuperable de aborto, `completed=false`, `execution_id` distinto por intento y garantía de que no se publiquen resultados científicos parciales.
 - La ampliación de fixtures es sintética y aislada. El nuevo caso D09 valida únicamente una cadena de referencia cruda→transformación→inferencia; no conecta los cálculos al motor, no implementa potencia ni persistencia durable, no modifica el manifiesto oficial y no certifica la matriz completa.
+
+
+## Suite candidata de sincronización del productor — SYNC-T26–SYNC-T35
+
+**Autoridad:** propuesta de aceptación para E12 en `docs/PR-D-DESIGN-V3-CANDIDATE.md`; no es norma vigente ni certificación de implementación.
+
+**Regla de identificadores:** T01–T32 ya están asignados en esta matriz. Para evitar colisiones y conservar su trazabilidad histórica, los casos nuevos usan el prefijo `SYNC-`. Los refinamientos solicitados como T26b y T32b se conservan como subcasos namespaced. No se renumeran ni reemplazan los T26–T32 existentes.
+
+| ID | Referencia candidata | Fixture / estímulo | Resultado esperado | Evidencia exigida | No permitido |
+|---|---|---|---|---|---|
+| SYNC-T26 | §17.1 | Recurso YouTube válido del video esperado con `snippet.publishedAt` | `published_at` se deriva de ese campo | Valor UTC parseado y correspondencia con video ID | Usar `created_at` como sustituto |
+| SYNC-T26b | §17.1, §17.4 | Recurso completo con `publishedAt` ausente/nulo y recurso con valor malformado; caso separado de API fallida | Causas individuales missing/invalid; fallo API clasificado como error de lectura/operativo | Causa estable por observación o fase de fallo API | Convertir 401/403/cuota/transporte/respuesta incompleta en timestamp missing |
+| SYNC-T27 | §17.1–§17.2 | `created_at` y `published_at` deliberadamente distintos | Solo `published_at` ancla la ventana | Timestamps independientes preservados | Inferir publicación desde hora de inserción |
+| SYNC-T28 | §17.2 | Captura exactamente a 3 h | Elegible | Comparación exacta de segundos inclusiva | Redondear antes de comparar |
+| SYNC-T29 | §17.2 | Captura exactamente a 6 h | Elegible | Comparación exacta de segundos inclusiva | Convertir límite superior en exclusivo |
+| SYNC-T30 | §17.2, §17.4 | Casos inmediatamente menores que 3 h y mayores que 6 h | Exclusión `OUTSIDE_SYNC_WINDOW` | Elapsed exacto y causa | Aceptar fuera de ventana por redondeo |
+| SYNC-T31 | §17.2–§17.3 | Captura válida con vistas y timestamp de captura | `sync_captured_at` y conteo se confirman como unidad; elapsed reproducible | Mismos timestamps y conteo tras lectura del fixture | Persistir solo duración derivada |
+| SYNC-T32 | §17.3 | Primera captura válida confirmada y segundo intento posterior | Primera escritura atómica gana; segunda no modifica campos | Resultado de filas afectadas y valores inmutables | Presentar “primer escritor” como “captura cronológicamente más temprana” |
+| SYNC-T32b | §17.5 | UTC cerca de medianoche y conversión a zona IANA Ushuaia | Hora/fecha local correctas | Casos de cambio de fecha y offset calculado por zona IANA | Offset fijo hardcodeado como regla general |
+| SYNC-T33 | §17.3 | Dos escritores concurrentes parten de `views_primeras_3h IS NULL` | Exactamente uno confirma; el otro no actualiza | Prueba concurrente aislada con resultado 1/0 | Confiar solo en prelectura Python o cron concurrency |
+| SYNC-T34 | §17.4 | Publicación/captura missing o inválida a nivel individual | Exclusión trazable; `n_total` y `n_eff` conservan semántica | ID, causa cerrada, contadores antes/después | Imputar timestamps o abortar lote sin fallo estructural |
+| SYNC-T35 | §17.5 | Históricos sin `published_at` fiable y control con fuente fiable | No verificados/excluidos cuando no hay fuente; derivación desde `published_at` cuando sí la hay | Procedencia documentada por fila | Reconstruir desde `created_at - hs_al_publicar_al_sync` |
+
+### E2E sintéticas de la suite de sincronización
+
+| ID | Flujo | Resultado esperado | Límites |
+|---|---|---|---|
+| SYNC-E2E-A | Fixtures con timestamps válidos dentro de 3–6 h → cohort builder → Familia II | Estimación sintética válida si se satisfacen todos los gates | Sin API real, Supabase, publicación ni datos productivos |
+| SYNC-E2E-B | Fixtures temporalmente válidos pero cohorte insuficiente → cohort builder → Familia II | `INSUFFICIENT_POWER`, sin conclusión favorable | Sin API real, Supabase, publicación ni datos productivos |
+
+**Estado inicial de cobertura:** [PENDIENTE]. La incorporación de esta tabla define aceptación; no afirma que las pruebas estén implementadas o ejecutadas.
+
+**Bloqueos de alcance:** `docs/manifest.json` permanece sin cambios y `execution_status="fixture"`; PR #90, #107 y #109 no se fusionan por este trabajo; no se modifica el productor privado, workflows productivos, motor real, migraciones, RPC ni Supabase de producción.
