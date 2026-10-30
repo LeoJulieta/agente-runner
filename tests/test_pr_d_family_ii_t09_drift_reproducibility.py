@@ -29,7 +29,7 @@ class PRDFamilyIITest(unittest.TestCase):
         self.assertEqual(m["contrast"], "two_sided_t")
         self.assertEqual(m["n_total"], 50)
         self.assertEqual(m["n_events"], 48)
-        self.assertEqual(m["n_eff"], 48)
+        self.assertEqual(m["n_eff"], 50)
         for key in ("effect_size", "se", "p_empirical", "ci_low", "ci_high"):
             self.assertTrue(np.isfinite(m[key]), key)
         self.assertGreater(m["se"], 0)
@@ -45,7 +45,7 @@ class PRDFamilyIITest(unittest.TestCase):
         result = fit_ols_log_positive_hc3(y, design, coefficient_index=1)
         self.assertEqual(result["metrics"]["n_total"], 42)
         self.assertEqual(result["metrics"]["n_events"], 40)
-        self.assertEqual(result["metrics"]["n_eff"], 40)
+        self.assertEqual(result["metrics"]["n_eff"], 42)
 
     def test_t09_below_minimum_is_insufficient_not_a_fake_estimate(self):
         y = np.exp(np.linspace(0.1, 1.0, 10))
@@ -54,6 +54,18 @@ class PRDFamilyIITest(unittest.TestCase):
         self.assertEqual(result["status"], "INSUFFICIENT_POWER")
         self.assertIsNone(result["metrics"]["p_empirical"])
         self.assertIsNone(result["metrics"]["effect_size"])
+        self.assertEqual(result["bh_input_p"], 1.0)
+
+
+    def test_t09_n_eff_and_n_events_have_independent_minimums(self):
+        y = np.array([1, 2, 3, 4] + [0] * 26, dtype=float)
+        design = np.column_stack([np.ones(y.size), np.arange(y.size, dtype=float)])
+        result = fit_ols_log_positive_hc3(y, design, coefficient_index=1)
+        self.assertEqual(result["status"], "INSUFFICIENT_POWER")
+        self.assertEqual(result["metrics"]["n_eff"], 30)
+        self.assertEqual(result["metrics"]["n_events"], 4)
+        self.assertEqual(result["metrics"]["insufficient_power_reason"], "n_events_below_minimum")
+        self.assertIsNone(result["metrics"]["p_empirical"])
         self.assertEqual(result["bh_input_p"], 1.0)
 
     def test_t09_negative_or_nonfinite_outcomes_are_rejected(self):
@@ -288,7 +300,7 @@ class PRDFamilyIITest(unittest.TestCase):
         self.assertEqual(result["status"], "ESTIMABLE")
         self.assertEqual(result["metrics"]["n_total"], 42)
         self.assertEqual(result["metrics"]["n_events"], 40)
-        self.assertEqual(result["metrics"]["n_eff"], 40)
+        self.assertEqual(result["metrics"]["n_eff"], 42)
         y_with_negative = y.copy()
         y_with_negative[0] = -0.01
         with self.assertRaisesRegex(ValueError, "ols_outcome_negative"):
