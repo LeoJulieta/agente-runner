@@ -2,7 +2,7 @@ name: PR D corrective isolated - synthetic E12 verification
 
 on:
   pull_request:
-    branches: ["pr-d/corrective-isolated-e12-e2e"]
+    branches: ["main"]
     paths:
       - "labs/pr_d_sync_contract.py"
       - "labs/pr_d_cohort_builder.py"
