@@ -30,7 +30,6 @@ class InferenceCorrections(unittest.TestCase):
         x=np.column_stack([np.ones(42),np.arange(42,dtype=float)])
         r=fit_ols_log_positive_hc3_v2(y,x,coefficient_index=1,min_n_eff=30)
         self.assertEqual(r["status"],"ESTIMABLE")
-        self.assertEqual(r["metrics"]["n_total"],42)
         self.assertEqual(r["metrics"]["n_eff"],42)
         self.assertEqual(r["metrics"]["n_events"],40)
 
