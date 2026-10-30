@@ -1,8 +1,8 @@
-# PR D — diseño candidato de preregistro T24c y registro durable T32
+# PR D — preregistro candidato T24c y diseño de registro durable de aborto T13/E11
 
 **Estado:** propuesta documental para auditoría humana; no normativa y no aprobada para implementación.
 **Base:** PR D v2 vigente (E1–E5). E6–E11 y la matriz T01–T32 continúan siendo material candidato.
-**Propósito:** convertir los bloqueos T24c y T32 en decisiones explícitas, datos requeridos y criterios verificables, sin elegir un método estadístico ni una infraestructura de persistencia por inferencia.
+**Propósito:** convertir el bloqueo T24c y el diseño de registro durable T13/E11 en decisiones explícitas, datos requeridos y criterios verificables, sin elegir una fórmula de potencia ni una infraestructura de persistencia por inferencia. T32 conserva su significado de persistencia científica atómica/idempotente por RPC.
 **Límite de seguridad:** no modifica el motor, manifiesto ni esquema de Supabase; no consulta ni escribe Supabase; no ejecuta hipótesis reales. `docs/manifest.json` debe permanecer `execution_status: "fixture"`.
 
 ---
@@ -67,6 +67,20 @@ El siguiente registro es una plantilla vacía. Los valores deben ser aportados y
 
 La referencia a Fisher solo podrá considerarse si el parámetro y el diseño justifican específicamente su aplicación; no es una alternativa automática para ninguna familia.
 
+
+### 1.4.1 Comparación metodológica pendiente — no selección de fórmula
+
+Esta comparación acota las alternativas a evaluar; **no selecciona ni autoriza un cálculo**.
+
+| Familia | Método candidato para evaluar | Cuándo podría aplicar | Parámetros/datos que faltan antes de decidir |
+|---|---|---|---|
+| I — iniciación, logística MLE/Wald | Método analítico de tamaño/potencia para regresión logística (por ejemplo, enfoque tipo Hsieh), solo si el diseño y sus supuestos coinciden; de lo contrario, simulación específica del diseño | Predictor, outcome binario y estructura de covariables compatibles con la referencia; sin asumir que una fórmula de dos grupos cubre cualquier logística | Probabilidad basal de Y>0; distribución/prevalencia del predictor; OR mínimo relevante; covariables y correlaciones; unidad independiente; agrupamiento/dependencia; exclusiones, faltantes y pérdida de muestra |
+| II — magnitud condicional, OLS/HC3 sobre ln(Y) | Simulación Monte Carlo que reproduzca el diseño, matriz de diseño, heterocedasticidad y contraste t con HC3; una fórmula OLS homocedástica genérica no se presume equivalente | Cuando la simulación reproduce el estimador HC3 y el proceso de selección Y>0 que define la población condicional | Efecto mínimo en escala logarítmica; varianza/residuales y estructura de heterocedasticidad; distribución/variación del predictor; covariables; unidad independiente; dependencia/clusters; tasa basal de positivos; exclusiones/faltantes |
+
+**Potencia individual frente a FDR:** PR D v2 §13.6 fija alpha=0.05 bilateral y objetivo de diseño power=0.80, pero el expediente debe dejar explícito si ese 80 % describe la potencia de cada contraste nominal individual o la probabilidad de que el procedimiento completo de la familia supere la decisión tras Benjamini–Hochberg. No son objetivos intercambiables. Si el objetivo es la decisión familiar posterior a BH, la referencia debe simular la familia congelada completa, el número de pruebas, la dependencia entre contrastes y la regla BH; no basta un cálculo marginal por hipótesis. Esta aclaración no modifica alpha, potencia objetivo ni el carácter informativo de n_required_power en PR D v1.
+
+**Traducción n_events a n_eff:** en Familia II, un tamaño requerido expresado en eventos positivos no determina el total de observaciones elegibles. Para estimar n_eff se necesita una tasa de positivos preregistrada y justificada, además de exclusiones, faltantes, truncamiento y unidad independiente. No se debe convertir n_events en n_eff usando una proporción inventada o estimada después de observar resultados.
+
 ### 1.5 Revisión independiente y congelamiento
 
 Antes de habilitar cualquier cálculo:
@@ -95,11 +109,13 @@ Hasta entonces, T24c permanece BLOQUEADO y T28 solo tiene cobertura parcial de f
 
 ---
 
-## 2. T32 — diseño candidato del registro durable de aborto
+## 2. T13/E11 — diseño candidato del registro durable de aborto
 
 ### 2.1 Problema que debe resolver
 
-La regla de aborto de lote prohíbe presentar resultados científicos parciales como válidos cuando un fallo estructural compromete la integridad del lote. T32 añade una necesidad operativa distinta: dejar un registro durable y recuperable del aborto.
+**Corrección de trazabilidad:** esta sección define T13/E11, no T32. T32 permanece reservado a la persistencia científica atómica e idempotente de §15.3/§15.6, probada mediante `tests/integration/test_pr_d_atomic_rpc.py` y `tests/integration/test_pr_d_engine_atomic_path.py`. La atomicidad de esa RPC no demuestra la durabilidad del registro operacional de aborto.
+
+La regla de aborto de lote prohíbe presentar resultados científicos parciales como válidos cuando un fallo estructural compromete la integridad del lote. T13/E11 añade una necesidad operativa distinta: dejar un registro durable y recuperable del aborto.
 
 La atomicidad de la persistencia científica y la durabilidad del registro operacional son propiedades distintas. Una transacción científica que hace rollback no puede, por sí sola, demostrar que el registro del fallo sobrevivió a ese rollback. Los tests existentes de RPC atómica/idempotente y la ruta del motor no demuestran aún el registro durable E11.
 
@@ -161,12 +177,17 @@ El paso 6 no selecciona proveedor ni tabla. La elección de almacenamiento es un
 
 ### 2.5 Condición crítica: ¿qué pasa si falla el propio registro?
 
-No se debe declarar T32 satisfecho si el sistema no pudo confirmar la escritura durable del evento. Debe existir un segundo mecanismo operacional de contingencia, independiente del destino primario, o una condición explícita de fallo crítico que impida continuar y requiera intervención humana. La estrategia concreta y sus garantías deben definirse antes de implementar; no se presume que un log de CI, stdout o el código de salida 2 sea por sí solo un registro durable y recuperable.
+Una segunda transacción en la misma base de datos comparte el dominio de fallo de esa base y no satisface por sí sola el requisito de independencia. Un artefacto de GitHub Actions puede servir como contingencia parcial, pero depende de la disponibilidad del runner, de GitHub y de la retención configurada; tampoco cubre todos los escenarios de terminación o pérdida del runner. Un almacenamiento externo en un dominio independiente puede ofrecer una separación más fuerte, pero exige decidir proveedor, disponibilidad, costo, credenciales, mínimo privilegio, retención, backup y restauración. Ninguna opción queda seleccionada por este documento.
+
+No se debe declarar T13 satisfecho si el sistema no pudo confirmar la escritura durable del evento. Debe existir un segundo mecanismo operacional de contingencia, independiente del destino primario, o una condición explícita de fallo crítico que impida continuar y requiera intervención humana. La estrategia concreta y sus garantías deben definirse antes de implementar; no se presume que un log de CI, stdout o el código de salida 2 sea por sí solo un registro durable y recuperable.
 
 Si el canal primario y la contingencia fallan, el sistema no puede afirmar que dejó un registro durable. Debe exponer ese estado como fallo de observabilidad/registro, detener nuevos lotes y conservar la mayor evidencia local disponible para recuperación manual, sin presentarla como persistencia confirmada.
 
 ### 2.6 Idempotencia, concurrencia y recuperación
 
+- **Confirmación perdida:** si la escritura primaria pudo haberse confirmado pero la respuesta se perdió, primero consultar/reconciliar por el mismo `execution_id`; no crear un segundo evento ni asumir que la escritura falló. Solo un nuevo intento operativo recibe un nuevo `execution_id`.
+- **Terminación abrupta:** si el runner muere antes de ejecutar el manejador de excepciones, no existe garantía de que el propio proceso registre el aborto. Se requiere evaluar un registro inicial/heartbeat antes del preflight y un reconciliador/watchdog externo que detecte intentos abandonados. Hasta que el reconciliador confirme la causa, el estado debe ser `ABORT_RECORD_UNCONFIRMED`/abandono pendiente, no un `ABORTED` durable inventado. Este estado requiere revisión de catálogo antes de convertirse en contrato.
+- **Ambos canales no disponibles:** declarar explícitamente que el aborto no pudo registrarse (`ABORT_RECORD_UNCONFIRMED`), detener nuevos lotes y preservar cualquier evidencia local como no confirmada; nunca afirmar auditoría completa ni durabilidad.
 - La unicidad se define por `execution_id`; el reintento es un nuevo intento y recibe un nuevo ID.
 - Una repetición de la misma solicitud de escritura para el mismo `execution_id` no crea duplicados ni altera el evento ya confirmado.
 - El mismo `batch_id` puede tener varios intentos; la consulta debe mostrar su secuencia sin borrar eventos anteriores.
@@ -187,24 +208,28 @@ Estas decisiones son bloqueantes; no se elige una por conveniencia ni se escribe
 8. **Recuperación:** procedimiento operativo, responsables y criterio para reintentar o cerrar.
 9. **Prueba aislada:** PostgreSQL local descartable o entorno E2E explícitamente aislado; nunca producción para desarrollar estos tests.
 
-### 2.8 Pruebas de aceptación propuestas para T32
+### 2.8 Pruebas de aceptación propuestas para T13/E11
 
 La cobertura solo podrá elevarse a IMPLEMENTADO cuando exista evidencia reproducible de, al menos:
 
 | Caso | Inyección/condición | Aserción obligatoria |
 |---|---|---|
-| T32-01 | Fallo estructural en preflight | Evento durable con fase `preflight`; cero resultados científicos publicados |
-| T32-02 | Fallo durante lectura | Código/fase correctos; lote abortado; sin resultados parciales |
-| T32-03 | Huella inconsistente | `METHOD_FINGERPRINT_MISMATCH`; no se publica evidencia |
-| T32-04 | Fallo durante persistencia científica | Rollback completo de resultados y evento operacional durable independiente |
-| T32-05 | Repetición de escritura del mismo `execution_id` | Una sola identidad/evento, sin duplicación |
-| T32-06 | Dos intentos concurrentes del mismo lote | Intentos distinguibles; ningún evento se sobrescribe |
-| T32-07 | Reinicio del proceso tras registrar aborto | Evento recuperable desde un nuevo proceso/sesión |
-| T32-08 | Fallo del destino operacional primario | Contingencia ejecutada o fallo crítico explícito; nunca afirmar durabilidad no confirmada |
-| T32-09 | Diagnóstico con secretos simulados | Secretos redactados; campos de identidad y clasificación preservados |
-| T32-10 | Código/fase fuera del catálogo | Rechazo controlado; no persistir categoría dinámica |
-| T32-11 | Conflicto de hash/identidad | Detención y señal de integridad; sin sobrescritura |
-| T32-12 | Restauración/recuperación | Operador puede localizar evento, leer diagnóstico permitido y reconstruir el intento |
+| T13-01 | Fallo estructural en preflight | Evento durable con fase `preflight`; cero resultados científicos publicados |
+| T13-02 | Fallo durante lectura | Código/fase correctos; lote abortado; sin resultados parciales |
+| T13-03 | Huella inconsistente | `METHOD_FINGERPRINT_MISMATCH`; no se publica evidencia |
+| T13-04 | Fallo durante persistencia científica | Rollback completo de resultados y evento operacional durable independiente |
+| T13-05 | Repetición de escritura del mismo `execution_id` | Una sola identidad/evento, sin duplicación |
+| T13-06 | Dos intentos concurrentes del mismo lote | Intentos distinguibles; ningún evento se sobrescribe |
+| T13-07 | Reinicio del proceso tras registrar aborto | Evento recuperable desde un nuevo proceso/sesión |
+| T13-08 | Fallo del destino operacional primario | Contingencia ejecutada o fallo crítico explícito; nunca afirmar durabilidad no confirmada |
+| T13-09 | Diagnóstico con secretos simulados | Secretos redactados; campos de identidad y clasificación preservados |
+| T13-10 | Código/fase fuera del catálogo | Rechazo controlado; no persistir categoría dinámica |
+| T13-11 | Conflicto de hash/identidad | Detención y señal de integridad; sin sobrescritura |
+| T13-12 | Restauración/recuperación | Operador puede localizar evento, leer diagnóstico permitido y reconstruir el intento |
+
+| T13-13 | Terminación abrupta del runner antes del manejador: matar el proceso después de crear identidad/heartbeat y antes de registrar el aborto; reiniciar el reconciliador y leer desde una sesión nueva | El reconciliador detecta el intento abandonado; solo registra el evento cuando la evidencia permite clasificarlo; no inventa código/fase. Si la causa no puede determinarse, conserva estado no confirmado y escala |
+| T13-14 | Escritura confirmada internamente por el destino primario, pero respuesta perdida por el cliente; repetir/reconciliar usando el mismo `execution_id` | La reconciliación devuelve el evento ya persistido: una sola entrada, sin duplicación ni falsa clasificación de fallo; no crear otro intento hasta resolver el estado anterior |
+| T13-15 | Simular indisponibilidad simultánea del destino primario y del canal de contingencia | Exponer `ABORT_RECORD_UNCONFIRMED`, detener nuevos lotes y no declarar durabilidad/auditoría completa; preservar evidencia local solo como mejor esfuerzo, alertar y exigir recuperación/intervención; no inventar un evento durable |
 
 Los tests deben probar el evento desde un contexto de lectura nuevo y después del límite transaccional relevante. Una aserción sobre retorno de función, stdout o exit code no demuestra durabilidad.
 
@@ -227,7 +252,7 @@ Este diseño no elige Supabase, PostgreSQL, GitHub Actions artifacts, almacenami
 
 Aun entonces, `n_required_power` continúa siendo informativo en PR D v1, no un gate.
 
-### T32 puede pasar de PARCIAL a IMPLEMENTADO solo cuando:
+### T13/E11 puede pasar de PARCIAL a IMPLEMENTADO solo cuando:
 
 - la arquitectura de almacenamiento/contingencia haya sido elegida y revisada;
 - la independencia del rollback esté demostrada;
