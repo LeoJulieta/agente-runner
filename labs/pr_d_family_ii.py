@@ -260,6 +260,11 @@ def evaluate_reproducibility(
     b_gates_pass: bool,
 ) -> dict[str, Any]:
     """Apply conservative A/B reproducibility rules without persistence."""
+    # bool subclasses/coercions are deliberately rejected: only literal bool is valid.
+    if any(type(value) is not bool for value in (
+        windows_disjoint, direction_consistent, b_gates_pass
+    )):
+        raise ValueError("reproducibility_flags_must_be_booleans")
     if b_status in {"INVALID", "INSUFFICIENT_POWER"}:
         return _repro(b_status, False, "not_evaluable", "b_precedence_status")
     if b_status == "RECHAZA":
