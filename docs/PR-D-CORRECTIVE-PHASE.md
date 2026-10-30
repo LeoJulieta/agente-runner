@@ -16,19 +16,19 @@ Resolver la divergencia de versionado entre las líneas documentales (#90/#107/#
 2. Incorporar la candidatura v3 E6–E12 sin promoverla a normativa.
 3. Actualizar matriz para diferenciar pruebas implementadas, cobertura parcial y límites.
 4. Incorporar módulos puros/sintéticos: parser temporal, constructor de cohorte y estimador Familia II HC3.
-5. Agregar E2E completo: respuesta YouTube simulada → extracción `snippet.publishedAt` → captura → ventana 3–6h → cohorte → Familia II.
-6. Mantener prueba PostgreSQL efímera para compare-and-set y concurrencia.
+5. E2E sintético: recurso YouTube simulado → `snippet.publishedAt` y `statistics.viewCount` asociados al `video_id` exacto → captura → ventana 3–6h → cohorte → Familia II. El fixture incluye un recurso señuelo para verificar la asociación por identidad.
+6. Mantener prueba PostgreSQL efímera para compare-and-set y concurrencia.\n7. Añadir tests deterministas parciales E6/E7/E10 para antecedentes A, precedencia de estados y tabla de drift. E8, E9 y E11/T13 permanecen expresamente pendientes.
 
 ## Aceptación verificable
-- Tests temporales y de exclusiones pasan.
-- E2E suficiente devuelve `ESTIMABLE` con HC3 y conteos esperados.
+- Tests temporales y de exclusiones pasan (21 tests).\n- Tests sintéticos E6/E7/E10 pasan (20 tests); cobertura parcial, no cierre contractual.
+- E2E suficiente devuelve `ESTIMABLE` con HC3 y conteos esperados; el outcome procede del `statistics.viewCount` del video esperado.
 - E2E insuficiente devuelve `INSUFFICIENT_POWER` y `bh_input_p=1.0`.
 - PostgreSQL efímero demuestra un solo escritor confirmado.
 - CI exige `execution_status == fixture`.
 - Diff sin cambios al contrato v2 ni al manifiesto.
 
 ## Límites
-Sin YouTube real, secretos, publicación, Supabase, productor privado, migraciones, RPC, workflows productivos ni ejecución científica. PostgreSQL es efímero y no certifica Supabase de producción. Primera escritura confirmada no significa captura cronológicamente más temprana.
+Sin YouTube real, secretos, publicación, Supabase, productor privado, migraciones, RPC, workflows productivos ni ejecución científica. E8 (Familia I/separación), E9 (potencia informativa) y E11/T13 (registro operativo durable) no se implementan ni se declaran cerrados. PostgreSQL es efímero y no certifica Supabase de producción. Primera escritura confirmada no significa captura cronológicamente más temprana.
 
 ## Cierre
 El resultado es un PR Draft revisable con diffs y checks. No se fusiona ni cambia la autoridad contractual. Promoción v3 e integración productiva requieren autorización separada.
