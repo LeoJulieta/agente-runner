@@ -16,6 +16,7 @@ from labs.pr_d_sync_contract import (
     ObservationExcluded,
     YouTubeReadError,
     evaluate_sync_window,
+    exclusion_record,
     extract_published_at,
     parse_sync_captured_at,
     publication_datetime_ushuaia,
@@ -93,6 +94,10 @@ def test_sync_t26b_missing_or_malformed_published_at_is_row_level_exclusion(valu
     with pytest.raises(ObservationExcluded) as exc:
         extract_published_at(youtube_resource(value), expected_video_id=VIDEO_ID)
     assert exc.value.code == expected_code
+    assert exclusion_record("fixture-row-1", exc.value) == {
+        "candidate_id": "fixture-row-1",
+        "reasons": [expected_code],
+    }
 
 
 def test_sync_t26b_api_failure_is_not_mislabeled_as_missing_timestamp():
@@ -185,3 +190,12 @@ def test_sync_e2e_b_valid_but_insufficient_synthetic_cohort_returns_insufficient
     assert result["status"] == "INSUFFICIENT_POWER"
     assert result["metrics"]["insufficient_power_reason"] == "n_eff_below_minimum"
     assert result["bh_input_p"] == 1.0
+
+
+def test_sync_t34_non_public_video_is_excluded_with_identity_and_cause():
+    with pytest.raises(ObservationExcluded) as exc:
+        extract_published_at(youtube_resource(privacy="unlisted"), expected_video_id=VIDEO_ID)
+    assert exclusion_record("fixture-row-2", exc.value) == {
+        "candidate_id": "fixture-row-2",
+        "reasons": ["VIDEO_NOT_PUBLIC"],
+    }
