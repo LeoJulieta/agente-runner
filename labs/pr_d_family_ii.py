@@ -51,7 +51,7 @@ def fit_ols_log_positive_hc3(
         eligible = np.ones(y_all.size, dtype=bool)
     else:
         eligible = np.asarray(list(eligible_mask))
-        if eligible.ndim != 1 or eligible.size != y_all.size or not np.isin(eligible, [True, False]).all():
+        if eligible.ndim != 1 or eligible.size != y_all.size or eligible.dtype.kind != "b":
             raise ValueError("ols_eligibility_mask_invalid")
         eligible = eligible.astype(bool, copy=False)
     y_eligible = y_all[eligible]
