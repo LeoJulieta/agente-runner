@@ -75,7 +75,21 @@ Fuentes oficiales:
 
 **Propuesta técnica para evaluación, no decisión ya aprobada:** recuperar y persistir el timestamp de YouTube en un campo explícito, manteniendo separado el momento de registro de Supabase. Validar la semántica para los estados de privacidad usados por el agente antes de convertirlo en ancla contractual.
 
-## 7. Contraste contractual y bloqueos
+## 7. Hallazgo adicional: derivación de `hora_publicacion` en H001/H002
+
+En la rama `fix/pr-d-inference-block-2`:
+
+- `labs/hypotheses/H001.yaml` y `H002.yaml` definen `hora_publicacion` con `source: created_at`, `subtract_hours_from_column: hs_al_publicar_al_sync`, `tz_offset_hours: -3` y `extract: hour`.
+- `labs/variable_catalog.yaml` repite esa derivación mediante `optional_subtract_column: hs_al_publicar_al_sync`.
+- Sin embargo, el productor de `hs_al_publicar_al_sync` en `sincronizar_metricas()` lo calcula como `(now_utc - created_at)`, es decir, duración transcurrida desde `created_at` hasta el momento del sync; no es un timestamp ni una duración calculada desde un `publishedAt` independiente.
+
+**Incoherencia semántica confirmada:** restar a `created_at` una duración que ya fue calculada como `sync_now - created_at` no reconstruye la hora real de publicación. La operación resultante equivale a `2 * created_at - sync_now` en términos temporales, no a `publishedAt`. Además, el código inspeccionado no persiste el timestamp de sincronización utilizado en ese cálculo.
+
+**Impacto potencial:** las variables `hora_publicacion` de H001/H002 podrían estar derivándose desde un ancla temporal incorrecta. No se cuantificó el efecto sobre filas históricas porque esta auditoría no leyó registros reales de Supabase.
+
+**Acción requerida:** bloquear cualquier interpretación de H001/H002 como medición válida de hora real de publicación hasta definir una fuente temporal coherente y auditar el cálculo histórico. No corregir retrospectivamente ni recalcular filas sin una decisión contractual y un plan de migración/reproducibilidad aprobado.
+
+## 8. Contraste contractual y bloqueos
 
 | Tema | Contrato / arquitectura PR D | Productor actual | Estado |
 |---|---|---|---|
@@ -96,7 +110,7 @@ Fuentes oficiales:
 5. **Write-once:** decidir y probar protección atómica frente a sincronizadores concurrentes; no asumir que el control Python actual basta.
 6. **Derivaciones:** revisar `variable_catalog.yaml` y H001/H002, que derivan variables horarias desde `created_at` y contemplan `hs_al_publicar_al_sync`. Confirmar que la resta temporal y el significado de esa duración son coherentes con el ancla finalmente elegida.
 
-## 8. Límites y siguiente etapa
+## 9. Límites y siguiente etapa
 
 - Este informe es evidencia de auditoría estática; no modifica el contrato ni resuelve por sí mismo las decisiones anteriores.
 - PR #110 aporta un constructor sintético configurable, pero no conecta el productor privado, el sincronizador ni el motor real con Familia II.
