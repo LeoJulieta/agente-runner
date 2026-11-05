@@ -1,0 +1,27 @@
+name: PR D v2 characterization tests
+
+on:
+  pull_request:
+    paths:
+      - "tests/pr_d_v2/**"
+      - "labs/lab_engine.py"
+      - "labs/hypotheses/H003.yaml"
+      - "labs/hypotheses/H005.yaml"
+      - ".github/workflows/lab_batch.yml"
+      - ".github/workflows/pr-d-characterization.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  characterize-contract-risks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run static characterization tests
+        run: python -m unittest discover -s tests/pr_d_v2 -v
