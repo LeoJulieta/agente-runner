@@ -83,6 +83,7 @@ def test_schema_types_and_legacy_rows(disposable_database):
         """, (row_id,)).fetchone()
     assert columns["id"] == "bigint"
     assert columns["youtube_video_id"] == "text"
+    assert columns["views_primeras_3h"] == "numeric"
     assert columns["published_at"] == "timestamp with time zone"
     assert columns["sync_captured_at"] == "timestamp with time zone"
     assert stored == (123, None, None)
@@ -92,7 +93,7 @@ def test_capture_rpc_is_executable_only_by_service_role(disposable_database):
     row_id = insert_video(disposable_database, "service-role-video")
     signature = (
         "pr_d_test.pr_d_capture_views_once("
-        "bigint,text,integer,timestamp with time zone,timestamp with time zone)"
+        "bigint,text,numeric,timestamp with time zone,timestamp with time zone)"
     )
     with psycopg.connect(disposable_database) as conn:
         privileges = conn.execute(
@@ -279,3 +280,31 @@ def test_two_concurrent_cas_writers_have_exactly_one_winner(disposable_database)
             SELECT views_primeras_3h FROM pr_d_test.youtube_shorts_log WHERE id = %s
         """, (row_id,)).fetchone()[0]
     assert stored in (100, 200)
+
+
+def test_uint64_view_count_round_trips_without_integer_overflow(disposable_database):
+    row_id = insert_video(disposable_database, "uint64-video")
+    maximum = 18446744073709551615
+    with psycopg.connect(disposable_database) as conn:
+        captured = conn.execute("""
+            SELECT pr_d_test.pr_d_capture_views_once(
+                %s, %s, %s::numeric, %s::timestamptz, %s::timestamptz
+            )
+        """, (row_id, "uint64-video", str(maximum),
+              "2026-10-30T02:30:00Z", "2026-10-30T05:30:00Z")).fetchone()[0]
+        stored = conn.execute(
+            "SELECT views_primeras_3h FROM pr_d_test.youtube_shorts_log WHERE id = %s",
+            (row_id,),
+        ).fetchone()[0]
+    assert captured is True
+    assert stored == maximum
+
+
+def test_view_count_above_uint64_is_rejected_by_constraint(disposable_database):
+    with psycopg.connect(disposable_database) as conn:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute("""
+                INSERT INTO pr_d_test.youtube_shorts_log
+                    (youtube_video_id, views_primeras_3h)
+                VALUES ('above-uint64', 18446744073709551616)
+            """)
