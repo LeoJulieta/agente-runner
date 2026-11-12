@@ -95,6 +95,17 @@ def test_candidate_ci_keeps_database_image_and_actions_immutable():
 def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     workflow_path = ROOT / ".github" / "workflows" / "pr-d-sandbox-eligibility-schema.yml"
     workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    workflow_events = workflow.get("on", workflow.get(True, {}))
+    push_paths = set(workflow_events.get("push", {}).get("paths", []))
+    required_http_dependencies = {
+        "tests/e2e/bootstrap_pr_d_postgrest.py",
+        "tests/e2e/test_pr_d_postgrest_isolated_http.py",
+        "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql",
+        "supabase/migrations/004_pr_d_v2_atomic_persistence.sql",
+    }
+    assert required_http_dependencies <= push_paths, (
+        "every disposable PostgREST E2E dependency must trigger the workflow"
+    )
     job = workflow["jobs"].get("postgrest-http-disposable")
     assert job is not None, "isolated PostgREST HTTP job must remain explicit"
     assert "postgres" in job.get("services", {}), "HTTP job must own its disposable PostgreSQL service"
