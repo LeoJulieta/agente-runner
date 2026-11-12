@@ -84,8 +84,37 @@ Cada corrida validará como mínimo:
 `n_total` contará los registros candidatos recuperados antes de aplicar
 filtros analíticos. `n_eff` contará las observaciones efectivamente
 elegibles para el análisis después de aplicar todos los filtros
-preregistrados, incluido el filtro de sincronización de 3--6 horas
-cuando corresponda.
+preregistrados, incluido el filtro de sincronización alrededor de las 3 horas
+cuando corresponda: intervalo cerrado de 2 h 55 min a 3 h 05 min (3 h ± 5 min).
+
+### 16.8 E12 — Outcome acumulado observado alrededor de las 3 horas
+
+Esta regla es una enmienda candidata de semántica del outcome y elegibilidad
+temporal; por alterar la población analítica y la interpretación de resultados,
+debe permanecer en el candidato PR D v3.0 y exige una nueva huella
+`method_fingerprint`. No modifica el contrato PR D v2 vigente en `main`.
+
+El outcome `views_primeras_3h` representa el valor acumulado de
+`statistics.viewCount` observado en un único instante entre 2 h 55 min y
+3 h 05 min después de `publishedAt`. No representa una suma de vistas
+ocurridas exclusivamente dentro de un intervalo exacto de tres horas ni
+un valor extrapolado. Se conservarán `published_at` y
+`sync_captured_at` para auditar el instante y el tiempo transcurrido
+exactos.
+
+La ventana de elegibilidad es cerrada en ambos extremos:
+`publishedAt + 2 h 55 min <= sync_captured_at <= publishedAt + 3 h 05 min`.
+Las capturas fuera de ese intervalo se excluyen antes del análisis y no
+se corrigen ni extrapolan. La misma regla se aplica a las ventanas A y B,
+salvo que una futura versión contractual preregistre expresamente otra
+regla antes de observar resultados.
+
+La configuración y procedencia de la cohorte deberán registrar el límite
+inferior (10 500 segundos), el superior (11 100 segundos), ambos
+inclusivos, y la política de exclusión de capturas ausentes. El
+`method_fingerprint` deberá incorporar estos límites, inclusividad,
+ancla temporal y política de datos faltantes; no basta con registrar
+solo el nombre del outcome.
 
 Para Familia II se registrará `n_events`, cantidad de observaciones
 elegibles con `Y > 0`. `n_eff` y `n_events` no son intercambiables: una
