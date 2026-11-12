@@ -207,7 +207,6 @@ $function$;
 
 DO $capture_owner_transfer$
 BEGIN
-    EXECUTE format('GRANT pr_d_capture_writer TO %I WITH ADMIN OPTION', current_user);
     EXECUTE 'ALTER FUNCTION public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz) OWNER TO pr_d_capture_writer';
     EXECUTE format('REVOKE pr_d_capture_writer FROM %I', current_user);
 END;
