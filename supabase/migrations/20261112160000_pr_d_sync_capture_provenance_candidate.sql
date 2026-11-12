@@ -160,6 +160,14 @@ CREATE TRIGGER youtube_shorts_log_capture_write_guard
     FOR EACH ROW EXECUTE FUNCTION public.pr_d_guard_capture_write();
 REVOKE ALL ON FUNCTION public.pr_d_guard_capture_write() FROM PUBLIC, anon, authenticated, service_role;
 
+-- Temporarily grant the migration executor membership so CREATE OR REPLACE
+-- remains replayable after the function has been transferred to the owner role.
+DO $capture_owner_membership$
+BEGIN
+    EXECUTE format('GRANT pr_d_capture_writer TO %I WITH ADMIN OPTION', current_user);
+END;
+$capture_owner_membership$;
+
 -- Remove the earlier int32 overload from this candidate if the migration is replayed.
 DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, integer, timestamptz, timestamptz);
 
