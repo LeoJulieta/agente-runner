@@ -75,12 +75,12 @@ DECLARE
 BEGIN
     SELECT oid INTO v_role_oid FROM pg_roles WHERE rolname = 'pr_d_capture_writer';
     IF v_role_oid IS NULL THEN
-        EXECUTE 'CREATE ROLE pr_d_capture_writer NOLOGIN NOINHERIT BYPASSRLS';
+        EXECUTE 'CREATE ROLE pr_d_capture_writer NOLOGIN NOINHERIT';
     ELSE
         IF EXISTS (
             SELECT 1 FROM pg_roles
             WHERE oid = v_role_oid
-              AND (rolcanlogin OR rolinherit OR NOT rolbypassrls)
+              AND (rolcanlogin OR rolinherit OR rolbypassrls)
         ) OR EXISTS (
             SELECT 1 FROM pg_auth_members
             WHERE roleid = v_role_oid OR member = v_role_oid
@@ -96,6 +96,12 @@ GRANT USAGE ON SCHEMA public TO pr_d_capture_writer;
 GRANT SELECT ON public.youtube_shorts_log TO pr_d_capture_writer;
 GRANT UPDATE (views_primeras_3h, published_at, sync_captured_at)
     ON public.youtube_shorts_log TO pr_d_capture_writer;
+DROP POLICY IF EXISTS pr_d_capture_writer_select ON public.youtube_shorts_log;
+CREATE POLICY pr_d_capture_writer_select
+    ON public.youtube_shorts_log FOR SELECT TO pr_d_capture_writer USING (true);
+DROP POLICY IF EXISTS pr_d_capture_writer_update ON public.youtube_shorts_log;
+CREATE POLICY pr_d_capture_writer_update
+    ON public.youtube_shorts_log FOR UPDATE TO pr_d_capture_writer USING (true) WITH CHECK (true);
 GRANT CREATE ON SCHEMA public TO pr_d_capture_writer;
 
 -- The guard preserves old rows and unrelated updates, but rejects every new
