@@ -1,11 +1,11 @@
 # PR-D-DESIGN-V3-CANDIDATE.md — PR D v3.0 (candidato no aprobado)
 
 **Base contractual vigente:** PR D v2 (E1–E5, congelado en `main`).  
-**Candidato de esta rama:** E6–E11; por alterar semántica de estados/reproducibilidad, se propone evaluación como versión mayor PR D v3.0, no como v2.1. La propuesta no está aprobada ni vigente.
+**Candidato de esta rama:** E6–E12; por alterar semántica de estados, reproducibilidad y elegibilidad del outcome, se propone evaluación como versión mayor PR D v3.0, no como v2.1. La propuesta no está aprobada ni vigente.
 
 **Fecha de congelamiento:** 2026-10-09
 
-**Estado:** PR D v2 (E1–E5) es la base contractual aprobada y vigente en `main` mediante PR #75. Las enmiendas E6–E11 de este documento siguen siendo una candidatura v3.0 no aprobada ni vigente; la implementación del motor no está autorizada.
+**Estado:** PR D v2 (E1–E5) es la base contractual aprobada y vigente en `main` mediante PR #75. Las enmiendas E6–E12 de este documento siguen siendo una candidatura v3.0 no aprobada ni vigente; la implementación del motor no está autorizada.
 **Alcance:** diseño estadístico y operativo previo a implementación\
 **Principio rector:** evidencia primero. Ninguna regla estadística podrá
 modificarse después de observar los resultados para favorecer una
