@@ -28,7 +28,8 @@ CREATE TABLE public.lab_results (
 );
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.lab_results TO service_role;
+ALTER TABLE public.lab_results ENABLE ROW LEVEL SECURITY;
+GRANT ALL PRIVILEGES ON public.lab_results TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.lab_results_id_seq TO service_role;
 
 -- The caller runs this bootstrap, then applies migration 004 and reloads PostgREST.
@@ -51,5 +52,6 @@ CREATE TABLE public.youtube_shorts_log (
     youtube_video_id text NOT NULL,
     views_primeras_3h integer
 );
-GRANT SELECT, INSERT, UPDATE ON TABLE public.youtube_shorts_log TO service_role;
+ALTER TABLE public.youtube_shorts_log ENABLE ROW LEVEL SECURITY;
+GRANT ALL PRIVILEGES ON TABLE public.youtube_shorts_log TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.youtube_shorts_log_id_seq TO service_role;
