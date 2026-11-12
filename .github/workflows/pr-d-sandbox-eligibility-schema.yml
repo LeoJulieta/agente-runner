@@ -50,6 +50,7 @@ jobs:
           --health-retries 12
     env:
       DATABASE_URL: postgresql://prd_test:prd_test@localhost:5432/prd_test
+      PR_D_DISPOSABLE_DATABASE: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
