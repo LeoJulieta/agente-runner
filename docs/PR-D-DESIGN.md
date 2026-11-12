@@ -1,10 +1,10 @@
 # PR-D-DESIGN.md
 
-**Versión contractual:** PR D v2 (contrato documental aprobado; incorpora E1–E5)
+**Versión contractual:** PR D v2.1 (enmienda candidata de sincronización; sandbox, pendiente de promoción)
 
 **Fecha de congelamiento:** 2026-10-09
 
-**Estado:** contrato documental aprobado y fusionado en `main` mediante PR #75; implementación del motor aún no autorizada
+**Estado:** PR D v2 sigue siendo la referencia aprobada en `main` mediante PR #75. Esta rama propone la enmienda v2.1; no está fusionada ni autoriza implementación de producción.
 **Alcance:** diseño estadístico y operativo previo a implementación\
 **Principio rector:** evidencia primero. Ninguna regla estadística podrá
 modificarse después de observar los resultados para favorecer una
@@ -83,8 +83,8 @@ Cada corrida validará como mínimo:
 `n_total` contará los registros candidatos recuperados antes de aplicar
 filtros analíticos. `n_eff` contará las observaciones efectivamente
 elegibles para el análisis después de aplicar todos los filtros
-preregistrados, incluido el filtro de sincronización de 3--6 horas
-cuando corresponda.
+preregistrados, incluido el filtro de sincronización alrededor de las 3 horas
+cuando corresponda: intervalo cerrado de 2 h 55 min a 3 h 05 min (3 h ± 5 min).
 
 Para Familia II se registrará `n_events`, cantidad de observaciones
 elegibles con `Y > 0`. `n_eff` y `n_events` no son intercambiables: una
