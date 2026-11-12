@@ -23,6 +23,7 @@ from labs.pr_d_sync_contract import (
 
 YOUTUBE_VIDEOS_LIST_URL = "https://www.googleapis.com/youtube/v3/videos"
 UINT64_MAX = (1 << 64) - 1
+MAX_RESPONSE_BYTES = 1024 * 1024
 _VIEW_COUNT_RE = re.compile(r"^[0-9]+$")
 
 
@@ -112,8 +113,10 @@ def collect_public_video_observation(
     )
     try:
         with opener(request, timeout=timeout_seconds) as response:
-            body = response.read()
+            body = response.read(MAX_RESPONSE_BYTES + 1)
         captured_at = clock()
+        if len(body) > MAX_RESPONSE_BYTES:
+            raise YouTubeReadError("youtube_api_response_too_large")
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         raise YouTubeReadError(f"youtube_api_transport_error:{type(exc).__name__}") from None
 
