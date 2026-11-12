@@ -163,6 +163,9 @@ jobs:
           python-version: "3.12"
       - name: Install isolated integration test runner
         run: python -m pip install --disable-pip-version-check pytest==8.3.5
+      - name: Compile the actual private YouTube sync modules
+        working-directory: private-agent
+        run: python -m compileall -q pr_d_sync_contract.py pr_d_youtube_collector.py pr_d_youtube_sync.py youtube_shorts_agent.py
       - name: Test the actual private sync adapter without production credentials
         working-directory: private-agent
         run: python -m pytest -q test_pr_d_youtube_sync_integration.py
