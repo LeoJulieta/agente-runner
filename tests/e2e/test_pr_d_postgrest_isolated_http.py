@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 import time
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
 
 import psycopg
@@ -34,7 +34,7 @@ def _assert_disposable_target():
     assert DISPOSABLE_MARKER == "1", "disposable_database_opt_in_required"
     assert API_URL, "local_postgrest_url_required"
     assert JWT_SECRET and len(JWT_SECRET.encode("utf-8")) >= 32, "test_only_jwt_secret_required"
-    api_host = __import__("urllib.parse", fromlist=["urlparse"]).urlparse(API_URL).hostname
+    api_host = urlparse(API_URL).hostname
     assert api_host in ALLOWED_HOSTS, "postgrest_api_must_be_loopback"
     params = conninfo_to_dict(DATABASE_URL)
     hosts = params.get("host", "").split(",")
@@ -108,8 +108,7 @@ def disposable_postgrest_database():
     last_error = None
     for _ in range(40):
         try:
-            status, _ = _request("POST", "/rpc/rpc_insert_baseline_and_evidence",
-                                payload=_payload("E2E_POSTGREST_READY", "readiness-probe"))
+            status, _ = _request("GET", "/")
             if status in {200, 400, 401, 403}:
                 break
         except (URLError, TimeoutError) as exc:
