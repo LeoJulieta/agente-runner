@@ -8,18 +8,18 @@ DECLARE
 BEGIN
     SELECT oid INTO v_role_oid FROM pg_roles WHERE rolname = 'pr_d_lab_results_writer';
     IF v_role_oid IS NULL THEN
-        EXECUTE 'CREATE ROLE pr_d_lab_results_writer NOLOGIN NOINHERIT BYPASSRLS';
+        EXECUTE 'CREATE ROLE pr_d_lab_results_writer NOLOGIN NOINHERIT';
     ELSE
         IF EXISTS (
             SELECT 1 FROM pg_roles
             WHERE oid = v_role_oid
-              AND (rolcanlogin OR rolinherit OR NOT rolbypassrls)
+              AND (rolcanlogin OR rolinherit OR rolbypassrls)
         ) OR EXISTS (
             SELECT 1 FROM pg_auth_members
             WHERE roleid = v_role_oid OR member = v_role_oid
         ) THEN
             RAISE EXCEPTION
-                'prd_lab_results_writer_role_misconfigured: dedicated role must be NOLOGIN, NOINHERIT, BYPASSRLS, and have no memberships';
+                'prd_lab_results_writer_role_misconfigured: dedicated role must be NOLOGIN, NOINHERIT, without BYPASSRLS, and have no memberships';
         END IF;
     END IF;
 END;
@@ -28,6 +28,12 @@ $writer_role$;
 GRANT USAGE ON SCHEMA public TO pr_d_lab_results_writer;
 GRANT SELECT, INSERT ON public.lab_results TO pr_d_lab_results_writer;
 GRANT USAGE, SELECT ON SEQUENCE public.lab_results_id_seq TO pr_d_lab_results_writer;
+DROP POLICY IF EXISTS pr_d_lab_results_writer_select ON public.lab_results;
+CREATE POLICY pr_d_lab_results_writer_select
+    ON public.lab_results FOR SELECT TO pr_d_lab_results_writer USING (true);
+DROP POLICY IF EXISTS pr_d_lab_results_writer_insert ON public.lab_results;
+CREATE POLICY pr_d_lab_results_writer_insert
+    ON public.lab_results FOR INSERT TO pr_d_lab_results_writer WITH CHECK (true);
 GRANT CREATE ON SCHEMA public TO pr_d_lab_results_writer;
 
 -- TRUNCATE bypasses the existing row-level DELETE protection trigger.
