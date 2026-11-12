@@ -484,11 +484,13 @@ def test_two_concurrent_cas_writers_have_exactly_one_winner(disposable_database)
     assert sum(results) == 1
     with psycopg.connect(disposable_database) as conn:
         stored = conn.execute("""
-            SELECT views_primeras_3h, hs_al_publicar_al_sync
+            SELECT views_primeras_3h, elapsed_seconds_e12,
+                   hs_al_publicar_al_sync
             FROM pr_d_test.youtube_shorts_log WHERE id = %s
         """, (row_id,)).fetchone()
     assert stored[0] in (100, 200)
-    assert stored[1] == Decimal("3.0000000000000000")
+    assert stored[1] == Decimal("10800.000000")
+    assert stored[2] is None
 
 
 def test_uint64_view_count_round_trips_without_integer_overflow(disposable_database):
