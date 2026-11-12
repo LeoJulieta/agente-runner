@@ -33,7 +33,7 @@ CREATE TABLE pr_d_internal.e12_collector_key_registry (
     key_id text PRIMARY KEY CHECK (key_id ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'),
     algorithm text NOT NULL CHECK (algorithm = 'Ed25519'),
     public_key_spki_base64 text NOT NULL
-        CHECK (public_key_spki_base64 ~ '^[A-Za-z0-9+/]{58}==$'),
+        CHECK (public_key_spki_base64 ~ '^[A-Za-z0-9+/]{59}=$'),
     status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revoked')),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     revoked_at timestamptz,
@@ -260,7 +260,7 @@ BEGIN
        OR p_collector_response_sha256 IS NULL
        OR p_collector_requested_ids_sha256 IS NULL
        OR p_collector_build IS NULL
-       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{58}==$'
+       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{59}=$'
        OR length(decode(p_collector_public_key_spki_base64, 'base64')) <> 44
        OR p_collector_payload_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_signature !~ '^[A-Za-z0-9+/]{86}==$'
@@ -542,7 +542,7 @@ BEGIN
        OR p_attestation_version IS DISTINCT FROM 'e12-observation-attestation/v1'
        OR p_attestation_algorithm IS DISTINCT FROM 'Ed25519'
        OR p_collector_key_id IS NULL
-       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{58}==$'
+       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{59}=$'
        OR length(decode(p_collector_public_key_spki_base64, 'base64')) <> 44
        OR p_collector_payload_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_signature !~ '^[A-Za-z0-9+/]{86}==$'
@@ -823,7 +823,7 @@ BEGIN
        OR p_attestation_version IS DISTINCT FROM 'e12-observation-attestation/v1'
        OR p_attestation_algorithm IS DISTINCT FROM 'Ed25519'
        OR p_collector_key_id IS NULL
-       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{58}==$'
+       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{59}=$'
        OR length(decode(p_collector_public_key_spki_base64, 'base64')) <> 44
        OR p_collector_payload_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_signature !~ '^[A-Za-z0-9+/]{86}==$'
@@ -1104,7 +1104,7 @@ BEGIN
        OR p_attestation_version IS DISTINCT FROM 'e12-observation-attestation/v1'
        OR p_attestation_algorithm IS DISTINCT FROM 'Ed25519'
        OR p_collector_key_id IS NULL
-       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{58}==$'
+       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{59}=$'
        OR length(decode(p_collector_public_key_spki_base64, 'base64')) <> 44
        OR p_collector_payload_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_signature !~ '^[A-Za-z0-9+/]{86}==$'
@@ -1385,7 +1385,7 @@ BEGIN
        OR p_attestation_version IS DISTINCT FROM 'e12-observation-attestation/v1'
        OR p_attestation_algorithm IS DISTINCT FROM 'Ed25519'
        OR p_collector_key_id IS NULL
-       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{58}==$'
+       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{59}=$'
        OR length(decode(p_collector_public_key_spki_base64, 'base64')) <> 44
        OR p_collector_payload_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_signature !~ '^[A-Za-z0-9+/]{86}==$'
@@ -1667,7 +1667,7 @@ BEGIN
        OR p_attestation_version IS DISTINCT FROM 'e12-observation-attestation/v1'
        OR p_attestation_algorithm IS DISTINCT FROM 'Ed25519'
        OR p_collector_key_id IS NULL
-       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{58}==$'
+       OR p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{59}=$'
        OR length(decode(p_collector_public_key_spki_base64, 'base64')) <> 44
        OR p_collector_payload_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_signature !~ '^[A-Za-z0-9+/]{86}==$'
