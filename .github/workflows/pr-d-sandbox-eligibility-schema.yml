@@ -1,0 +1,57 @@
+name: PR D sandbox eligibility and schema checks
+
+on:
+  push:
+    branches:
+      - sandbox/pr-d-cohort-eligibility-schema-2026-11-12
+    paths:
+      - "labs/pr_d_cohort_builder.py"
+      - "tests/test_pr_d_cohort_builder_eligibility.py"
+      - "tests/integration/test_pr_d_sync_schema_compatibility.py"
+      - "tests/fixtures/pr_d_youtube_shorts_log_schema.sql"
+      - "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
+      - ".github/workflows/pr-d-sandbox-eligibility-schema.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  python-eligibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Run eligibility-first cohort tests
+        run: python -m pytest -q tests/test_pr_d_cohort_builder_eligibility.py
+
+  disposable-postgres-schema:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: prd_test
+          POSTGRES_PASSWORD: prd_test
+          POSTGRES_DB: prd_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prd_test -d prd_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://prd_test:prd_test@localhost:5432/prd_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest "psycopg[binary]"
+      - name: Apply candidate migration to disposable schema and test CAS
+        run: python -m pytest -q tests/integration/test_pr_d_sync_schema_compatibility.py
