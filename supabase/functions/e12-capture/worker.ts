@@ -15,13 +15,6 @@ export type WorkerDependencies = {
   nowEpochSeconds?: () => number;
   randomUUID?: () => string;
   leaseTtlSeconds?: number;
-  attestObservation?: (payload: ObservationAttestationPayload) => Promise<ObservationAttestation>;
-  verifyAttestation?: (
-    payload: ObservationAttestationPayload,
-    attestation: ObservationAttestation,
-    publicKeySpkiBase64: string,
-    hmacSecretBase64: string,
-  ) => Promise<boolean>;
 };
 
 type CandidateRow = {
@@ -306,11 +299,10 @@ export async function handleE12Capture(
   const provenancePublicKey = dependencies.env("E12_PROVENANCE_PUBLIC_KEY_SPKI_B64");
   const provenancePrivateKey = dependencies.env("E12_PROVENANCE_PRIVATE_KEY_PKCS8_B64");
   const provenanceHmacSecret = dependencies.env("E12_PROVENANCE_HMAC_SECRET_B64");
-  const injectedAttestor = Boolean(dependencies.attestObservation && dependencies.verifyAttestation);
   if (!supabaseUrl || !serviceRoleKey || !youtubeApiKey) {
     return jsonResponse(500, { error: "required_worker_secret_missing" });
   }
-  if (!provenanceKeyId || !provenancePublicKey || (!injectedAttestor && (!provenancePrivateKey || !provenanceHmacSecret))) {
+  if (!provenanceKeyId || !provenancePublicKey || !provenancePrivateKey || !provenanceHmacSecret) {
     return jsonResponse(500, { error: "required_provenance_key_missing" });
   }
 
@@ -417,12 +409,17 @@ export async function handleE12Capture(
             requestedVideoIdsSha256: observation.requestedVideoIdsSha256 ?? "",
             collectorBuild: observation.collectorBuild ?? "",
           };
-          const attestation = dependencies.attestObservation
-            ? await dependencies.attestObservation(payload)
-            : await createObservationAttestation(payload, provenancePrivateKey!, provenanceHmacSecret!);
-          const signatureValid = dependencies.verifyAttestation
-            ? await dependencies.verifyAttestation(payload, attestation, provenancePublicKey, provenanceHmacSecret ?? "")
-            : await verifyObservationAttestation(payload, attestation, provenancePublicKey, provenanceHmacSecret!);
+          const attestation = await createObservationAttestation(
+            payload,
+            provenancePrivateKey,
+            provenanceHmacSecret,
+          );
+          const signatureValid = await verifyObservationAttestation(
+            payload,
+            attestation,
+            provenancePublicKey,
+            provenanceHmacSecret,
+          );
           if (!signatureValid) throw new Error("e12_observation_attestation_invalid");
           const didCapture = await persistObservation(
             supabaseUrl,
