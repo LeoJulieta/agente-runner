@@ -103,13 +103,34 @@ Deno.test("non-public videos are excluded, not converted to zero views", () => {
 });
 
 Deno.test("collector rejects unrequested and duplicate video IDs", () => {
-  for (const payload of [
-    { items: [{ id: "other", status: { privacyStatus: "public" }, snippet: { publishedAt: "2026-10-30T02:30:00Z" }, statistics: { viewCount: "1" } }] },
-    { items: [
-      { id: "video-1", status: { privacyStatus: "public" }, snippet: { publishedAt: "2026-10-30T02:30:00Z" }, statistics: { viewCount: "1" } },
-      { id: "video-1", status: { privacyStatus: "public" }, snippet: { publishedAt: "2026-10-30T02:30:00Z" }, statistics: { viewCount: "1" } },
-    ] },
-  ]) {
+  for (
+    const payload of [
+      {
+        items: [{
+          id: "other",
+          status: { privacyStatus: "public" },
+          snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+          statistics: { viewCount: "1" },
+        }],
+      },
+      {
+        items: [
+          {
+            id: "video-1",
+            status: { privacyStatus: "public" },
+            snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+            statistics: { viewCount: "1" },
+          },
+          {
+            id: "video-1",
+            status: { privacyStatus: "public" },
+            snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+            statistics: { viewCount: "1" },
+          },
+        ],
+      },
+    ]
+  ) {
     let threw = false;
     try {
       parseYouTubeVideosResponse(
