@@ -6,6 +6,7 @@ calls, or real observations. All public functions are deterministic and pure.
 from __future__ import annotations
 
 import math
+from numbers import Real
 from typing import Any, Iterable
 
 import numpy as np
@@ -39,8 +40,21 @@ def fit_ols_log_positive_hc3(
     are excluded from the conditional log-positive fit. Therefore n_total is
     candidate count, n_eff eligible-row count, and n_events eligible Y>0 count.
     """
-    y_all = np.asarray(list(outcomes), dtype=np.float64)
-    design_all = np.asarray(list(design_matrix), dtype=np.float64)
+    raw_outcomes = list(outcomes)
+    raw_design = list(design_matrix)
+    if any(isinstance(value, bool) or not isinstance(value, Real) for value in raw_outcomes):
+        raise ValueError("ols_input_numeric_types_invalid")
+    for row in raw_design:
+        if isinstance(row, (str, bytes)):
+            raise ValueError("ols_input_numeric_types_invalid")
+        try:
+            values = list(row)
+        except TypeError as exc:
+            raise ValueError("ols_input_numeric_types_invalid") from exc
+        if any(isinstance(value, bool) or not isinstance(value, Real) for value in values):
+            raise ValueError("ols_input_numeric_types_invalid")
+    y_all = np.asarray(raw_outcomes, dtype=np.float64)
+    design_all = np.asarray([list(row) for row in raw_design], dtype=np.float64)
     if y_all.ndim != 1 or design_all.ndim != 2 or design_all.shape[0] != y_all.size:
         raise ValueError("ols_input_shape_invalid")
     if y_all.size == 0 or not np.isfinite(y_all).all() or not np.isfinite(design_all).all():
@@ -164,8 +178,12 @@ def compute_d_init(
 
 def compute_d_cond(outcomes_a: Iterable[float], outcomes_b: Iterable[float]) -> dict[str, Any]:
     """Compute contract-defined MAD-standardized median shift using Y>0 only."""
-    a = np.asarray(list(outcomes_a), dtype=np.float64)
-    b = np.asarray(list(outcomes_b), dtype=np.float64)
+    raw_a = list(outcomes_a)
+    raw_b = list(outcomes_b)
+    if any(isinstance(value, bool) or not isinstance(value, Real) for value in (*raw_a, *raw_b)):
+        raise ValueError("d_cond_input_numeric_types_invalid")
+    a = np.asarray(raw_a, dtype=np.float64)
+    b = np.asarray(raw_b, dtype=np.float64)
     if a.ndim != 1 or b.ndim != 1 or not np.isfinite(a).all() or not np.isfinite(b).all():
         raise ValueError("d_cond_input_nonfinite_or_shape_invalid")
     if np.any(a < 0) or np.any(b < 0):
