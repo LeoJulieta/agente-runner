@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import json
 import os
 import threading
@@ -20,6 +22,7 @@ PAYLOAD_SHA = "c" * 64
 RESPONSE_SHA = "a" * 64
 REQUESTED_IDS_SHA = "b" * 64
 COLLECTOR_BUILD = "e12-collector/0.1.0"
+HMAC_SECRET = bytes([7]) * 32
 KEY_ID = "e12-test-key"
 
 
@@ -31,7 +34,9 @@ def connect():
 
 def bootstrap():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        conn.execute("DO $$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+        conn.execute("CREATE SCHEMA extensions")
+        conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions")
+        conn.execute("DO $ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
         conn.execute("DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
         conn.execute("DO $$ BEGIN CREATE ROLE service_role NOLOGIN BYPASSRLS; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
         conn.execute("ALTER ROLE service_role BYPASSRLS")
@@ -125,9 +130,9 @@ def prepared_database():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("""
             INSERT INTO pr_d_internal.e12_collector_key_registry(
-                key_id, algorithm, public_key_spki_base64, status
-            ) VALUES (%s, 'Ed25519', %s, 'active')
-        """, (KEY_ID, PUBLIC_KEY))
+                key_id, algorithm, public_key_spki_base64, hmac_secret, status
+            ) VALUES (%s, 'Ed25519', %s, %s, 'active')
+        """, (KEY_ID, PUBLIC_KEY, HMAC_SECRET))
 
 
 def claim(run_id):
@@ -145,18 +150,19 @@ def release(run_id, token):
         return conn.execute("SELECT public.pr_d_release_e12_worker_lease(%s, %s)", (run_id, token)).fetchone()[0]
 
 
-def capture(run_id, token, row_id=1, video_id="video-1"):
+def capture(run_id, token, row_id=1, video_id="video-1", hmac_override=None):
     canonical = canonical_payload(run_id, token, row_id, video_id)
+    hmac_signature = hmac_override or hmac.new(HMAC_SECRET, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
     with connect() as conn:
         return conn.execute(
             """SELECT public.pr_d_capture_views_once(
                 %s,%s,123,%s,%s,%s,%s,
-                'e12-observation-attestation/v1','Ed25519',%s,%s,%s,%s,%s,%s,%s,%s
+                'e12-observation-attestation/v1','Ed25519',%s,%s,%s,%s,%s,%s,%s,%s,%s
             )""",
             (
                 row_id, video_id, PUBLISHED, CAPTURED, run_id, token,
                 KEY_ID, PUBLIC_KEY, canonical, PAYLOAD_SHA, SIGNATURE,
-                RESPONSE_SHA, REQUESTED_IDS_SHA, COLLECTOR_BUILD,
+                hmac_signature, RESPONSE_SHA, REQUESTED_IDS_SHA, COLLECTOR_BUILD,
             ),
         ).fetchone()[0]
 
@@ -226,6 +232,7 @@ def test_revoked_key_is_rejected_and_attestation_columns_are_immutable():
 
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("UPDATE pr_d_internal.e12_collector_key_registry SET status='active', revoked_at=NULL WHERE key_id=%s", (KEY_ID,))
+    assert capture(RUN_A, token, row_id=2, video_id="video-2", hmac_override="0" * 64) is False
     assert capture(RUN_A, token, row_id=2, video_id="video-2") is True
 
     with connect() as conn:
