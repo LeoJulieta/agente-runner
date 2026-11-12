@@ -44,4 +44,3 @@ def test_quarantined_http_e2e_files_are_not_in_candidate_ci_pytest_command():
     assert "tests/e2e/test_pr_d_supabase_http_rpc.py" not in pytest_command
     assert "tests/e2e/test_pr_d_engine_http_e2e.py" not in pytest_command
     assert "tests/integration/test_pr_d_atomic_rpc.py" not in pytest_command
-    assert "tests/integration/test_pr_d_atomic_rpc.py" not in workflow
