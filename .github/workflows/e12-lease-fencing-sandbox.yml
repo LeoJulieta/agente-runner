@@ -59,6 +59,7 @@ jobs:
           supabase migration new e12_worker_lease_fencing
           migration="$(find supabase/migrations -maxdepth 1 -name '*_e12_worker_lease_fencing.sql' -print -quit)"
           test -n "$migration"
+          cmp "$GITHUB_WORKSPACE/supabase/ops/e12_worker_lease_fencing.sql" "$GITHUB_WORKSPACE/supabase/migrations/20261112231203_e12_worker_lease_fencing.sql"
           cp "$GITHUB_WORKSPACE/supabase/migrations/20261112231203_e12_worker_lease_fencing.sql" "$migration"
           test -s "$migration"
           echo "Generated disposable migration path: $migration"
@@ -74,7 +75,8 @@ jobs:
           supabase migration new e12_collector_attestation
           migration="$(find supabase/migrations -maxdepth 1 -name '*_e12_collector_attestation.sql' -print -quit)"
           test -n "$migration"
-          cp "$GITHUB_WORKSPACE/supabase/ops/e12_collector_attestation.sql" "$migration"
+          cmp "$GITHUB_WORKSPACE/supabase/ops/e12_collector_attestation.sql" "$GITHUB_WORKSPACE/supabase/migrations/20261112232558_e12_collector_attestation.sql"
+          cp "$GITHUB_WORKSPACE/supabase/migrations/20261112232558_e12_collector_attestation.sql" "$migration"
           test -s "$migration"
           echo "Generated disposable attestation migration path: $migration"
           sha256sum "$migration"
@@ -84,5 +86,5 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/e12_lease_test
           E12_LEASE_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261112231203_e12_worker_lease_fencing.sql
-          E12_ATTESTATION_SQL_PATH: ${{ github.workspace }}/supabase/ops/e12_collector_attestation.sql
+          E12_ATTESTATION_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261112232558_e12_collector_attestation.sql
         run: python -m pytest -q tests/e12/test_worker_lease_fencing.py
