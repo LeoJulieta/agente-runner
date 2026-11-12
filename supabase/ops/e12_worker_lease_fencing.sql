@@ -36,6 +36,8 @@ CREATE OR REPLACE FUNCTION pr_d_internal.pr_d_claim_e12_worker_lease(p_run_id uu
 RETURNS TABLE(acquired boolean, fencing_token text, lease_expires_at timestamptz)
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, pr_d_internal
+SET statement_timeout = '10s'
+SET lock_timeout = '5s'
 AS $claim$
 DECLARE
     v_claims jsonb;
@@ -60,12 +62,12 @@ BEGIN
     ON CONFLICT (singleton) DO UPDATE
        SET owner_run_id = EXCLUDED.owner_run_id,
            lease_expires_at = EXCLUDED.lease_expires_at,
-           fencing_token = CASE WHEN lease.lease_expires_at <= v_now
+           fencing_token = CASE WHEN lease.lease_expires_at <= clock_timestamp()
                                 THEN lease.fencing_token + 1 ELSE lease.fencing_token END,
            heartbeat_at = v_now,
            updated_at = v_now
-     WHERE (lease.lease_expires_at <= v_now AND lease.fencing_token < 9223372036854775807)
-        OR (lease.owner_run_id = EXCLUDED.owner_run_id AND lease.lease_expires_at > v_now)
+     WHERE (lease.lease_expires_at <= clock_timestamp() AND lease.fencing_token < 9223372036854775807)
+        OR (lease.owner_run_id = EXCLUDED.owner_run_id AND lease.lease_expires_at > clock_timestamp())
     RETURNING lease.fencing_token, lease.lease_expires_at INTO v_token, v_expiry;
 
     IF NOT FOUND THEN
@@ -81,6 +83,8 @@ CREATE OR REPLACE FUNCTION pr_d_internal.pr_d_renew_e12_worker_lease(
 )
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, pr_d_internal
+SET statement_timeout = '10s'
+SET lock_timeout = '5s'
 AS $renew$
 DECLARE v_claims jsonb; v_now timestamptz; v_updated integer;
 BEGIN
@@ -97,7 +101,7 @@ BEGIN
        SET lease_expires_at = v_now + make_interval(secs => p_ttl_seconds),
            heartbeat_at = v_now, updated_at = v_now
      WHERE singleton AND owner_run_id = p_run_id AND fencing_token = p_fencing_token
-       AND lease_expires_at > v_now;
+       AND lease_expires_at > clock_timestamp();
     GET DIAGNOSTICS v_updated = ROW_COUNT;
     RETURN v_updated = 1;
 END;
@@ -106,6 +110,8 @@ $renew$;
 CREATE OR REPLACE FUNCTION pr_d_internal.pr_d_release_e12_worker_lease(p_run_id uuid, p_fencing_token bigint)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, pr_d_internal
+SET statement_timeout = '10s'
+SET lock_timeout = '5s'
 AS $release$
 DECLARE v_claims jsonb; v_now timestamptz; v_updated integer;
 BEGIN
@@ -120,7 +126,7 @@ BEGIN
     UPDATE pr_d_internal.e12_worker_lease
        SET lease_expires_at = v_now, heartbeat_at = v_now, updated_at = v_now
      WHERE singleton AND owner_run_id = p_run_id AND fencing_token = p_fencing_token
-       AND lease_expires_at > v_now;
+       AND lease_expires_at > clock_timestamp();
     GET DIAGNOSTICS v_updated = ROW_COUNT;
     RETURN v_updated = 1;
 END;
@@ -167,6 +173,8 @@ CREATE FUNCTION pr_d_internal.pr_d_capture_views_once(
 )
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public, pr_d_internal
+SET statement_timeout = '10s'
+SET lock_timeout = '5s'
 AS $capture$
 DECLARE
     v_claims jsonb;
