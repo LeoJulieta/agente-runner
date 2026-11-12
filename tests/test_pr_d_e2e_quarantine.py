@@ -116,7 +116,7 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     assert 'params.get("dbname") == "prd_test" and params.get("user") == "prd_test"' in safe_test
     assert 'params.get("dbname") != "prd_test" or params.get("user") != "prd_test"' in bootstrap
     assert "postgrest_api_must_be_loopback" in safe_test
-    assert 'Request("GET", "/")' in safe_test, "readiness probe must not mutate database state"
+    assert 'status, _ = _request("GET", "/")' in safe_test, "readiness probe must use a read-only HTTP GET"
     assert "readiness-probe" not in safe_test
 
     bootstrap_sql = (ROOT / "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql").read_text(encoding="utf-8")
