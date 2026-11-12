@@ -57,8 +57,14 @@ async function signedRequest(body = "{}"): Promise<Request> {
 Deno.test("cron HMAC accepts fresh signatures and rejects stale or altered ones", async () => {
   const signature = await sign(SECRET, TIMESTAMP);
   assert(await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS), "valid HMAC should pass");
-  assert(!await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS, "POST", "/other", "{}"), "path substitution must fail");
-  assert(!await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS, "POST", "/e12-capture", "{ }"), "body substitution must fail");
+  assert(
+    !await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS, "POST", "/other", "{}"),
+    "path substitution must fail",
+  );
+  assert(
+    !await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS, "POST", "/e12-capture", "{ }"),
+    "body substitution must fail",
+  );
   assert(!await verifyCronSignature(TIMESTAMP, "0".repeat(64), SECRET, NOW_SECONDS), "altered HMAC should fail");
   assert(!await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS + 121), "stale HMAC should fail");
   assert(!await verifyCronSignature(TIMESTAMP, signature, "short", NOW_SECONDS), "weak secret should fail");
@@ -294,7 +300,6 @@ Deno.test("worker reports CAS first-write conflicts without overwriting outcomes
     "CAS conflict must be reported without retrying a write",
   );
 });
-
 Deno.test("worker enforces a streaming body cap when Content-Length is absent", async () => {
   let calls = 0;
   const oversized = new ReadableStream<Uint8Array>({
@@ -311,10 +316,13 @@ Deno.test("worker enforces a streaming body cap when Content-Length is absent", 
     // No Content-Length: exercise the streaming bound itself.
     duplex: "half",
   } as RequestInit);
-  const response = await handleE12Capture(request, dependencies(() => {
-    calls++;
-    return Promise.resolve(new Response("[]", { status: 200 }));
-  }));
+  const response = await handleE12Capture(
+    request,
+    dependencies(() => {
+      calls++;
+      return Promise.resolve(new Response("[]", { status: 200 }));
+    }),
+  );
   assert(response.status === 400, "oversized streamed body must be rejected");
   assert(calls === 0, "oversized body must not reach upstream services");
 });
