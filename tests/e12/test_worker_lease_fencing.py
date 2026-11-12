@@ -346,8 +346,7 @@ def test_batch_cas_checks_each_hmac_and_bounds_batch_size():
     first = capture_record(RUN_A, token, 4, "video-4")
     second_invalid = capture_record(RUN_A, token, 5, "video-5", hmac_override="0" * 64)
 
-    duplicate = pytest.raises(psycopg.errors.RaiseException)
-    with duplicate:
+    with pytest.raises(psycopg.errors.RaiseException):
         capture_batch([first, first])
 
     result = capture_batch([first, second_invalid])
