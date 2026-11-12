@@ -197,9 +197,13 @@ AS $function$
     SELECT EXISTS (SELECT 1 FROM changed);
 $function$;
 
-ALTER FUNCTION public.pr_d_capture_views_once(
-    bigint, text, numeric, timestamptz, timestamptz
-) OWNER TO pr_d_capture_writer;
+DO $capture_owner_transfer$
+BEGIN
+    EXECUTE format('GRANT pr_d_capture_writer TO %I WITH ADMIN OPTION', current_user);
+    EXECUTE 'ALTER FUNCTION public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz) OWNER TO pr_d_capture_writer';
+    EXECUTE format('REVOKE pr_d_capture_writer FROM %I', current_user);
+END;
+$capture_owner_transfer$;
 REVOKE CREATE ON SCHEMA public FROM pr_d_capture_writer;
 
 -- Least privilege: PostgreSQL grants EXECUTE on new functions to PUBLIC by default.
