@@ -47,7 +47,7 @@ jobs:
         run: |
           deno fmt supabase/functions/e12-capture
           deno fmt --check supabase/functions/e12-capture
-          deno test supabase/functions/e12-capture/worker_test.ts supabase/functions/e12-capture/collector_test.ts supabase/functions/e12-capture/lease_test.ts
+          deno test supabase/functions/e12-capture/worker_test.ts supabase/functions/e12-capture/collector_test.ts supabase/functions/e12-capture/lease_test.ts supabase/functions/e12-capture/provenance_test.ts
       - name: Generate migration filename with Supabase CLI v3
         shell: bash
         run: |
