@@ -394,7 +394,7 @@ def test_atomic_lab_results_rpc_is_the_only_service_role_insert_capability():
     assert wrapper_execute is True
     assert implementation_execute is False
     assert wrapper_owner == "pr_d_lab_results_writer"
-    assert writer_role == (False, False, False)
+    assert writer_role == (False, False, False, False, False, False, False)
     assert writer_memberships == 0
 
 
