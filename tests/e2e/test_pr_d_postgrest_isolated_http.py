@@ -445,3 +445,45 @@ def test_e12_captured_video_identity_cannot_be_reassigned():
             (row_id,),
         ).fetchone()
     assert stored == (video_id, 123)
+
+
+def test_e12_captured_evidence_cannot_be_deleted_but_pending_row_can():
+    video_id = "e12-http-delete-protected"
+    row_id = _insert_e12_video(video_id)
+    status, result = _request(
+        "POST",
+        "/rpc/pr_d_capture_views_once",
+        payload={
+            "p_row_id": row_id,
+            "p_youtube_video_id": video_id,
+            "p_views": "456",
+            "p_published_at": "2026-10-30T02:30:00Z",
+            "p_sync_captured_at": "2026-10-30T05:30:00Z",
+        },
+    )
+    assert status == 200 and result is True
+
+    delete_status, _ = _request(
+        "DELETE",
+        f"/youtube_shorts_log?id=eq.{row_id}",
+    )
+    assert delete_status >= 400, f"captured_evidence_delete_must_be_rejected_http_{delete_status}"
+
+    pending_id = _insert_e12_video("e12-http-pending-delete-allowed")
+    pending_status, _ = _request(
+        "DELETE",
+        f"/youtube_shorts_log?id=eq.{pending_id}",
+    )
+    assert pending_status in {200, 204}, f"pending_row_cleanup_should_remain_available_http_{pending_status}"
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        captured_exists = conn.execute(
+            "SELECT count(*) FROM public.youtube_shorts_log WHERE id=%s AND views_primeras_3h=456",
+            (row_id,),
+        ).fetchone()[0]
+        pending_exists = conn.execute(
+            "SELECT count(*) FROM public.youtube_shorts_log WHERE id=%s",
+            (pending_id,),
+        ).fetchone()[0]
+    assert captured_exists == 1
+    assert pending_exists == 0
