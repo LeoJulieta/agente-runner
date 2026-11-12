@@ -134,14 +134,22 @@ def compute_d_init(
 ) -> dict[str, Any]:
     """Compute abs(p_A-p_B); missing comparable counts return null with reason."""
     values = (positive_a, total_a, positive_b, total_b)
+
+    # Validate every supplied value before classifying the tuple as incomplete.
+    # A missing count must never mask an invalid count elsewhere in the tuple.
+    present = tuple(value for value in values if value is not None)
+    if any(type(value) is not int for value in present):
+        raise ValueError("d_init_counts_must_be_integers")
+    if total_a is not None and total_a <= 0:
+        raise ValueError("d_init_total_must_be_positive")
+    if total_b is not None and total_b <= 0:
+        raise ValueError("d_init_total_must_be_positive")
+    if positive_a is not None and total_a is not None and not 0 <= positive_a <= total_a:
+        raise ValueError("d_init_positive_count_out_of_range")
+    if positive_b is not None and total_b is not None and not 0 <= positive_b <= total_b:
+        raise ValueError("d_init_positive_count_out_of_range")
     if any(value is None for value in values):
         return {"d_init": None, "d_init_reason": "insufficient_data"}
-    if any(type(value) is not int for value in values):
-        raise ValueError("d_init_counts_must_be_integers")
-    if total_a <= 0 or total_b <= 0:
-        raise ValueError("d_init_total_must_be_positive")
-    if not 0 <= positive_a <= total_a or not 0 <= positive_b <= total_b:
-        raise ValueError("d_init_positive_count_out_of_range")
     p_a = np.float64(positive_a) / np.float64(total_a)
     p_b = np.float64(positive_b) / np.float64(total_b)
     value = float(abs(p_a - p_b))
