@@ -115,11 +115,7 @@ export function parseYouTubeVideosResponse(
       elapsedSeconds: formatElapsedSeconds(elapsedMicros),
       elapsedMicros,
       eligible,
-      reason: elapsedMicros < 0n
-        ? "published_at_in_future"
-        : eligible
-        ? "eligible"
-        : "outside_e12_window",
+      reason: elapsedMicros < 0n ? "published_at_in_future" : eligible ? "eligible" : "outside_e12_window",
     });
   }
   return observations;
@@ -175,8 +171,10 @@ export async function collectYouTubeBatch(
   if (!Array.isArray(videoIds) || videoIds.length < 1 || videoIds.length > 50) {
     throw new Error("youtube_batch_size_must_be_1_to_50");
   }
-  if (videoIds.some((id) => typeof id !== "string" || !id.trim()) ||
-      new Set(videoIds).size !== videoIds.length) {
+  if (
+    videoIds.some((id) => typeof id !== "string" || !id.trim()) ||
+    new Set(videoIds).size !== videoIds.length
+  ) {
     throw new Error("youtube_video_ids_invalid_or_duplicated");
   }
   if (!apiKey) throw new Error("youtube_api_key_missing");
