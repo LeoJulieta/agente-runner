@@ -8,18 +8,18 @@ DECLARE
 BEGIN
     SELECT oid INTO v_role_oid FROM pg_roles WHERE rolname = 'pr_d_lab_results_writer';
     IF v_role_oid IS NULL THEN
-        EXECUTE 'CREATE ROLE pr_d_lab_results_writer NOLOGIN NOINHERIT';
+        EXECUTE 'CREATE ROLE pr_d_lab_results_writer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS';
     ELSE
         IF EXISTS (
             SELECT 1 FROM pg_roles
             WHERE oid = v_role_oid
-              AND (rolcanlogin OR rolinherit OR rolbypassrls)
+              AND (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolreplication OR rolbypassrls)
         ) OR EXISTS (
             SELECT 1 FROM pg_auth_members
             WHERE roleid = v_role_oid OR member = v_role_oid
         ) THEN
             RAISE EXCEPTION
-                'prd_lab_results_writer_role_misconfigured: dedicated role must be NOLOGIN, NOINHERIT, without BYPASSRLS, and have no memberships';
+                'prd_lab_results_writer_role_misconfigured: dedicated role must be NOLOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOINHERIT, NOREPLICATION, NOBYPASSRLS, and have no memberships';
         END IF;
     END IF;
 END;
@@ -138,7 +138,7 @@ CREATE OR REPLACE FUNCTION public.rpc_insert_baseline_and_evidence(
 RETURNS jsonb
 LANGUAGE sql
 SECURITY DEFINER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog
 AS $wrapper$
     SELECT public.pr_d_rpc_insert_baseline_and_evidence_impl(
         p_lab_id, p_gen, p_baseline_value, p_baseline_type,
