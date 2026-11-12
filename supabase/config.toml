@@ -1,0 +1,4 @@
+[functions.e12-capture]
+# The function authenticates each cron invocation with a short-lived HMAC.
+# Never place SUPABASE_SERVICE_ROLE_KEY in pg_net headers or cron.job SQL.
+verify_jwt = false
