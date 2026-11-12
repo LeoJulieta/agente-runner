@@ -116,6 +116,8 @@ jobs:
           python-version: "3.12"
       - name: Install pinned test dependencies
         run: python -m pip install --disable-pip-version-check -r requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Bootstrap only the identity-verified disposable database
+        run: python tests/e2e/bootstrap_pr_d_postgrest.py
       - name: Start pinned PostgREST after PostgreSQL health check
         run: >-
           docker run -d --name prd-postgrest --network host
@@ -128,4 +130,4 @@ jobs:
         run: python -m pytest -q tests/e2e/test_pr_d_postgrest_isolated_http.py
       - name: Stop disposable PostgREST container
         if: always()
-        run: docker rm -f prd-postgrest
+        run: docker rm -f prd-postgrest || true
