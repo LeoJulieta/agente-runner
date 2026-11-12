@@ -176,3 +176,14 @@ def test_duplicate_candidate_identity_is_rejected():
 def test_boolean_elapsed_is_not_accepted_as_number():
     with pytest.raises(CohortInputError, match="sync_elapsed_invalid"):
         build([row("bad", elapsed=True)])
+
+
+def test_sync_window_rejects_non_string_missing_policy_as_contract_error():
+    with pytest.raises(CohortInputError, match="sync_window_missing_policy_unsupported"):
+        SyncWindow(
+            lower_seconds=10_800,
+            upper_seconds=21_600,
+            lower_inclusive=True,
+            upper_inclusive=True,
+            missing_policy=[],
+        )
