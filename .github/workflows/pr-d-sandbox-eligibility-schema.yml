@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - sandbox/pr-d-cohort-eligibility-schema-2026-11-12
+      - sandbox/pr-d-e12-write-boundary-legacy-migration-2026-11-12
     paths:
       - "labs/pr_d_cohort_builder.py"
       - "labs/pr_d_family_ii.py"
@@ -32,6 +33,7 @@ on:
       - "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql"
       - "supabase/migrations/004_pr_d_v2_atomic_persistence.sql"
       - "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
+      - "supabase/migrations/20261112170000_pr_d_lab_results_rpc_write_boundary_candidate.sql"
       - ".github/workflows/pr-d-sandbox-eligibility-schema.yml"
 
 # A newer push supersedes older sandbox validation runs on this same branch.
