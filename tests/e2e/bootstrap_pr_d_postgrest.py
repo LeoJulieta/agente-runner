@@ -28,10 +28,12 @@ def main():
     bootstrap = (ROOT / "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql").read_text(encoding="utf-8")
     migration = (ROOT / "supabase/migrations/004_pr_d_v2_atomic_persistence.sql").read_text(encoding="utf-8")
     e12_migration = (ROOT / "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql").read_text(encoding="utf-8")
+    lab_results_migration = (ROOT / "supabase/migrations/20261112170000_pr_d_lab_results_rpc_write_boundary_candidate.sql").read_text(encoding="utf-8")
     with psycopg.connect(dsn, autocommit=True) as conn:
         conn.execute(bootstrap)
         conn.execute(migration)
         conn.execute(e12_migration)
+        conn.execute(lab_results_migration)
 
 
 if __name__ == "__main__":
