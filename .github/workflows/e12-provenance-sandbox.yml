@@ -1,0 +1,30 @@
+name: E12 provenance attestation sandbox tests
+
+on:
+  push:
+    branches:
+      - sandbox/e12-provenance-attestation-2026-11-12
+    paths:
+      - "supabase/functions/e12-capture/collector.ts"
+      - "supabase/functions/e12-capture/collector_test.ts"
+      - "supabase/functions/e12-capture/provenance.ts"
+      - "supabase/functions/e12-capture/provenance_test.ts"
+      - ".github/workflows/e12-provenance-sandbox.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Format and test collector provenance
+        run: |
+          deno fmt supabase/functions/e12-capture
+          deno fmt --check supabase/functions/e12-capture
+          deno test supabase/functions/e12-capture/collector_test.ts supabase/functions/e12-capture/provenance_test.ts
