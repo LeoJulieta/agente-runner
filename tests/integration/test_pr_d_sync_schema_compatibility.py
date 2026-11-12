@@ -5,6 +5,7 @@ loopback database and schema. The test starts from the audited legacy int4
 column type and exercises both permitted and forbidden write paths.
 """
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from threading import Barrier
@@ -65,7 +66,7 @@ def disposable_database():
         conn.execute("""
             INSERT INTO pr_d_test.youtube_shorts_log
                 (youtube_video_id, views_primeras_3h, hs_al_publicar_al_sync)
-            VALUES ('legacy-fixture', 123, 2.75)
+            VALUES ('legacy-fixture', 123, 3.01)
         """)
 
         migration = MIGRATION.read_text(encoding="utf-8")
@@ -134,7 +135,17 @@ def test_schema_widens_legacy_int4_and_preserves_existing_rows(disposable_databa
     assert columns["hs_al_publicar_al_sync"] == "numeric"
     assert columns["published_at"] == "timestamp with time zone"
     assert columns["sync_captured_at"] == "timestamp with time zone"
-    assert stored == (123, Decimal("2.75"), None, None)
+    assert stored == (123, Decimal("3.01"), None, None)
+    with psycopg.connect(disposable_database) as conn:
+        existing_trigger = conn.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM pg_trigger
+                WHERE tgrelid = 'pr_d_test.youtube_shorts_log'::regclass
+                  AND tgname = 'shorts_updated_at'
+                  AND NOT tgisinternal
+            )
+        """).fetchone()[0]
+    assert existing_trigger is True
 
 
 def test_internal_capture_role_is_least_privilege_and_rpc_is_service_only(disposable_database):
@@ -208,16 +219,22 @@ def test_service_role_cannot_bypass_cas_but_can_update_unrelated_columns(disposa
                  WHERE id = %s
             """, (PUBLISHED_AT, CAPTURED_AT, row_id))
 
-    # The guard is narrow: unrelated metadata updates keep working.
+    # The guard is narrow: unrelated metadata updates and the legacy
+    # shorts_updated_at trigger keep working.
+    with psycopg.connect(disposable_database) as conn:
+        before_updated_at = conn.execute("""
+            SELECT updated_at FROM pr_d_test.youtube_shorts_log WHERE id = %s
+        """, (row_id,)).fetchone()[0]
     with psycopg.connect(disposable_database) as conn:
         _as_service_role(conn)
-        changed = conn.execute("""
+        changed, updated_at = conn.execute("""
             UPDATE pr_d_test.youtube_shorts_log
                SET status = 'published'
              WHERE id = %s
-            RETURNING status
-        """, (row_id,)).fetchone()[0]
+            RETURNING status, updated_at
+        """, (row_id,)).fetchone()
         assert changed == "published"
+        assert updated_at >= before_updated_at
 
     with psycopg.connect(disposable_database) as conn:
         stored = conn.execute("""
@@ -283,8 +300,8 @@ def test_capture_rpc_is_service_role_only_and_stores_exact_elapsed(disposable_da
         """, (row_id,)).fetchone()
     assert stored == (
         321,
-        __import__("datetime").datetime.fromisoformat("2026-10-30T02:30:00+00:00"),
-        __import__("datetime").datetime.fromisoformat("2026-10-30T05:30:00+00:00"),
+        datetime.fromisoformat("2026-10-30T02:30:00+00:00"),
+        datetime.fromisoformat("2026-10-30T05:30:00+00:00"),
         Decimal("3.0000000000000000"),
     )
 
