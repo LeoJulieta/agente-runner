@@ -6,7 +6,15 @@
 
 ALTER TABLE public.youtube_shorts_log
     ADD COLUMN IF NOT EXISTS published_at timestamptz,
-    ADD COLUMN IF NOT EXISTS sync_captured_at timestamptz;
+    ADD COLUMN IF NOT EXISTS sync_captured_at timestamptz,
+    ADD COLUMN IF NOT EXISTS elapsed_seconds_e12 numeric(20,6);
+
+COMMENT ON COLUMN public.youtube_shorts_log.published_at IS
+    'YouTube videos.list snippet.publishedAt for the exact video observed by the E12 collector.';
+COMMENT ON COLUMN public.youtube_shorts_log.sync_captured_at IS
+    'UTC client receive timestamp recorded immediately after the videos.list HTTP response body is read; not a YouTube server-side event timestamp.';
+COMMENT ON COLUMN public.youtube_shorts_log.elapsed_seconds_e12 IS
+    'Exact elapsed seconds derived from sync_captured_at minus published_at, stored to microsecond precision. Separate from legacy hs_al_publicar_al_sync, whose historical formula uses created_at.';
 
 DO $preflight$
 DECLARE
@@ -66,15 +74,19 @@ ALTER TABLE public.youtube_shorts_log
 ALTER TABLE public.youtube_shorts_log
     ADD CONSTRAINT youtube_shorts_log_sync_capture_window_ck
     CHECK (
-        (published_at IS NULL AND sync_captured_at IS NULL)
+        (
+            published_at IS NULL
+            AND sync_captured_at IS NULL
+            AND elapsed_seconds_e12 IS NULL
+        )
         OR (
             published_at IS NOT NULL
             AND sync_captured_at IS NOT NULL
             AND views_primeras_3h IS NOT NULL
             AND views_primeras_3h >= 0
-            AND hs_al_publicar_al_sync IS NOT NULL
-            AND hs_al_publicar_al_sync =
-                EXTRACT(EPOCH FROM (sync_captured_at - published_at)) / 3600
+            AND elapsed_seconds_e12 IS NOT NULL
+            AND elapsed_seconds_e12 =
+                EXTRACT(EPOCH FROM (sync_captured_at - published_at))
             AND sync_captured_at >= published_at + interval '2 hours 55 minutes'
             AND sync_captured_at <= published_at + interval '3 hours 5 minutes'
         )
@@ -154,10 +166,10 @@ GRANT USAGE ON SCHEMA public TO pr_d_capture_owner;
 
 GRANT SELECT (
     id, youtube_video_id, views_primeras_3h,
-    published_at, sync_captured_at, hs_al_publicar_al_sync
+    published_at, sync_captured_at, elapsed_seconds_e12
 ) ON public.youtube_shorts_log TO pr_d_capture_owner;
 GRANT UPDATE (
-    views_primeras_3h, published_at, sync_captured_at, hs_al_publicar_al_sync
+    views_primeras_3h, published_at, sync_captured_at, elapsed_seconds_e12
 ) ON public.youtube_shorts_log TO pr_d_capture_owner;
 
 -- The restricted role is subject to RLS (it is not BYPASSRLS). Give it only
@@ -191,6 +203,7 @@ BEGIN
                NEW.views_primeras_3h IS NOT NULL
                OR NEW.published_at IS NOT NULL
                OR NEW.sync_captured_at IS NOT NULL
+               OR NEW.elapsed_seconds_e12 IS NOT NULL
                OR NEW.hs_al_publicar_al_sync IS NOT NULL
            ) THEN
             RAISE EXCEPTION
@@ -206,6 +219,7 @@ BEGIN
                OLD.views_primeras_3h IS NOT NULL
                OR OLD.published_at IS NOT NULL
                OR OLD.sync_captured_at IS NOT NULL
+               OR OLD.elapsed_seconds_e12 IS NOT NULL
                OR OLD.hs_al_publicar_al_sync IS NOT NULL
            ) THEN
             RAISE EXCEPTION
@@ -220,6 +234,7 @@ BEGIN
            NEW.views_primeras_3h IS DISTINCT FROM OLD.views_primeras_3h
            OR NEW.published_at IS DISTINCT FROM OLD.published_at
            OR NEW.sync_captured_at IS DISTINCT FROM OLD.sync_captured_at
+           OR NEW.elapsed_seconds_e12 IS DISTINCT FROM OLD.elapsed_seconds_e12
            OR NEW.hs_al_publicar_al_sync IS DISTINCT FROM OLD.hs_al_publicar_al_sync
            OR (
                OLD.views_primeras_3h IS NOT NULL
@@ -290,13 +305,14 @@ BEGIN
        SET views_primeras_3h = p_views,
            published_at = p_published_at,
            sync_captured_at = p_sync_captured_at,
-           hs_al_publicar_al_sync =
-               EXTRACT(EPOCH FROM (p_sync_captured_at - p_published_at)) / 3600
+           elapsed_seconds_e12 =
+               EXTRACT(EPOCH FROM (p_sync_captured_at - p_published_at))
      WHERE id = p_row_id
        AND youtube_video_id = p_youtube_video_id
        AND views_primeras_3h IS NULL
        AND published_at IS NULL
        AND sync_captured_at IS NULL
+       AND elapsed_seconds_e12 IS NULL
        AND hs_al_publicar_al_sync IS NULL;
 
     GET DIAGNOSTICS v_updated = ROW_COUNT;
