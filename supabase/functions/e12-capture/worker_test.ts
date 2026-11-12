@@ -214,6 +214,33 @@ Deno.test("worker skips replayed signed minute before any YouTube request", asyn
   assert(calls === 1, "duplicate invocation must stop after slot claim");
 });
 
+Deno.test("worker fails closed instead of silently truncating more than 500 candidates", async () => {
+  let calls = 0;
+  const candidates = Array.from({ length: 500 }, (_, index) => ({
+    id: index + 1,
+    youtube_video_id: `video-${index + 1}`,
+    created_at: "2026-10-30T02:00:00Z",
+  }));
+  const fetchImpl: typeof fetch = (input) => {
+    calls++;
+    const url = String(input);
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rest/v1/youtube_shorts_log")) {
+      return Promise.resolve(new Response(JSON.stringify(candidates), {
+        status: 200,
+        headers: { "content-range": "0-499/501" },
+      }));
+    }
+    throw new Error("candidate cap must stop before YouTube");
+  };
+
+  const response = await handleE12Capture(await signedRequest(), dependencies(fetchImpl));
+  assert(response.status === 502, "candidate truncation must fail closed");
+  assert(calls === 2, "worker must stop after detecting more than 500 candidates");
+});
+
 Deno.test("worker reports CAS first-write conflicts without overwriting outcomes", async () => {
   const fetchImpl: typeof fetch = (input) => {
     const url = String(input);
