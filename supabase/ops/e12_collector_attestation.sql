@@ -17,6 +17,22 @@ BEGIN
 END;
 $preflight$;
 
+DO $crypto_schema_grant$
+DECLARE
+    v_crypto_schema text;
+BEGIN
+    SELECT n.nspname
+      INTO v_crypto_schema
+      FROM pg_catalog.pg_extension AS e
+      JOIN pg_catalog.pg_namespace AS n ON n.oid = e.extnamespace
+     WHERE e.extname = 'pgcrypto';
+    IF v_crypto_schema IS NULL THEN
+        RAISE EXCEPTION 'prd_e12_attestation_preflight_failed: pgcrypto extension missing';
+    END IF;
+    EXECUTE pg_catalog.format('GRANT USAGE ON SCHEMA %I TO pr_d_capture_owner', v_crypto_schema);
+END;
+$crypto_schema_grant$;
+
 ALTER TABLE public.youtube_shorts_log
     ADD COLUMN IF NOT EXISTS e12_capture_run_id uuid,
     ADD COLUMN IF NOT EXISTS e12_fencing_token bigint,
