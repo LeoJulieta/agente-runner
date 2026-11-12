@@ -135,6 +135,26 @@ def test_check_accepts_closed_tolerance_and_rejects_values_outside_it(disposable
             """)
 
 
+def test_negative_view_count_cannot_be_captured_or_inserted(disposable_database):
+    row_id = insert_video(disposable_database, "negative-cas")
+    assert _cas(disposable_database, row_id, "negative-cas", -1) is False
+    with psycopg.connect(disposable_database) as conn:
+        stored = conn.execute(
+            "SELECT views_primeras_3h FROM pr_d_test.youtube_shorts_log WHERE id = %s",
+            (row_id,),
+        ).fetchone()[0]
+    assert stored is None
+
+    with psycopg.connect(disposable_database) as conn:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            conn.execute("""
+                INSERT INTO pr_d_test.youtube_shorts_log
+                    (youtube_video_id, views_primeras_3h, published_at, sync_captured_at)
+                VALUES ('negative-direct-insert', -1,
+                        '2026-10-30T02:30:00Z', '2026-10-30T05:30:00Z')
+            """)
+
+
 def test_two_concurrent_cas_writers_have_exactly_one_winner(disposable_database):
     row_id = insert_video(disposable_database, "concurrent-video")
     barrier = Barrier(2)
