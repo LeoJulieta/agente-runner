@@ -54,7 +54,8 @@ def _build(n_rows, *, include_out_of_window=False):
         decision = evaluate_sync_window(publication, captured)
         row = {
             "candidate_id": video_id,
-            "sync_elapsed_seconds": decision.elapsed_seconds,
+            "published_at": publication,
+            "sync_captured_at": captured,
             "outcome": _view_count(api, video_id),
             "intercept": 1,
             "condition": 1 if i >= n_rows // 2 else 0,
@@ -70,7 +71,8 @@ def _build(n_rows, *, include_out_of_window=False):
         candidate_id_field="candidate_id",
         outcome_field="outcome",
         predictor_fields=("intercept", "condition"),
-        sync_elapsed_seconds_field="sync_elapsed_seconds",
+        sync_published_at_field="published_at",
+        sync_captured_at_field="sync_captured_at",
         sync_window=SyncWindow(
             lower_seconds=LOWER_SYNC_SECONDS, upper_seconds=UPPER_SYNC_SECONDS,
             lower_inclusive=True, upper_inclusive=True, missing_policy=MISSING_EXCLUDE,
