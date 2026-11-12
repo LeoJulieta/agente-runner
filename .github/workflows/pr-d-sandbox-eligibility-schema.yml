@@ -121,7 +121,7 @@ jobs:
       - name: Start pinned PostgREST after PostgreSQL health check
         run: >-
           docker run -d --name prd-postgrest --network host
-          -e PGRST_DB_URI=postgres://prd_test:prd_test@127.0.0.1:5432/prd_test
+          -e PGRST_DB_URI=postgres://authenticator:prd_test_auth@127.0.0.1:5432/prd_test
           -e PGRST_DB_SCHEMAS=public
           -e PGRST_DB_ANON_ROLE=anon
           -e PGRST_JWT_SECRET=pr-d-http-e2e-only-secret-32-bytes-minimum
