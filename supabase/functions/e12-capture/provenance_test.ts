@@ -24,7 +24,7 @@ const PAYLOAD: ObservationAttestationPayload = {
 };
 
 Deno.test("Ed25519 attestation verifies and binds exact observation values", async () => {
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair;
   const privateBytes = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
   const publicBytes = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
   const toBase64 = (bytes: Uint8Array) => {
