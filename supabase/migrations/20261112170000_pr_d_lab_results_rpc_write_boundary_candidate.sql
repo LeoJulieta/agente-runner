@@ -111,9 +111,13 @@ AS $wrapper$
     );
 $wrapper$;
 
-ALTER FUNCTION public.rpc_insert_baseline_and_evidence(
-    text, integer, jsonb, text, jsonb, jsonb, text, boolean, text
-) OWNER TO pr_d_lab_results_writer;
+DO $lab_results_owner_transfer$
+BEGIN
+    EXECUTE format('GRANT pr_d_lab_results_writer TO %I WITH ADMIN OPTION', current_user);
+    EXECUTE 'ALTER FUNCTION public.rpc_insert_baseline_and_evidence(text, integer, jsonb, text, jsonb, jsonb, text, boolean, text) OWNER TO pr_d_lab_results_writer';
+    EXECUTE format('REVOKE pr_d_lab_results_writer FROM %I', current_user);
+END;
+$lab_results_owner_transfer$;
 REVOKE CREATE ON SCHEMA public FROM pr_d_lab_results_writer;
 
 REVOKE ALL ON FUNCTION public.rpc_insert_baseline_and_evidence(
