@@ -1,6 +1,34 @@
 -- SANDBOX CANDIDATE ONLY. Never apply to a live project from this branch.
 -- Adds explicit YouTube publication and observation instants without changing
 -- legacy rows or assuming youtube_video_id is the primary key.
+-- A dedicated non-login owner is the only principal allowed to change the
+-- protected capture columns. service_role can call the RPC but cannot SET ROLE
+-- to this principal; no membership is granted to any login/API role.
+DO $capture_writer_role$
+DECLARE
+    v_role_oid oid;
+BEGIN
+    SELECT oid INTO v_role_oid FROM pg_roles WHERE rolname = 'pr_d_capture_writer';
+    IF v_role_oid IS NULL THEN
+        EXECUTE 'CREATE ROLE pr_d_capture_writer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS';
+    ELSE
+        IF EXISTS (
+            SELECT 1 FROM pg_roles
+            WHERE oid = v_role_oid
+              AND (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolreplication OR rolbypassrls)
+        ) OR EXISTS (
+            SELECT 1 FROM pg_auth_members
+            WHERE roleid = v_role_oid OR member = v_role_oid
+        ) THEN
+            RAISE EXCEPTION
+                'prd_capture_writer_role_misconfigured: dedicated role must be NOLOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOINHERIT, NOREPLICATION, NOBYPASSRLS, and have no memberships';
+        END IF;
+    END IF;
+END;
+$capture_writer_role$;
+
+
+-- Add provenance columns only after the privileged-role preflight passes.
 ALTER TABLE public.youtube_shorts_log
     ADD COLUMN IF NOT EXISTS published_at timestamptz,
     ADD COLUMN IF NOT EXISTS sync_captured_at timestamptz;
@@ -50,9 +78,26 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
-    ALTER TABLE public.youtube_shorts_log
-        ALTER COLUMN views_primeras_3h TYPE numeric(20,0)
-        USING views_primeras_3h::numeric(20,0);
+    -- A prior candidate may already have installed the guard trigger. Drop only
+    -- this known trigger inside the migration transaction before changing the
+    -- referenced column type; it is recreated below before commit.
+    DROP TRIGGER IF EXISTS youtube_shorts_log_capture_write_guard
+        ON public.youtube_shorts_log;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'youtube_shorts_log'
+          AND column_name = 'views_primeras_3h'
+          AND data_type = 'numeric'
+          AND numeric_precision = 20
+          AND numeric_scale = 0
+    ) THEN
+        ALTER TABLE public.youtube_shorts_log
+            ALTER COLUMN views_primeras_3h TYPE numeric(20,0)
+            USING views_primeras_3h::numeric(20,0);
+    END IF;
 
     ALTER TABLE public.youtube_shorts_log
         DROP CONSTRAINT IF EXISTS youtube_shorts_log_views_nonnegative_ck;
@@ -65,32 +110,6 @@ BEGIN
         ));
 END;
 $views_nonnegative$;
-
--- A dedicated non-login owner is the only principal allowed to change the
--- protected capture columns. service_role can call the RPC but cannot SET ROLE
--- to this principal; no membership is granted to any login/API role.
-DO $capture_writer_role$
-DECLARE
-    v_role_oid oid;
-BEGIN
-    SELECT oid INTO v_role_oid FROM pg_roles WHERE rolname = 'pr_d_capture_writer';
-    IF v_role_oid IS NULL THEN
-        EXECUTE 'CREATE ROLE pr_d_capture_writer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS';
-    ELSE
-        IF EXISTS (
-            SELECT 1 FROM pg_roles
-            WHERE oid = v_role_oid
-              AND (rolcanlogin OR rolsuper OR rolcreatedb OR rolcreaterole OR rolinherit OR rolreplication OR rolbypassrls)
-        ) OR EXISTS (
-            SELECT 1 FROM pg_auth_members
-            WHERE roleid = v_role_oid OR member = v_role_oid
-        ) THEN
-            RAISE EXCEPTION
-                'prd_capture_writer_role_misconfigured: dedicated role must be NOLOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOINHERIT, NOREPLICATION, NOBYPASSRLS, and have no memberships';
-        END IF;
-    END IF;
-END;
-$capture_writer_role$;
 
 GRANT USAGE ON SCHEMA public TO pr_d_capture_writer;
 GRANT SELECT ON public.youtube_shorts_log TO pr_d_capture_writer;
