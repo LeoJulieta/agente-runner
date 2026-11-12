@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 import time
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
@@ -119,6 +120,9 @@ def disposable_postgrest_database():
         conn.execute("DROP TABLE IF EXISTS public.lab_results CASCADE")
         conn.execute(
             "DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz)"
+        )
+        conn.execute(
+            "DROP FUNCTION IF EXISTS public.pr_d_claim_e12_worker_slot(timestamptz)"
         )
         # Drop the table first so its trigger dependency is removed before the
         # trigger function itself is dropped.
@@ -381,3 +385,52 @@ def test_e12_capture_rpc_concurrent_http_claim_has_one_winner():
             (row_id,),
         ).fetchone()
     assert stored == (2147483648, Decimal("10800"), None)
+
+
+def test_e12_worker_slot_is_single_use_and_replay_safe_over_http():
+    bucket = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    payload = {"p_minute_bucket": bucket.isoformat()}
+
+    first_status, first = _request(
+        "POST", "/rpc/pr_d_claim_e12_worker_slot", payload=payload
+    )
+    replay_status, replay = _request(
+        "POST", "/rpc/pr_d_claim_e12_worker_slot", payload=payload
+    )
+    assert first_status == replay_status == 200
+    assert first is True
+    assert replay is False
+
+    stale = {"p_minute_bucket": (bucket - timedelta(minutes=3)).isoformat()}
+    stale_status, stale_result = _request(
+        "POST", "/rpc/pr_d_claim_e12_worker_slot", payload=stale
+    )
+    assert stale_status == 200 and stale_result is False
+
+    unaligned = {"p_minute_bucket": (bucket + timedelta(seconds=1)).isoformat()}
+    unaligned_status, unaligned_result = _request(
+        "POST", "/rpc/pr_d_claim_e12_worker_slot", payload=unaligned
+    )
+    assert unaligned_status == 200 and unaligned_result is False
+
+    anon_status, _ = _request(
+        "POST", "/rpc/pr_d_claim_e12_worker_slot",
+        role="anon", payload=payload,
+    )
+    assert anon_status in {401, 403}
+
+    # Reset only the disposable singleton row to exercise concurrent callers.
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("DELETE FROM pr_d_internal.e12_worker_run_slot")
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(
+            lambda _: _request(
+                "POST", "/rpc/pr_d_claim_e12_worker_slot", payload=payload
+            ),
+            range(2),
+        ))
+    assert all(status == 200 for status, _ in results)
+    assert sorted(value for _, value in results) == [False, True]
