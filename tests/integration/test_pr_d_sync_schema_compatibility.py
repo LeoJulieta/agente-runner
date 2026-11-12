@@ -88,6 +88,44 @@ def test_schema_types_and_legacy_rows(disposable_database):
     assert stored == (123, None, None)
 
 
+def test_capture_rpc_is_executable_only_by_service_role(disposable_database):
+    row_id = insert_video(disposable_database, "service-role-video")
+    signature = (
+        "pr_d_test.pr_d_capture_views_once("
+        "bigint,text,integer,timestamp with time zone,timestamp with time zone)"
+    )
+    with psycopg.connect(disposable_database) as conn:
+        privileges = conn.execute(
+            """
+            SELECT
+                has_function_privilege('service_role', %s, 'EXECUTE'),
+                has_function_privilege('anon', %s, 'EXECUTE'),
+                has_function_privilege('authenticated', %s, 'EXECUTE')
+            """,
+            (signature, signature, signature),
+        ).fetchone()
+        assert privileges == (True, False, False)
+
+        conn.execute("SET ROLE service_role")
+        captured = conn.execute(
+            """
+            SELECT pr_d_test.pr_d_capture_views_once(
+                %s, %s, %s, %s::timestamptz, %s::timestamptz
+            )
+            """,
+            (row_id, "service-role-video", 321,
+             "2026-10-30T02:30:00Z", "2026-10-30T05:30:00Z"),
+        ).fetchone()[0]
+        assert captured is True
+
+    with psycopg.connect(disposable_database) as conn:
+        stored = conn.execute(
+            "SELECT views_primeras_3h FROM pr_d_test.youtube_shorts_log WHERE id = %s",
+            (row_id,),
+        ).fetchone()[0]
+    assert stored == 321
+
+
 def test_migration_cas_is_reusable_and_first_write_wins(disposable_database):
     row_id = insert_video(disposable_database)
     assert _cas(disposable_database, row_id, "yt-fixture-001", 456) is True
