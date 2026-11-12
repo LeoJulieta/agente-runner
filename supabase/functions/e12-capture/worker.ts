@@ -42,7 +42,11 @@ export async function verifyCronSignature(
   secret: string,
   nowEpochSeconds: number,
 ): Promise<boolean> {
-  if (secret.length < 32 || !/^\d{10}$/.test(timestamp) || !/^[a-f0-9]{64}$/i.test(suppliedSignature)) {
+  if (
+    new TextEncoder().encode(secret).byteLength < 32 ||
+    !/^\d{10}$/.test(timestamp) ||
+    !/^[a-f0-9]{64}$/i.test(suppliedSignature)
+  ) {
     return false;
   }
   const timestampSeconds = Number(timestamp);
@@ -117,7 +121,11 @@ async function fetchPendingCandidates(
 
   const response = await fetchImpl(url, {
     method: "GET",
-    headers: { apikey: serviceRoleKey, Accept: "application/json" },
+    headers: {
+      apikey: serviceRoleKey,
+      Accept: "application/json",
+      Prefer: "count=exact",
+    },
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(`supabase_candidates_http_${response.status}`);
@@ -126,6 +134,10 @@ async function fetchPendingCandidates(
   if (!Array.isArray(payload)) throw new Error("supabase_candidates_response_invalid");
 
   const rows: CandidateRow[] = [];
+  const contentRange = response.headers.get("content-range") ?? "";
+  const totalText = contentRange.split("/")[1];
+  const total = totalText && totalText !== "*" ? Number(totalText) : Number.NaN;
+
   for (const item of payload) {
     if (!item || typeof item !== "object") throw new Error("supabase_candidate_invalid");
     const row = item as Record<string, unknown>;
@@ -142,6 +154,14 @@ async function fetchPendingCandidates(
       youtube_video_id: row.youtube_video_id,
       created_at: row.created_at,
     });
+  }
+
+  // Never silently omit rows if the operational candidate cap is reached.
+  if (
+    (Number.isFinite(total) && total > CANDIDATE_LIMIT) ||
+    (!Number.isFinite(total) && rows.length >= CANDIDATE_LIMIT)
+  ) {
+    throw new Error("supabase_candidate_scan_limit_exceeded");
   }
   return rows;
 }
