@@ -84,9 +84,9 @@ Deno.test("worker rejects GET and invalid HMAC before making network calls", asy
 
 Deno.test("worker accepts only an empty command body, never caller-supplied observations", async () => {
   let calls = 0;
-  const fetchImpl = async () => {
+  const fetchImpl = () => {
     calls++;
-    return new Response("[]", { status: 200 });
+    return Promise.resolve(new Response("[]", { status: 200 }));
   };
   const response = await handleE12Capture(
     await signedRequest(JSON.stringify({ p_views: "999", p_published_at: "forged" })),
