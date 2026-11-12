@@ -40,6 +40,10 @@ Deno.test("Ed25519 attestation verifies and binds exact observation values", asy
 
   const attestation = await createObservationAttestation(PAYLOAD, privateKey, HMAC_SECRET_BASE64);
   assert(attestation.payloadSha256.length === 64, "payload digest must be SHA-256 hex");
+  assert(
+    attestation.hmacSignatureHex === "6d453d4d60ea19168802afbae6242f043db9a09952e68b10f6c97f42244d3afd",
+    "WebCrypto HMAC must match the independently computed SHA-256 test vector",
+  );
   assert(await verifyObservationAttestation(PAYLOAD, attestation, publicKey, HMAC_SECRET_BASE64), "signature should verify");
 
   const altered = { ...PAYLOAD, viewCount: "18446744073709551614" };
