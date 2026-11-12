@@ -69,7 +69,7 @@ $views_nonnegative$;
 -- Reusable compare-and-set operation. Both stable identifiers must match;
 -- only an unpopulated metric/provenance row can be claimed exactly once.
 CREATE OR REPLACE FUNCTION public.pr_d_capture_views_once(
-    p_row_id bigint, p_youtube_video_id text, p_views numeric(20,0),
+    p_row_id bigint, p_youtube_video_id text, p_views numeric,
     p_published_at timestamptz, p_sync_captured_at timestamptz
 )
 RETURNS boolean
@@ -87,6 +87,8 @@ AS $function$
           AND sync_captured_at IS NULL
           AND p_views IS NOT NULL
           AND p_views >= 0
+          AND p_views <= 18446744073709551615
+          AND p_views = trunc(p_views)
           AND p_published_at IS NOT NULL
           AND p_sync_captured_at >= p_published_at + interval '2 hours 55 minutes'
           AND p_sync_captured_at <= p_published_at + interval '3 hours 5 minutes'
