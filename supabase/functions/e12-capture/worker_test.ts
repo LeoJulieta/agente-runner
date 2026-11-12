@@ -105,6 +105,12 @@ Deno.test("worker obtains source observation itself and persists only through th
     const body = typeof init?.body === "string" ? init.body : "";
     calls.push({ url, method, headers, body });
 
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
     if (url.includes("/rest/v1/youtube_shorts_log")) {
       return Promise.resolve(
         new Response(
@@ -149,9 +155,14 @@ Deno.test("worker obtains source observation itself and persists only through th
     result.candidates === 1 && result.eligible === 1 && result.captured === 1,
     "one eligible row should be captured",
   );
-  assert(calls.length === 3, "worker should query candidates, YouTube, then CAS");
+  assert(calls.length === 4, "worker should claim slot, query candidates, call YouTube, then CAS");
 
-  const candidateCall = calls[0];
+  const slotCall = calls[0];
+  const slotBody = JSON.parse(slotCall.body);
+  assert(slotCall.url.endsWith("/rpc/pr_d_claim_e12_worker_slot"), "worker must claim an idempotency slot first");
+  assert(slotBody.p_minute_bucket === "2026-10-30T05:30:00.000Z", "slot must derive from the signed cron minute");
+
+  const candidateCall = calls[1];
   assert(candidateCall.url.includes("created_at=gte."), "created_at may be used only as a coarse candidate filter");
   assert(candidateCall.url.includes("status=eq.published"), "only published rows are candidates");
   assert(
@@ -163,7 +174,7 @@ Deno.test("worker obtains source observation itself and persists only through th
     "service key must not be copied into Authorization header",
   );
 
-  const youtubeCall = calls[1];
+  const youtubeCall = calls[2];
   const youtubeUrl = new URL(youtubeCall.url);
   assert(
     youtubeUrl.searchParams.get("part") === "snippet,statistics,status",
@@ -175,7 +186,7 @@ Deno.test("worker obtains source observation itself and persists only through th
     "YouTube key must be used only for the source request",
   );
 
-  const rpcCall = calls[2];
+  const rpcCall = calls[3];
   const rpcBody = JSON.parse(rpcCall.body);
   assert(rpcCall.url.endsWith("/rpc/pr_d_capture_views_once"), "persistence must use the CAS RPC");
   assert(rpcBody.p_row_id === "42", "row id must be exact");
@@ -187,6 +198,23 @@ Deno.test("worker obtains source observation itself and persists only through th
     "capture time must be taken after response read",
   );
   assert(!("hs_al_publicar_al_sync" in rpcBody), "legacy elapsed column must never be written by E12");
+});
+
+Deno.test("worker skips replayed signed minute before any YouTube request", async () => {
+  let calls = 0;
+  const fetchImpl: typeof fetch = (input) => {
+    calls++;
+    const url = String(input);
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return Promise.resolve(new Response("false", { status: 200 }));
+    }
+    throw new Error("duplicate invocation must not reach candidates or YouTube");
+  };
+
+  const response = await handleE12Capture(await signedRequest(), dependencies(fetchImpl));
+  const result = await response.json();
+  assert(response.status === 200 && result.skippedDuplicateInvocation === true, "replayed minute must be skipped");
+  assert(calls === 1, "duplicate invocation must stop after slot claim");
 });
 
 Deno.test("worker reports CAS first-write conflicts without overwriting outcomes", async () => {
