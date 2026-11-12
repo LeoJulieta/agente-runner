@@ -106,27 +106,31 @@ Deno.test("worker obtains source observation itself and persists only through th
     calls.push({ url, method, headers, body });
 
     if (url.includes("/rest/v1/youtube_shorts_log")) {
-      return Promise.resolve(new Response(
-        JSON.stringify([{
-          id: 42,
-          youtube_video_id: "video-1",
-          created_at: "2026-10-30T02:00:00Z",
-        }]),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify([{
+            id: 42,
+            youtube_video_id: "video-1",
+            created_at: "2026-10-30T02:00:00Z",
+          }]),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
     }
     if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
-      return Promise.resolve(new Response(
-        JSON.stringify({
-          items: [{
-            id: "video-1",
-            snippet: { publishedAt: "2026-10-30T02:30:00Z" },
-            statistics: { viewCount: YOUTUBE_UINT64_MAX.toString() },
-            status: { privacyStatus: "public" },
-          }],
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            items: [{
+              id: "video-1",
+              snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+              statistics: { viewCount: YOUTUBE_UINT64_MAX.toString() },
+              status: { privacyStatus: "public" },
+            }],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
     }
     if (url.includes("/rest/v1/rpc/pr_d_capture_views_once")) {
       return Promise.resolve(new Response("true", { status: 200, headers: { "content-type": "application/json" } }));
@@ -189,27 +193,31 @@ Deno.test("worker reports CAS first-write conflicts without overwriting outcomes
   const fetchImpl: typeof fetch = (input) => {
     const url = String(input);
     if (url.includes("/rest/v1/youtube_shorts_log")) {
-      return Promise.resolve(new Response(
-        JSON.stringify([{
-          id: 7,
-          youtube_video_id: "video-1",
-          created_at: "2026-10-30T02:00:00Z",
-        }]),
-        { status: 200 },
-      ));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify([{
+            id: 7,
+            youtube_video_id: "video-1",
+            created_at: "2026-10-30T02:00:00Z",
+          }]),
+          { status: 200 },
+        ),
+      );
     }
     if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
-      return Promise.resolve(new Response(
-        JSON.stringify({
-          items: [{
-            id: "video-1",
-            snippet: { publishedAt: "2026-10-30T02:30:00Z" },
-            statistics: { viewCount: "50" },
-            status: { privacyStatus: "public" },
-          }],
-        }),
-        { status: 200 },
-      ));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            items: [{
+              id: "video-1",
+              snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+              statistics: { viewCount: "50" },
+              status: { privacyStatus: "public" },
+            }],
+          }),
+          { status: 200 },
+        ),
+      );
     }
     if (url.includes("/rpc/pr_d_capture_views_once")) {
       return Promise.resolve(new Response("false", { status: 200 }));
