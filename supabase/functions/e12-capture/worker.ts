@@ -46,7 +46,7 @@ export async function verifyCronSignature(
   secret: string,
   nowEpochSeconds: number,
 ): Promise<boolean> {
-  if (!/^\d{10}$/.test(timestamp) || !/^[a-f0-9]{64}$/i.test(suppliedSignature)) {
+  if (secret.length < 32 || !/^\d{10}$/.test(timestamp) || !/^[a-f0-9]{64}$/i.test(suppliedSignature)) {
     return false;
   }
   const timestampSeconds = Number(timestamp);
@@ -92,7 +92,6 @@ async function fetchPendingCandidates(
   url.searchParams.set("sync_captured_at", "is.null");
   url.searchParams.set("elapsed_seconds_e12", "is.null");
   url.searchParams.set("created_at", `gte.${cutoffIso}`);
-  url.searchParams.append("created_at", `lte.${nowIso}`);
   url.searchParams.set("order", "created_at.desc");
   url.searchParams.set("limit", String(CANDIDATE_LIMIT));
 
@@ -183,8 +182,12 @@ export async function handleE12Capture(
     return jsonResponse(401, { error: "unauthorized" });
   }
 
+  const contentLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(contentLength) && contentLength > 2) {
+    return jsonResponse(400, { error: "request_body_must_be_empty" });
+  }
   const body = await request.text();
-  if (body.trim() !== "" && body.trim() !== "{}") {
+  if (body.length > 2 || (body.trim() !== "" && body.trim() !== "{}")) {
     return jsonResponse(400, { error: "request_body_must_be_empty" });
   }
 
