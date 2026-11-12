@@ -61,9 +61,9 @@ Deno.test("cron HMAC accepts fresh signatures and rejects stale or altered ones"
 
 Deno.test("worker rejects GET and invalid HMAC before making network calls", async () => {
   let calls = 0;
-  const fetchImpl = async () => {
+  const fetchImpl = () => {
     calls++;
-    return new Response("[]", { status: 200 });
+    return Promise.resolve(new Response("[]", { status: 200 }));
   };
   const deps = dependencies(fetchImpl);
   const getResponse = await handleE12Capture(
@@ -98,7 +98,7 @@ Deno.test("worker accepts only an empty command body, never caller-supplied obse
 
 Deno.test("worker obtains source observation itself and persists only through the CAS RPC", async () => {
   const calls: Array<{ url: string; method: string; headers: Headers; body: string }> = [];
-  const fetchImpl: typeof fetch = async (input, init) => {
+  const fetchImpl: typeof fetch = (input, init) => {
     const url = String(input);
     const method = init?.method ?? "GET";
     const headers = new Headers(init?.headers);
@@ -106,17 +106,17 @@ Deno.test("worker obtains source observation itself and persists only through th
     calls.push({ url, method, headers, body });
 
     if (url.includes("/rest/v1/youtube_shorts_log")) {
-      return new Response(
+      return Promise.resolve(new Response(
         JSON.stringify([{
           id: 42,
           youtube_video_id: "video-1",
           created_at: "2026-10-30T02:00:00Z",
         }]),
         { status: 200, headers: { "content-type": "application/json" } },
-      );
+      ));
     }
     if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
-      return new Response(
+      return Promise.resolve(new Response(
         JSON.stringify({
           items: [{
             id: "video-1",
@@ -126,10 +126,10 @@ Deno.test("worker obtains source observation itself and persists only through th
           }],
         }),
         { status: 200, headers: { "content-type": "application/json" } },
-      );
+      ));
     }
     if (url.includes("/rest/v1/rpc/pr_d_capture_views_once")) {
-      return new Response("true", { status: 200, headers: { "content-type": "application/json" } });
+      return Promise.resolve(new Response("true", { status: 200, headers: { "content-type": "application/json" } }));
     }
     throw new Error("unexpected_test_fetch_url");
   };
@@ -186,20 +186,20 @@ Deno.test("worker obtains source observation itself and persists only through th
 });
 
 Deno.test("worker reports CAS first-write conflicts without overwriting outcomes", async () => {
-  const fetchImpl: typeof fetch = async (input) => {
+  const fetchImpl: typeof fetch = (input) => {
     const url = String(input);
     if (url.includes("/rest/v1/youtube_shorts_log")) {
-      return new Response(
+      return Promise.resolve(new Response(
         JSON.stringify([{
           id: 7,
           youtube_video_id: "video-1",
           created_at: "2026-10-30T02:00:00Z",
         }]),
         { status: 200 },
-      );
+      ));
     }
     if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
-      return new Response(
+      return Promise.resolve(new Response(
         JSON.stringify({
           items: [{
             id: "video-1",
@@ -209,9 +209,11 @@ Deno.test("worker reports CAS first-write conflicts without overwriting outcomes
           }],
         }),
         { status: 200 },
-      );
+      ));
     }
-    if (url.includes("/rpc/pr_d_capture_views_once")) return new Response("false", { status: 200 });
+    if (url.includes("/rpc/pr_d_capture_views_once")) {
+      return Promise.resolve(new Response("false", { status: 200 }));
+    }
     throw new Error("unexpected_test_fetch_url");
   };
 
