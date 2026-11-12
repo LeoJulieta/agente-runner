@@ -45,7 +45,7 @@ function assertPayload(payload: ObservationAttestationPayload): void {
       !/^[a-f0-9]{64}$/.test(payload.requestedVideoIdsSha256)) {
     throw new Error("e12_attestation_digest_invalid");
   }
-  if (!/^[a-zA-Z0-9._+-]{1,96}$/.test(payload.collectorBuild)) {
+  if (!/^[a-zA-Z0-9._+\/-]{1,96}$/.test(payload.collectorBuild)) {
     throw new Error("e12_attestation_build_invalid");
   }
 }
