@@ -90,3 +90,31 @@ def test_candidate_ci_keeps_database_image_and_actions_immutable():
                 assert len(ref) == 40 and all(char in "0123456789abcdef" for char in ref), (
                     f"GitHub action must be pinned to a full commit SHA: {uses}"
                 )
+
+
+def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
+    workflow_path = ROOT / ".github" / "workflows" / "pr-d-sandbox-eligibility-schema.yml"
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    job = workflow["jobs"].get("postgrest-http-disposable")
+    assert job is not None, "isolated PostgREST HTTP job must remain explicit"
+    assert "postgres" in job.get("services", {}), "HTTP job must own its disposable PostgreSQL service"
+    postgres_image = job["services"]["postgres"]["image"]
+    assert "@sha256:" in postgres_image, "HTTP PostgreSQL service must use immutable digest"
+    steps = job.get("steps", [])
+    commands = [step.get("run", "") for step in steps if isinstance(step, dict)]
+    bootstrap_index = next((i for i, cmd in enumerate(commands) if "bootstrap_pr_d_postgrest.py" in cmd), None)
+    start_index = next((i for i, cmd in enumerate(commands) if "docker run" in cmd and "postgrest/postgrest" in cmd), None)
+    test_index = next((i for i, cmd in enumerate(commands) if "test_pr_d_postgrest_isolated_http.py" in cmd), None)
+    cleanup = next((step for step in steps if isinstance(step, dict) and "docker rm -f prd-postgrest" in step.get("run", "")), None)
+    assert bootstrap_index is not None and start_index is not None and test_index is not None
+    assert bootstrap_index < start_index < test_index, "database identity and schema must be bootstrapped before PostgREST starts"
+    assert cleanup is not None and cleanup.get("if") == "always()", "PostgREST container cleanup must run even after failures"
+
+    safe_test = (ROOT / "tests/e2e/test_pr_d_postgrest_isolated_http.py").read_text(encoding="utf-8")
+    bootstrap = (ROOT / "tests/e2e/bootstrap_pr_d_postgrest.py").read_text(encoding="utf-8")
+    assert 'DISPOSABLE_MARKER == "1"' in safe_test
+    assert 'params.get("dbname") == "prd_test" and params.get("user") == "prd_test"' in safe_test
+    assert 'params.get("dbname") != "prd_test" or params.get("user") != "prd_test"' in bootstrap
+    assert "postgrest_api_must_be_loopback" in bootstrap
+    assert 'Request("GET", "/")' in safe_test, "readiness probe must not mutate database state"
+    assert "readiness-probe" not in safe_test
