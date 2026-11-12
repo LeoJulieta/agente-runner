@@ -124,7 +124,7 @@ def test_schema_widens_legacy_int4_and_preserves_existing_rows(disposable_databa
         """).fetchall())
         stored = conn.execute("""
             SELECT views_primeras_3h, hs_al_publicar_al_sync,
-                   published_at, sync_captured_at
+                   published_at, sync_captured_at, elapsed_seconds_e12
             FROM pr_d_test.youtube_shorts_log
             WHERE youtube_video_id = 'legacy-fixture'
         """).fetchone()
@@ -133,9 +133,10 @@ def test_schema_widens_legacy_int4_and_preserves_existing_rows(disposable_databa
     assert columns["youtube_video_id"] == "text"
     assert columns["views_primeras_3h"] == "numeric"
     assert columns["hs_al_publicar_al_sync"] == "numeric"
+    assert columns["elapsed_seconds_e12"] == "numeric"
     assert columns["published_at"] == "timestamp with time zone"
     assert columns["sync_captured_at"] == "timestamp with time zone"
-    assert stored == (123, Decimal("3.01"), None, None)
+    assert stored == (123, Decimal("3.01"), None, None, None)
     with psycopg.connect(disposable_database) as conn:
         existing_trigger = conn.execute("""
             SELECT EXISTS (
@@ -191,6 +192,8 @@ def test_internal_capture_role_is_least_privilege_and_rpc_is_service_only(dispos
                 has_column_privilege('pr_d_capture_owner',
                     'pr_d_test.youtube_shorts_log', 'views_primeras_3h', 'UPDATE'),
                 has_column_privilege('pr_d_capture_owner',
+                    'pr_d_test.youtube_shorts_log', 'elapsed_seconds_e12', 'UPDATE'),
+                has_column_privilege('pr_d_capture_owner',
                     'pr_d_test.youtube_shorts_log', 'hs_al_publicar_al_sync', 'UPDATE'),
                 has_table_privilege('pr_d_capture_owner',
                     'pr_d_test.youtube_shorts_log', 'UPDATE'),
@@ -210,7 +213,7 @@ def test_internal_capture_role_is_least_privilege_and_rpc_is_service_only(dispos
     assert internal_privileges == (True, False, False)
     assert role == (False, False, False, False, False, False, False)
     assert membership_count == 0
-    assert helper_privileges == (True, True, False, False, False)
+    assert helper_privileges == (True, True, False, False, False, False)
     assert rls_and_ownership == (True, True)
 
 
@@ -224,6 +227,7 @@ def test_service_role_cannot_bypass_cas_but_can_update_unrelated_columns(disposa
                    SET views_primeras_3h = 99,
                        published_at = %s,
                        sync_captured_at = %s,
+                       elapsed_seconds_e12 = 10800,
                        hs_al_publicar_al_sync = 3
                  WHERE id = %s
             """, (PUBLISHED_AT, CAPTURED_AT, row_id))
@@ -248,10 +252,10 @@ def test_service_role_cannot_bypass_cas_but_can_update_unrelated_columns(disposa
     with psycopg.connect(disposable_database) as conn:
         stored = conn.execute("""
             SELECT views_primeras_3h, published_at, sync_captured_at,
-                   hs_al_publicar_al_sync
+                   elapsed_seconds_e12, hs_al_publicar_al_sync
             FROM pr_d_test.youtube_shorts_log WHERE id = %s
         """, (row_id,)).fetchone()
-    assert stored == (None, None, None, None)
+    assert stored == (None, None, None, None, None)
 
 
 def test_service_role_cannot_insert_forged_capture_or_delete_captured_row(disposable_database):
@@ -261,8 +265,8 @@ def test_service_role_cannot_insert_forged_capture_or_delete_captured_row(dispos
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
                     (youtube_video_id, views_primeras_3h, published_at,
-                     sync_captured_at, hs_al_publicar_al_sync)
-                VALUES ('forged-insert', 7, %s, %s, 3)
+                     sync_captured_at, elapsed_seconds_e12, hs_al_publicar_al_sync)
+                VALUES ('forged-insert', 7, %s, %s, 10800, 3)
             """, (PUBLISHED_AT, CAPTURED_AT))
 
     row_id = insert_video(disposable_database, "captured-delete-bypass")
@@ -304,14 +308,15 @@ def test_capture_rpc_is_service_role_only_and_stores_exact_elapsed(disposable_da
     with psycopg.connect(disposable_database) as conn:
         stored = conn.execute("""
             SELECT views_primeras_3h, published_at, sync_captured_at,
-                   hs_al_publicar_al_sync
+                   elapsed_seconds_e12, hs_al_publicar_al_sync
             FROM pr_d_test.youtube_shorts_log WHERE id = %s
         """, (row_id,)).fetchone()
     assert stored == (
         321,
         datetime.fromisoformat("2026-10-30T02:30:00+00:00"),
         datetime.fromisoformat("2026-10-30T05:30:00+00:00"),
-        Decimal("3.0000000000000000"),
+        Decimal("10800.000000"),
+        None,
     )
 
 
@@ -321,10 +326,11 @@ def test_migration_cas_is_reusable_and_first_write_wins(disposable_database):
     assert _cas(disposable_database, row_id, "yt-fixture-001", 999) is False
     with psycopg.connect(disposable_database) as conn:
         stored = conn.execute("""
-            SELECT views_primeras_3h, hs_al_publicar_al_sync
+            SELECT views_primeras_3h, elapsed_seconds_e12,
+                   hs_al_publicar_al_sync
             FROM pr_d_test.youtube_shorts_log WHERE id = %s
         """, (row_id,)).fetchone()
-    assert stored == (456, Decimal("3.0000000000000000"))
+    assert stored == (456, Decimal("10800.000000"), None)
 
 
 def test_wrong_youtube_id_cannot_claim_row(disposable_database):
@@ -507,6 +513,6 @@ def test_view_count_above_uint64_is_rejected_by_database_constraint(disposable_d
                    SET views_primeras_3h = 18446744073709551616,
                        published_at = %s,
                        sync_captured_at = %s,
-                       hs_al_publicar_al_sync = 3
+                       elapsed_seconds_e12 = 10800
                  WHERE id = %s
             """, (PUBLISHED_AT, CAPTURED_AT, row_id))
