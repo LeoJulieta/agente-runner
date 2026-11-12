@@ -25,13 +25,7 @@ def test_legacy_public_schema_http_e2e_files_are_explicitly_skipped():
             if not any(isinstance(target, ast.Name) and target.id == "pytestmark" for target in node.targets):
                 continue
             value = node.value
-            if (
-                isinstance(value, ast.Call)
-                and isinstance(value.func, ast.Attribute)
-                and isinstance(value.func.value, ast.Name)
-                and value.func.value.id == "pytest"
-                and value.func.attr == "skip"
-            ):
+            if isinstance(value, ast.Call) and ast.unparse(value.func) == "pytest.mark.skip":
                 module_skip = True
                 break
         assert module_skip, f"{path.name} must remain module-skipped until safely rewritten"
