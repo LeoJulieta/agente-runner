@@ -48,7 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        # Docker Official Image 17.11 multi-platform index digest; immutable.
+        image: postgres:17.11@sha256:653186fe15006c099d2fb3bc1d8461c1dee9d036c43f2e5fdaf4f22e5e601876
         env:
           POSTGRES_USER: prd_test
           POSTGRES_PASSWORD: prd_test
@@ -72,3 +73,15 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements/pr-d-statistical-fixtures-py312.txt
       - name: Apply candidate migration to disposable schema and test CAS
         run: python -m pytest -q tests/integration/test_pr_d_sync_schema_compatibility.py
+
+  windows-iana-timezone:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned dependencies including IANA tzdata
+        run: python -m pip install --disable-pip-version-check -r requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Verify IANA timezone conversion and temporal eligibility on Windows
+        run: python -m pytest -q tests/test_pr_d_sync_cohort_estimator_e2e.py
