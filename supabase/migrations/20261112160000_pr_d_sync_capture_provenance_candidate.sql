@@ -116,6 +116,25 @@ BEGIN
             'prd_capture_role_preflight_failed: pr_d_capture_owner must have no role memberships';
     END IF;
 
+    IF NOT (
+        SELECT relrowsecurity
+        FROM pg_class
+        WHERE oid = 'public.youtube_shorts_log'::regclass
+    ) THEN
+        RAISE EXCEPTION
+            'prd_capture_table_preflight_failed: youtube_shorts_log must have RLS enabled';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM pg_class
+        WHERE oid = 'public.youtube_shorts_log'::regclass
+          AND relowner = v_role_oid
+    ) THEN
+        RAISE EXCEPTION
+            'prd_capture_table_preflight_failed: restricted capture role must not own youtube_shorts_log';
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'pr_d_internal') THEN
         CREATE SCHEMA pr_d_internal AUTHORIZATION pr_d_capture_owner;
     END IF;
