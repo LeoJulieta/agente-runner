@@ -84,7 +84,7 @@ SET search_path = pg_catalog, pr_d_internal
 SET statement_timeout = '10s'
 SET lock_timeout = '5s'
 AS $renew$
-DECLARE v_claims jsonb; v_now timestamptz; v_updated integer;
+DECLARE v_claims jsonb; v_updated integer;
 BEGIN
     v_claims := NULLIF(current_setting('request.jwt.claims', true), '')::jsonb;
     IF v_claims ->> 'role' IS DISTINCT FROM 'service_role' THEN
@@ -94,7 +94,6 @@ BEGIN
        OR p_ttl_seconds < 30 OR p_ttl_seconds > 300 THEN
         RAISE EXCEPTION 'prd_e12_lease_arguments_invalid' USING ERRCODE = '22023';
     END IF;
-    v_now := clock_timestamp();
     UPDATE pr_d_internal.e12_worker_lease
        SET lease_expires_at = clock_timestamp() + make_interval(secs => p_ttl_seconds),
            heartbeat_at = clock_timestamp(), updated_at = clock_timestamp()
@@ -111,7 +110,7 @@ SET search_path = pg_catalog, pr_d_internal
 SET statement_timeout = '10s'
 SET lock_timeout = '5s'
 AS $release$
-DECLARE v_claims jsonb; v_now timestamptz; v_updated integer;
+DECLARE v_claims jsonb; v_updated integer;
 BEGIN
     v_claims := NULLIF(current_setting('request.jwt.claims', true), '')::jsonb;
     IF v_claims ->> 'role' IS DISTINCT FROM 'service_role' THEN
@@ -120,7 +119,6 @@ BEGIN
     IF p_run_id IS NULL OR p_fencing_token IS NULL THEN
         RAISE EXCEPTION 'prd_e12_lease_arguments_invalid' USING ERRCODE = '22023';
     END IF;
-    v_now := clock_timestamp();
     UPDATE pr_d_internal.e12_worker_lease
        SET lease_expires_at = clock_timestamp(), heartbeat_at = clock_timestamp(), updated_at = clock_timestamp()
      WHERE singleton AND owner_run_id = p_run_id AND fencing_token = p_fencing_token
