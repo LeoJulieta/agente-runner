@@ -78,6 +78,8 @@ jobs:
           # Fail-closed: absent/false keeps E12 capture disabled until the
           # candidate Supabase migration is deliberately deployed and approved.
           PR_D_E12_CAPTURE_ENABLED: ${{ vars.PR_D_E12_CAPTURE_ENABLED }}
+          # Second independent gate: blank/unset remains dry-run.
+          PR_D_E12_DRY_RUN: ${{ vars.PR_D_E12_DRY_RUN }}
           UNSPLASH_ACCESS_KEY: ${{ secrets.UNSPLASH_ACCESS_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
