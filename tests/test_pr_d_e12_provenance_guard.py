@@ -35,6 +35,26 @@ def test_valid_e12_provenance_is_required_before_fingerprint_assignment():
     assert E12_METHOD_FINGERPRINT != METHOD_FINGERPRINT_OLS_HC3
 
 
+def test_empty_eligible_cohort_keeps_the_validated_e12_fingerprint():
+    cohort = build_preregistered_cohort(
+        [
+            {"id": "early-1", "views_primeras_3h": 10, "x": 1.0, "elapsed": 7200},
+            {"id": "early-2", "views_primeras_3h": 20, "x": 2.0, "elapsed": 8000},
+        ],
+        candidate_id_field="id",
+        outcome_field="views_primeras_3h",
+        predictor_fields=["x"],
+        sync_elapsed_seconds_field="elapsed",
+        sync_window=SyncWindow(10500, 11100, True, True, "exclude_with_reason"),
+        preregistered_masks={},
+        temporal_anchor="publishedAt",
+    )
+    result = fit_eligible_cohort_hc3(cohort, coefficient_index=0)
+    assert result["status"] == "INSUFFICIENT_POWER"
+    assert result["metrics"]["n_eff"] == 0
+    assert result["metrics"]["method_fingerprint"] == E12_METHOD_FINGERPRINT
+
+
 def test_missing_filter_provenance_is_rejected():
     cohort = _cohort()
     del cohort["filter_provenance"]
