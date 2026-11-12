@@ -32,11 +32,11 @@ def _kwargs(**overrides):
     values = {
         "b_status": "PROMETE", "b_hypothesis_id": "H001",
         "b_contract_sha256": "a" * 64,
-        "b_method_fingerprint": "ols-ln-positive-y-hc3-t-two-sided-v1",
+        "b_method_fingerprint": "ols-ln-positive-y-hc3-t-two-sided-v1__yt-viewcount-publishedat-10500-11100-closed-missing-excluded-v1",
         "b_effect_size": 0.4, "b_ci_low": 0.1, "b_ci_high": 0.7,
         "antecedent_a": {
             "hypothesis_id": "H001", "contract_sha256": "a" * 64,
-            "method_fingerprint": "ols-ln-positive-y-hc3-t-two-sided-v1",
+            "method_fingerprint": "ols-ln-positive-y-hc3-t-two-sided-v1__yt-viewcount-publishedat-10500-11100-closed-missing-excluded-v1",
             "window": "A", "status": "PROMETE",
             "effect_size": 0.3, "ci_low": 0.05, "ci_high": 0.6,
         },
@@ -76,3 +76,9 @@ def test_reproducibility_precedence_and_failure_paths(overrides, status, reason)
 def test_reproducibility_rejects_non_boolean_flags():
     with pytest.raises(ValueError, match="reproducibility_flags_must_be_booleans"):
         evaluate_reproducibility(**_kwargs(windows_disjoint=1))
+
+
+def test_family_ii_fingerprint_freezes_temporal_outcome_contract():
+    from labs.pr_d_family_ii import METHOD_FINGERPRINT_OLS_HC3
+
+    assert METHOD_FINGERPRINT_OLS_HC3 == "ols-ln-positive-y-hc3-t-two-sided-v1__yt-viewcount-publishedat-10500-11100-closed-missing-excluded-v1"

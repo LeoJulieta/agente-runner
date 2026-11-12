@@ -702,3 +702,10 @@ inclusivos, y la política de exclusión de capturas ausentes. El
 `method_fingerprint` deberá incorporar estos límites, inclusividad,
 ancla temporal y política de datos faltantes; no basta con registrar
 solo el nombre del outcome.
+
+Para esta candidatura, la huella exacta de Familia II será
+`ols-ln-positive-y-hc3-t-two-sided-v1__yt-viewcount-publishedat-10500-11100-closed-missing-excluded-v1`. Codifica OLS sobre log(Y), HC3, contraste t bilateral,
+YouTube `statistics.viewCount`, ancla `publishedAt`, límites de
+10 500–11 100 segundos inclusivos y exclusión de capturas ausentes.
+No se considerarán comparables resultados con otra huella; cambiar
+cualquiera de estos elementos exige una nueva versión de huella.

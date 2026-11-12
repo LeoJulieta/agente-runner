@@ -11,7 +11,7 @@ from typing import Any, Iterable
 import numpy as np
 import statsmodels.api as sm
 
-METHOD_FINGERPRINT_OLS_HC3 = "ols-ln-positive-y-hc3-t-two-sided-v1"
+METHOD_FINGERPRINT_OLS_HC3 = "ols-ln-positive-y-hc3-t-two-sided-v1__yt-viewcount-publishedat-10500-11100-closed-missing-excluded-v1"
 DRIFT_DEGENERACY_REASONS = frozenset({
     "insufficient_positive_events",
     "scale_zero_medians_equal",
