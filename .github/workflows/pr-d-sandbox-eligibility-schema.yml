@@ -5,6 +5,7 @@ on:
     branches:
       - sandbox/pr-d-cohort-eligibility-schema-2026-11-12
       - sandbox/pr-d-e12-write-boundary-legacy-migration-2026-11-12
+      - sandbox/pr-d-e12-adversarial-hardening-2026-11-12
     paths:
       - "labs/pr_d_cohort_builder.py"
       - "labs/pr_d_family_ii.py"
