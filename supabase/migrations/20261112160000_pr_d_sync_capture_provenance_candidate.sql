@@ -124,6 +124,12 @@ BEGIN
         RETURN NEW;
     END IF;
 
+    IF OLD.views_primeras_3h IS NOT NULL
+       AND NEW.youtube_video_id IS DISTINCT FROM OLD.youtube_video_id THEN
+        RAISE EXCEPTION 'prd_capture_video_identity_is_immutable'
+            USING ERRCODE = '42501';
+    END IF;
+
     IF (
         NEW.views_primeras_3h IS DISTINCT FROM OLD.views_primeras_3h
         OR NEW.published_at IS DISTINCT FROM OLD.published_at
@@ -139,7 +145,7 @@ $guard$;
 DROP TRIGGER IF EXISTS youtube_shorts_log_capture_write_guard
     ON public.youtube_shorts_log;
 CREATE TRIGGER youtube_shorts_log_capture_write_guard
-    BEFORE INSERT OR UPDATE OF views_primeras_3h, published_at, sync_captured_at
+    BEFORE INSERT OR UPDATE OF youtube_video_id, views_primeras_3h, published_at, sync_captured_at
     ON public.youtube_shorts_log
     FOR EACH ROW EXECUTE FUNCTION public.pr_d_guard_capture_write();
 REVOKE ALL ON FUNCTION public.pr_d_guard_capture_write() FROM PUBLIC, anon, authenticated, service_role;
