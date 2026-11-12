@@ -228,10 +228,12 @@ Deno.test("worker fails closed instead of silently truncating more than 500 cand
       return Promise.resolve(new Response("true", { status: 200 }));
     }
     if (url.includes("/rest/v1/youtube_shorts_log")) {
-      return Promise.resolve(new Response(JSON.stringify(candidates), {
-        status: 200,
-        headers: { "content-range": "0-499/501" },
-      }));
+      return Promise.resolve(
+        new Response(JSON.stringify(candidates), {
+          status: 200,
+          headers: { "content-range": "0-499/501" },
+        }),
+      );
     }
     throw new Error("candidate cap must stop before YouTube");
   };
