@@ -12,6 +12,9 @@ export type E12Observation = {
   elapsedMicros: bigint;
   eligible: boolean;
   reason: "eligible" | "published_at_in_future" | "outside_e12_window";
+  responseBodySha256?: string;
+  requestedVideoIdsSha256?: string;
+  collectorBuild?: string;
 };
 
 export type ClockMicros = () => bigint;
@@ -146,7 +149,7 @@ export function parseYouTubeVideosResponse(
 async function readBoundedBody(
   response: Response,
   clockMicros: ClockMicros,
-): Promise<{ bodyText: string; capturedAtMicros: bigint }> {
+): Promise<{ bodyText: string; capturedAtMicros: bigint; responseBodySha256: string }> {
   const reader = response.body?.getReader();
   if (!reader) {
     // A successful API response without a readable body is not a valid
@@ -178,7 +181,9 @@ async function readBoundedBody(
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { bodyText: new TextDecoder().decode(bytes), capturedAtMicros };
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  const responseBodySha256 = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return { bodyText: new TextDecoder("utf-8", { fatal: true }).decode(bytes), capturedAtMicros, responseBodySha256 };
 }
 
 export async function collectYouTubeBatch(
@@ -210,6 +215,20 @@ export async function collectYouTubeBatch(
   });
   if (!response.ok) throw new Error(`youtube_http_${response.status}`);
 
-  const { bodyText, capturedAtMicros } = await readBoundedBody(response, clockMicros);
-  return parseYouTubeVideosResponse(bodyText, videoIds, capturedAtMicros);
+  const { bodyText, capturedAtMicros, responseBodySha256 } = await readBoundedBody(response, clockMicros);
+  const requestedCanonical = JSON.stringify([...videoIds].sort());
+  const requestedDigestBytes = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(requestedCanonical)),
+  );
+  const requestedVideoIdsSha256 = Array.from(
+    requestedDigestBytes,
+    (byte) => byte.toString(16).padStart(2, "0"),
+  ).join("");
+  const observations = parseYouTubeVideosResponse(bodyText, videoIds, capturedAtMicros);
+  return observations.map((observation) => ({
+    ...observation,
+    responseBodySha256,
+    requestedVideoIdsSha256,
+    collectorBuild: "e12-collector/0.1.0",
+  }));
 }
