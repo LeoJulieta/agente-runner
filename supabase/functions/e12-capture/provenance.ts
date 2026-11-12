@@ -23,6 +23,7 @@ export type ObservationAttestation = {
   keyId: string;
   payloadSha256: string;
   signatureBase64: string;
+  hmacSignatureHex: string;
 };
 
 function assertPayload(payload: ObservationAttestationPayload): void {
@@ -94,6 +95,31 @@ function decodeBase64(value: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function constantTimeEqual(left: string, right: string): boolean {
+  if (left.length !== right.length) return false;
+  let difference = 0;
+  for (let index = 0; index < left.length; index++) {
+    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return difference === 0;
+}
+
+async function hmacSha256Hex(canonical: Uint8Array, secretBase64: string): Promise<string> {
+  const secretBytes = new Uint8Array(decodeBase64(secretBase64));
+  if (secretBytes.byteLength < 32) throw new Error("e12_attestation_hmac_key_too_short");
+  const key = await crypto.subtle.importKey(
+    "raw",
+    toArrayBuffer(secretBytes),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(
+    await crypto.subtle.sign("HMAC", key, toArrayBuffer(canonical)),
+  );
+  return Array.from(signature, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 function encodeBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -112,6 +138,7 @@ export async function hashRequestedVideoIds(videoIds: string[]): Promise<string>
 export async function createObservationAttestation(
   payload: ObservationAttestationPayload,
   privateKeyPkcs8Base64: string,
+  hmacSecretBase64: string,
 ): Promise<ObservationAttestation> {
   const canonical = canonicalizeObservationPayload(payload);
   const privateKey = await crypto.subtle.importKey(
@@ -128,6 +155,7 @@ export async function createObservationAttestation(
     keyId: payload.keyId,
     payloadSha256: await sha256Hex(canonical),
     signatureBase64: encodeBase64(signature),
+    hmacSignatureHex: await hmacSha256Hex(canonical, hmacSecretBase64),
   };
 }
 
@@ -135,6 +163,7 @@ export async function verifyObservationAttestation(
   payload: ObservationAttestationPayload,
   attestation: ObservationAttestation,
   publicKeySpkiBase64: string,
+  hmacSecretBase64: string,
 ): Promise<boolean> {
   if (attestation.version !== E12_ATTESTATION_VERSION ||
       attestation.algorithm !== E12_ATTESTATION_ALGORITHM ||
@@ -143,6 +172,11 @@ export async function verifyObservationAttestation(
     const canonical = canonicalizeObservationPayload(payload);
     const digest = await sha256Hex(canonical);
     if (digest !== attestation.payloadSha256) return false;
+    if (!/^[a-f0-9]{64}$/.test(attestation.hmacSignatureHex)) return false;
+    if (!constantTimeEqual(
+      await hmacSha256Hex(canonical, hmacSecretBase64),
+      attestation.hmacSignatureHex,
+    )) return false;
     const publicKey = await crypto.subtle.importKey(
       "spki",
       decodeBase64(publicKeySpkiBase64),
