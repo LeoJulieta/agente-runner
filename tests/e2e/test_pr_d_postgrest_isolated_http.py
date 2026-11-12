@@ -187,3 +187,63 @@ def test_anon_role_cannot_execute_privileged_rpc():
     )
     assert status in {401, 403}, f"anon_rpc_must_be_denied_http_{status}"
     assert _rows("E2E_POSTGREST_ANON_DENIED") == []
+
+
+def _insert_e12_video(video_id):
+    with psycopg.connect(DATABASE_URL) as conn:
+        return conn.execute(
+            "INSERT INTO public.youtube_shorts_log (youtube_video_id) VALUES (%s) RETURNING id",
+            (video_id,),
+        ).fetchone()[0]
+
+
+def test_e12_capture_rpc_over_http_is_cas_and_preserves_uint64():
+    video_id = "e12-http-uint64"
+    row_id = _insert_e12_video(video_id)
+    payload = {
+        "p_row_id": row_id,
+        "p_youtube_video_id": video_id,
+        "p_views": "18446744073709551615",
+        "p_published_at": "2026-10-30T02:30:00Z",
+        "p_sync_captured_at": "2026-10-30T05:30:00Z",
+    }
+    first_status, first = _request("POST", "/rpc/pr_d_capture_views_once", payload=payload)
+    second_status, second = _request("POST", "/rpc/pr_d_capture_views_once", payload=payload)
+    assert first_status == second_status == 200
+    assert first is True
+    assert second is False
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute(
+            "SELECT views_primeras_3h FROM public.youtube_shorts_log WHERE id = %s",
+            (row_id,),
+        ).fetchone()[0]
+    assert stored == 18446744073709551615
+
+
+def test_e12_capture_rpc_rejects_wrong_id_outside_window_and_anon():
+    row_id = _insert_e12_video("e12-http-correct")
+    base = {
+        "p_row_id": row_id,
+        "p_youtube_video_id": "wrong-id",
+        "p_views": "99",
+        "p_published_at": "2026-10-30T02:30:00Z",
+        "p_sync_captured_at": "2026-10-30T05:30:00Z",
+    }
+    status, result = _request("POST", "/rpc/pr_d_capture_views_once", payload=base)
+    assert status == 200 and result is False
+
+    outside = dict(base, p_youtube_video_id="e12-http-correct", p_sync_captured_at="2026-10-30T05:35:00.000001Z")
+    status, result = _request("POST", "/rpc/pr_d_capture_views_once", payload=outside)
+    assert status == 200 and result is False
+
+    status, _ = _request(
+        "POST", "/rpc/pr_d_capture_views_once", role="anon",
+        payload=dict(base, p_youtube_video_id="e12-http-correct"),
+    )
+    assert status in {401, 403}
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute(
+            "SELECT views_primeras_3h FROM public.youtube_shorts_log WHERE id = %s",
+            (row_id,),
+        ).fetchone()[0]
+    assert stored is None
