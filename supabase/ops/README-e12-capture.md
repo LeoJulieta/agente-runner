@@ -40,3 +40,5 @@ The SQL CAS remains the final first-write-wins authority. Legacy `hs_al_publicar
 Before reading candidates or calling YouTube, the worker calls the service-role-only RPC `pr_d_claim_e12_worker_slot`. Its private singleton table allows one successful claim per signed UTC minute, rejects older replays, and is not exposed through PostgREST. The CAS still protects each row independently.
 
 The HMAC signature remains visible in the pg_net queue and is valid for at most 120 seconds. Replaying it cannot cause a second worker run for the same minute; a first valid invocation simply triggers the same bounded worker. This does not replace the need to audit pg_net ACLs and existing jobs before deployment.
+
+The worker asks PostgREST for an exact candidate count and caps one cycle at 500 rows. If the result would be truncated, it fails closed before calling YouTube rather than silently skipping older candidates. A larger backlog requires an explicit pagination/quota design.
