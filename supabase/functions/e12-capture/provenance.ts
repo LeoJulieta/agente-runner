@@ -6,6 +6,7 @@ export const E12_ATTESTATION_ALGORITHM = "Ed25519";
 export type ObservationAttestationPayload = {
   keyId: string;
   runId: string;
+  fencingToken: string;
   rowId: string;
   videoId: string;
   publishedAt: string;
@@ -31,7 +32,7 @@ function assertPayload(payload: ObservationAttestationPayload): void {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.runId)) {
     throw new Error("e12_attestation_run_id_invalid");
   }
-  if (!/^[1-9]\d*$/.test(payload.rowId) || !payload.videoId.trim() || payload.videoId !== payload.videoId.trim()) {
+  if (!/^[1-9]\d*$/.test(payload.fencingToken) || !/^[1-9]\d*$/.test(payload.rowId) || !payload.videoId.trim() || payload.videoId !== payload.videoId.trim()) {
     throw new Error("e12_attestation_identity_invalid");
   }
   if (!/^(0|[1-9]\d*)$/.test(payload.viewCount) || BigInt(payload.viewCount) > YOUTUBE_UINT64_MAX) {
@@ -59,6 +60,7 @@ export function canonicalizeObservationPayload(payload: ObservationAttestationPa
     E12_ATTESTATION_VERSION,
     payload.keyId,
     payload.runId,
+    payload.fencingToken,
     payload.rowId,
     payload.videoId,
     payload.publishedAt,
