@@ -9,7 +9,6 @@ import hashlib
 import hmac
 import json
 import os
-from pathlib import Path
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
@@ -20,7 +19,6 @@ import pytest
 from psycopg.conninfo import conninfo_to_dict
 
 
-ROOT = Path(__file__).resolve().parents[2]
 API_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 DATABASE_URL = os.getenv("TEST_DATABASE_URL", "")
 JWT_SECRET = os.getenv("PR_D_TEST_JWT_SECRET", "")
