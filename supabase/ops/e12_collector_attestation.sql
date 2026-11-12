@@ -351,7 +351,7 @@ BEGIN
        INTO v_expected_hmac
        USING pg_catalog.convert_to(p_collector_payload_canonical, 'UTF8'),
              v_key.hmac_secret, 'sha256';
-    IF v_expected_hmac IS DISTINCT FROM decode(p_collector_hmac_signature, 'hex') THEN
+    IF v_expected_hmac IS DISTINCT FROM pg_catalog.decode(p_collector_hmac_signature, 'hex') THEN
         RETURN false;
     END IF;
 
