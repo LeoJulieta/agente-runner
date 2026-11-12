@@ -238,6 +238,10 @@ def test_revoked_key_is_rejected_and_attestation_columns_are_immutable():
     with connect() as conn:
         conn.execute("SET ROLE service_role")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("SELECT hmac_secret FROM pr_d_internal.e12_collector_key_registry")
+        conn.rollback()
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("UPDATE public.youtube_shorts_log SET collector_signature=%s WHERE id=2", ("B" * 86 + "==",))
         conn.rollback()
         conn.execute("SET ROLE service_role")
