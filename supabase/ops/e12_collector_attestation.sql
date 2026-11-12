@@ -316,6 +316,11 @@ BEGIN
         RETURN false;
     END IF;
 
+    IF digest(convert_to(p_collector_payload_canonical, 'UTF8'), 'sha256')
+       IS DISTINCT FROM decode(p_collector_payload_sha256, 'hex') THEN
+        RETURN false;
+    END IF;
+
     SELECT public_key_spki_base64, hmac_secret
       INTO v_key
       FROM pr_d_internal.e12_collector_key_registry
