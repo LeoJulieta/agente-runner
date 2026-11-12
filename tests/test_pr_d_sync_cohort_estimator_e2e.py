@@ -76,6 +76,7 @@ def _build(n_rows, *, include_out_of_window=False):
             lower_inclusive=True, upper_inclusive=True, missing_policy=MISSING_EXCLUDE,
         ),
         preregistered_masks={},
+        temporal_anchor="publishedAt",
     )
 
 
