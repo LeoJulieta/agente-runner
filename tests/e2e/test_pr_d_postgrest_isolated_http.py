@@ -537,3 +537,47 @@ def test_lab_results_immutability_guard_covers_id_and_later_columns():
             (evidence_id,),
         ).fetchone()
     assert stored == ("STALE", None)
+
+def test_lab_results_writer_rejects_preexisting_superuser_role_atomically():
+    from pathlib import Path
+
+    migration = (
+        Path(__file__).resolve().parents[2]
+        / "supabase/migrations/20261112170000_pr_d_lab_results_rpc_write_boundary_candidate.sql"
+    ).read_text(encoding="utf-8")
+
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("BEGIN")
+        conn.execute("ALTER ROLE pr_d_lab_results_writer SUPERUSER")
+        conn.execute("SAVEPOINT candidate_migration")
+        with pytest.raises(
+            psycopg.errors.RaiseException,
+            match="prd_lab_results_writer_role_misconfigured",
+        ):
+            conn.execute(migration)
+        conn.execute("ROLLBACK TO SAVEPOINT candidate_migration")
+
+        assert conn.execute(
+            "SELECT rolsuper FROM pg_roles WHERE rolname='pr_d_lab_results_writer'"
+        ).fetchone()[0] is True
+        assert conn.execute(
+            """
+            SELECT count(*) FROM pg_auth_members
+            WHERE roleid = (SELECT oid FROM pg_roles WHERE rolname='pr_d_lab_results_writer')
+               OR member = (SELECT oid FROM pg_roles WHERE rolname='pr_d_lab_results_writer')
+            """
+        ).fetchone()[0] == 0
+        owner = conn.execute(
+            """
+            SELECT pg_get_userbyid(proowner)
+            FROM pg_proc
+            WHERE oid = 'public.rpc_insert_baseline_and_evidence(text,integer,jsonb,text,jsonb,jsonb,text,boolean,text)'::regprocedure
+            """
+        ).fetchone()[0]
+        assert owner == "pr_d_lab_results_writer"
+        conn.execute("ROLLBACK")
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        assert conn.execute(
+            "SELECT rolsuper FROM pg_roles WHERE rolname='pr_d_lab_results_writer'"
+        ).fetchone()[0] is False
