@@ -112,3 +112,29 @@ def test_adapter_rejects_non_null_analytic_values_on_excluded_rows():
     cohort["n_events"] = 39
     with pytest.raises(ValueError, match="excluded_analytic_placeholder_must_be_null"):
         fit_eligible_cohort_hc3(cohort, coefficient_index=1)
+
+
+@pytest.mark.parametrize(
+    ("elapsed", "expected_eligible"),
+    [
+        (timedelta(hours=3), True),
+        (timedelta(hours=6), True),
+        (timedelta(hours=3) - timedelta(microseconds=1), False),
+        (timedelta(hours=6) + timedelta(microseconds=1), False),
+    ],
+)
+def test_sync_window_closed_boundaries_and_immediate_outside_values(elapsed, expected_eligible):
+    published = datetime.fromisoformat(PUBLISHED.replace("Z", "+00:00"))
+    captured = published + elapsed
+    decision = evaluate_sync_window(published, captured.isoformat())
+    assert decision.eligible is expected_eligible
+    assert decision.elapsed_seconds == elapsed.total_seconds()
+    assert decision.reason is (None if expected_eligible else "OUTSIDE_SYNC_WINDOW")
+
+
+def test_sync_window_normalizes_equivalent_timezone_offsets():
+    published_utc = "2026-10-30T02:30:00Z"
+    captured_with_offset = "2026-10-30T09:30:00+03:00"
+    decision = evaluate_sync_window(published_utc, captured_with_offset)
+    assert decision.eligible is True
+    assert decision.elapsed_seconds == 4 * 60 * 60
