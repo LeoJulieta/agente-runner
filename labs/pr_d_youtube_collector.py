@@ -129,3 +129,92 @@ def collect_public_video_observation(
         expected_video_id=video_id,
         sync_captured_at=captured_at,
     )
+
+
+def parse_video_observations_batch(
+    response: Any,
+    *,
+    expected_video_ids: list[str],
+    sync_captured_at: datetime,
+) -> tuple[dict[str, YouTubeObservation], dict[str, str]]:
+    """Parse a videos.list batch into accepted observations and row exclusions.
+
+    A malformed individual resource excludes only that video. A malformed
+    top-level response rejects the batch because no row-level provenance can
+    be trusted. Duplicate requested IDs are rejected before parsing.
+    """
+    if not isinstance(expected_video_ids, list) or not expected_video_ids:
+        raise ValueError("youtube_video_ids_required")
+    if len(expected_video_ids) > 50:
+        raise ValueError("youtube_batch_limit_exceeded")
+    if any(not isinstance(video_id, str) or not video_id.strip() for video_id in expected_video_ids):
+        raise ValueError("youtube_video_id_invalid")
+    if len(set(expected_video_ids)) != len(expected_video_ids):
+        raise ValueError("youtube_video_ids_duplicate")
+    if not isinstance(response, dict) or not isinstance(response.get("items"), list):
+        raise YouTubeReadError("youtube_items_missing_or_invalid")
+
+    observations: dict[str, YouTubeObservation] = {}
+    excluded: dict[str, str] = {}
+    for video_id in expected_video_ids:
+        try:
+            observations[video_id] = parse_video_observation(
+                response,
+                expected_video_id=video_id,
+                sync_captured_at=sync_captured_at,
+            )
+        except ObservationExcluded as exc:
+            excluded[video_id] = exc.code
+        except YouTubeReadError as exc:
+            excluded[video_id] = str(exc)
+    return observations, excluded
+
+
+def collect_public_video_observations_batch(
+    video_ids: list[str],
+    *,
+    api_key: str,
+    opener: Callable[..., Any] = urlopen,
+    clock: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    timeout_seconds: float = 15.0,
+) -> tuple[dict[str, YouTubeObservation], dict[str, str]]:
+    """Fetch up to 50 public videos in one call and timestamp the received body."""
+    if not isinstance(video_ids, list) or not video_ids:
+        raise ValueError("youtube_video_ids_required")
+    if len(video_ids) > 50:
+        raise ValueError("youtube_batch_limit_exceeded")
+    if len(set(video_ids)) != len(video_ids):
+        raise ValueError("youtube_video_ids_duplicate")
+    if not isinstance(api_key, str) or not api_key.strip():
+        raise ValueError("youtube_api_key_required")
+    if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)) or timeout_seconds <= 0:
+        raise ValueError("youtube_timeout_invalid")
+
+    query = urlencode({
+        "part": "snippet,statistics,status",
+        "id": ",".join(video_ids),
+        "key": api_key,
+    })
+    request = Request(
+        f"{YOUTUBE_VIDEOS_LIST_URL}?{query}",
+        headers={"Accept": "application/json"},
+        method="GET",
+    )
+    try:
+        with opener(request, timeout=timeout_seconds) as response:
+            body = response.read(MAX_RESPONSE_BYTES + 1)
+            captured_at = clock()
+        if len(body) > MAX_RESPONSE_BYTES:
+            raise YouTubeReadError("youtube_api_response_too_large")
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        raise YouTubeReadError(f"youtube_api_transport_error:{type(exc).__name__}") from None
+
+    try:
+        payload = json.loads(body)
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError):
+        raise YouTubeReadError("youtube_api_json_invalid") from None
+    return parse_video_observations_batch(
+        payload,
+        expected_video_ids=video_ids,
+        sync_captured_at=captured_at,
+    )
