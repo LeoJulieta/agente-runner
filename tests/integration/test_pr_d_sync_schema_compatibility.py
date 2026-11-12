@@ -429,3 +429,43 @@ def test_preexisting_superuser_capture_writer_role_is_rejected_atomically(dispos
         assert conn.execute(
             "SELECT rolsuper FROM pg_roles WHERE rolname='pr_d_capture_writer'"
         ).fetchone()[0] is False
+
+def test_candidate_migration_replay_is_safe_after_guard_installation(disposable_database):
+    migration = MIGRATION.read_text(encoding="utf-8")
+    migration = migration.replace("public.youtube_shorts_log", "pr_d_test.youtube_shorts_log")
+    migration = migration.replace("public.pr_d_capture_views_once", "pr_d_test.pr_d_capture_views_once")
+    migration = migration.replace("public.pr_d_guard_capture_write", "pr_d_test.pr_d_guard_capture_write")
+    migration = migration.replace("ON SCHEMA public", "ON SCHEMA pr_d_test")
+
+    with psycopg.connect(disposable_database) as conn:
+        # Re-running after the first install must not attempt an incompatible
+        # int4->numeric conversion while the capture guard is attached.
+        conn.execute(migration)
+        data_type, precision, scale = conn.execute(
+            """
+            SELECT data_type, numeric_precision, numeric_scale
+            FROM information_schema.columns
+            WHERE table_schema='pr_d_test'
+              AND table_name='youtube_shorts_log'
+              AND column_name='views_primeras_3h'
+            """
+        ).fetchone()
+        assert (data_type, precision, scale) == ("numeric", 20, 0)
+        trigger_count = conn.execute(
+            """
+            SELECT count(*) FROM pg_trigger
+            WHERE tgrelid='pr_d_test.youtube_shorts_log'::regclass
+              AND tgname='youtube_shorts_log_capture_write_guard'
+              AND NOT tgisinternal
+            """
+        ).fetchone()[0]
+        assert trigger_count == 1
+        memberships = conn.execute(
+            """
+            SELECT count(*) FROM pg_auth_members
+            WHERE roleid=(SELECT oid FROM pg_roles WHERE rolname='pr_d_capture_writer')
+               OR member=(SELECT oid FROM pg_roles WHERE rolname='pr_d_capture_writer')
+            """
+        ).fetchone()[0]
+        assert memberships == 0
+
