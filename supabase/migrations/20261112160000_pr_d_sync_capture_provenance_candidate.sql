@@ -67,6 +67,9 @@ BEGIN
 END;
 $views_nonnegative$;
 
+-- Remove the earlier int32 overload from this candidate if the migration is replayed.
+DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, integer, timestamptz, timestamptz);
+
 -- Reusable compare-and-set operation. Both stable identifiers must match;
 -- only an unpopulated metric/provenance row can be claimed exactly once.
 CREATE OR REPLACE FUNCTION public.pr_d_capture_views_once(
