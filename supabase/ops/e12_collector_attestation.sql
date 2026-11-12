@@ -130,7 +130,7 @@ CREATE OR REPLACE FUNCTION public.pr_d_guard_capture_fields()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY INVOKER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog
 AS $guard$
 BEGIN
     IF TG_OP = 'INSERT' THEN
@@ -245,7 +245,7 @@ CREATE FUNCTION pr_d_internal.pr_d_capture_views_once(
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = pg_catalog, extensions, public, pr_d_internal
+SET search_path = pg_catalog, pr_d_internal
 SET statement_timeout = '10s'
 SET lock_timeout = '5s'
 AS $capture$
@@ -255,6 +255,8 @@ DECLARE
     v_lease_live boolean;
     v_key record;
     v_expected_hmac bytea;
+    v_expected_digest bytea;
+    v_crypto_schema text;
     v_payload jsonb;
     v_payload_published_at timestamptz;
     v_payload_sync_captured_at timestamptz;
@@ -275,7 +277,7 @@ BEGIN
        OR p_collector_payload_canonical IS NULL OR length(p_collector_payload_canonical) > 4096
        OR p_collector_payload_sha256 IS NULL OR p_collector_payload_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_signature IS NULL OR p_collector_signature !~ '^[A-Za-z0-9+/]{86}==$'
-       OR length(decode(p_collector_signature, 'base64')) <> 64
+       OR length(pg_catalog.decode(p_collector_signature, 'base64')) <> 64
        OR p_collector_hmac_signature IS NULL OR p_collector_hmac_signature !~ '^[a-f0-9]{64}$'
        OR p_collector_response_sha256 IS NULL OR p_collector_response_sha256 !~ '^[a-f0-9]{64}$'
        OR p_collector_requested_ids_sha256 IS NULL OR p_collector_requested_ids_sha256 !~ '^[a-f0-9]{64}$'
@@ -286,7 +288,7 @@ BEGIN
     END IF;
 
     IF p_collector_public_key_spki_base64 !~ '^[A-Za-z0-9+/]{59}=$'
-       OR length(decode(p_collector_public_key_spki_base64, 'base64')) <> 44 THEN
+       OR length(pg_catalog.decode(p_collector_public_key_spki_base64, 'base64')) <> 44 THEN
         RETURN false;
     END IF;
 
@@ -316,8 +318,17 @@ BEGIN
         RETURN false;
     END IF;
 
-    IF digest(convert_to(p_collector_payload_canonical, 'UTF8'), 'sha256')
-       IS DISTINCT FROM decode(p_collector_payload_sha256, 'hex') THEN
+    SELECT n.nspname
+      INTO v_crypto_schema
+      FROM pg_catalog.pg_extension AS e
+      JOIN pg_catalog.pg_namespace AS n ON n.oid = e.extnamespace
+     WHERE e.extname = 'pgcrypto';
+    IF NOT FOUND THEN RETURN false; END IF;
+
+    EXECUTE pg_catalog.format('SELECT %I.digest($1, $2)', v_crypto_schema)
+       INTO v_expected_digest
+       USING pg_catalog.convert_to(p_collector_payload_canonical, 'UTF8'), 'sha256';
+    IF v_expected_digest IS DISTINCT FROM pg_catalog.decode(p_collector_payload_sha256, 'hex') THEN
         RETURN false;
     END IF;
 
@@ -336,11 +347,10 @@ BEGIN
     END IF;
 
     -- A caller with only service_role cannot forge this database authorization.
-    v_expected_hmac := hmac(
-        convert_to(p_collector_payload_canonical, 'UTF8'),
-        v_key.hmac_secret,
-        'sha256'
-    );
+    EXECUTE pg_catalog.format('SELECT %I.hmac($1, $2, $3)', v_crypto_schema)
+       INTO v_expected_hmac
+       USING pg_catalog.convert_to(p_collector_payload_canonical, 'UTF8'),
+             v_key.hmac_secret, 'sha256';
     IF v_expected_hmac IS DISTINCT FROM decode(p_collector_hmac_signature, 'hex') THEN
         RETURN false;
     END IF;
@@ -417,7 +427,7 @@ CREATE FUNCTION public.pr_d_capture_views_once(
 RETURNS boolean
 LANGUAGE sql
 SECURITY INVOKER
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog
 AS $wrapper$
     SELECT pr_d_internal.pr_d_capture_views_once(
         p_row_id, p_youtube_video_id, p_views, p_published_at,
