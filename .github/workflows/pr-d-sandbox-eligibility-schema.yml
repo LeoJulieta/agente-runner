@@ -13,6 +13,7 @@ on:
       - "tests/test_pr_d_family_ii_validation.py"
       - "tests/test_pr_d_drift_reproducibility.py"
       - "tests/test_pr_d_cohort_builder_eligibility.py"
+      - "tests/test_pr_d_e12_provenance_guard.py"
       - "tests/integration/test_pr_d_sync_schema_compatibility.py"
       - "tests/fixtures/pr_d_youtube_shorts_log_schema.sql"
       - "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
