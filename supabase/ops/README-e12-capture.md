@@ -18,7 +18,7 @@ The service-role key belongs only in the Edge Function environment. **Never plac
 
 ## Request authentication
 
-The Cron SQL signs the current Unix timestamp with HMAC-SHA256. The queue stores only the timestamp and signature. The Edge Function rejects timestamps older than 120 seconds and accepts only an empty body (or `{}`). The request cannot provide a video ID, view count, publication time, or row ID.
+The Cron SQL signs a canonical request with HMAC-SHA256: HTTP method, exact pathname, Unix timestamp, and SHA-256 digest of the exact request body. The queue stores only the timestamp and signature (plus ordinary request metadata); it never stores the service-role key. The Edge Function rejects timestamps outside a 120-second skew window and accepts only an empty body or `{}`. The request cannot provide a video ID, view count, publication time, or row ID.
 
 ## Candidate discovery and evidence
 
