@@ -482,7 +482,7 @@ Deno.test("worker never calls CAS when independent attestation verification fail
         published_at: "2026-10-30T02:30:00Z",
       }]), { status: 200 });
     }
-    if (url.includes("youtube.googleapis.com")) {
+    if (url.includes("www.googleapis.com/youtube/v3/videos")) {
       return new Response(JSON.stringify({
         items: [{
           id: "video-1",
