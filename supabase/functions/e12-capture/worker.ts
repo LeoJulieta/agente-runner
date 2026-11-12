@@ -74,7 +74,7 @@ async function claimWorkerSlot(
   minuteBucket: string,
   fetchImpl: typeof fetch,
 ): Promise<boolean> {
-  const baseUrl = supabaseUrl.replace(/\\/+$/, "");
+  const baseUrl = supabaseUrl.replace(/\/+$/, "");
   const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/pr_d_claim_e12_worker_slot`, {
     method: "POST",
     headers: {
