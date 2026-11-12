@@ -41,6 +41,34 @@ REVOKE TRUNCATE, TRIGGER, REFERENCES
     ON TABLE public.lab_results
     FROM PUBLIC, anon, authenticated, service_role;
 
+
+-- Harden the existing immutability trigger against schema drift. The previous
+-- column-by-column list omitted id and later-added metadata columns. Compare
+-- the complete row while explicitly allowing only status and last_test changes.
+CREATE OR REPLACE FUNCTION public.trg_lab_results_proteccion()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog
+AS $immutability$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'lab_results: DELETE prohibido (regla 2)'
+            USING ERRCODE = '42501';
+    END IF;
+
+    IF TG_OP = 'UPDATE' AND
+       (to_jsonb(OLD) - ARRAY['status', 'last_test'])
+       IS DISTINCT FROM
+       (to_jsonb(NEW) - ARRAY['status', 'last_test']) THEN
+        RAISE EXCEPTION
+            'lab_results: UPDATE prohibido fuera de status/last_test (regla 2/5)'
+            USING ERRCODE = '42501';
+    END IF;
+
+    RETURN NEW;
+END;
+$immutability$;
+
 -- Move the existing implementation behind the new security-definer boundary.
 -- The conditional rename makes replay safe while preserving the public RPC name.
 DO $rename_impl$
