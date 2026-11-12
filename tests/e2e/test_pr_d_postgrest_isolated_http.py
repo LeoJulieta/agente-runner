@@ -414,3 +414,34 @@ def test_service_role_cannot_truncate_protected_lab_tables():
             conn.execute("SET ROLE service_role")
             with pytest.raises(psycopg.errors.InsufficientPrivilege):
                 conn.execute(f"TRUNCATE TABLE {table}")
+
+
+def test_e12_captured_video_identity_cannot_be_reassigned():
+    video_id = "e12-http-identity-frozen"
+    row_id = _insert_e12_video(video_id)
+    status, result = _request(
+        "POST",
+        "/rpc/pr_d_capture_views_once",
+        payload={
+            "p_row_id": row_id,
+            "p_youtube_video_id": video_id,
+            "p_views": "123",
+            "p_published_at": "2026-10-30T02:30:00Z",
+            "p_sync_captured_at": "2026-10-30T05:30:00Z",
+        },
+    )
+    assert status == 200 and result is True
+
+    patch_status, _ = _request(
+        "PATCH",
+        f"/youtube_shorts_log?id=eq.{row_id}",
+        payload={"youtube_video_id": "different-video"},
+    )
+    assert patch_status >= 400, f"captured_video_identity_must_be_immutable_http_{patch_status}"
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute(
+            "SELECT youtube_video_id, views_primeras_3h FROM public.youtube_shorts_log WHERE id=%s",
+            (row_id,),
+        ).fetchone()
+    assert stored == (video_id, 123)
