@@ -152,6 +152,7 @@ def release(run_id, token):
 
 def capture(run_id, token, row_id=1, video_id="video-1", hmac_override=None):
     canonical = canonical_payload(run_id, token, row_id, video_id)
+    payload_sha = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     hmac_signature = hmac_override or hmac.new(HMAC_SECRET, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
     with connect() as conn:
         return conn.execute(
@@ -161,7 +162,7 @@ def capture(run_id, token, row_id=1, video_id="video-1", hmac_override=None):
             )""",
             (
                 row_id, video_id, PUBLISHED, CAPTURED, run_id, token,
-                KEY_ID, PUBLIC_KEY, canonical, PAYLOAD_SHA, SIGNATURE,
+                KEY_ID, PUBLIC_KEY, canonical, payload_sha, SIGNATURE,
                 hmac_signature, RESPONSE_SHA, REQUESTED_IDS_SHA, COLLECTOR_BUILD,
             ),
         ).fetchone()[0]
@@ -188,10 +189,10 @@ def test_exclusive_claim_renew_takeover_and_stale_owner_rejection():
     with connect() as conn:
         row = conn.execute("""
             SELECT views_primeras_3h, e12_capture_run_id, e12_fencing_token,
-                   collector_key_id, collector_signature, collector_payload_canonical
+                   collector_key_id, collector_signature, collector_payload_canonical, collector_payload_sha256
             FROM public.youtube_shorts_log WHERE id=1
         """).fetchone()
-        assert row == (123, RUN_B, token_b, KEY_ID, SIGNATURE, canonical_payload(RUN_B, token_b, 1, "video-1"))
+        assert row == (123, RUN_B, token_b, KEY_ID, SIGNATURE, canonical_payload(RUN_B, token_b, 1, "video-1"), hashlib.sha256(canonical_payload(RUN_B, token_b, 1, "video-1").encode("utf-8")).hexdigest())
 
 
 def test_two_simultaneous_claims_have_exactly_one_winner():
