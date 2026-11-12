@@ -172,7 +172,10 @@ def test_e12_capture_boundary_has_private_definer_and_direct_dml_guards():
     assert "youtube_shorts_log_pr_d_capture_guard" in migration
     assert "BEFORE INSERT OR UPDATE OR DELETE" in migration
     assert "hs_al_publicar_al_sync" in migration
+    assert "elapsed_seconds_e12 numeric(20,6)" in migration
+    assert "elapsed_seconds_e12 =" in migration
     assert "request.jwt.claims" in migration
+    assert "hs_al_publicar_al_sync =\n" not in migration
 
     # Both disposable fixtures must start from the audited legacy int4 schema.
     assert "views_primeras_3h integer" in sql_fixture
