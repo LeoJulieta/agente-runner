@@ -407,7 +407,8 @@ export async function handleE12Capture(
           const payload: ObservationAttestationPayload = {
             keyId: provenanceKeyId,
             runId: lease.runId,
-                rowId: String(row.id),
+            fencingToken: lease.fencingToken,
+            rowId: String(row.id),
             videoId: observation.videoId,
             publishedAt: observation.publishedAt,
             viewCount: observation.viewCount,
@@ -445,7 +446,6 @@ export async function handleE12Capture(
         duplicateRows,
         slotClaimed: true,
         leaseClaimed: true,
-        fencingToken: lease.fencingToken,
         eligible,
         captured,
         casLost,
