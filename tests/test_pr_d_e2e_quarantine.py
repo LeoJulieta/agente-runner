@@ -145,6 +145,13 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     atomic_boundary_migration = (ROOT / "supabase/migrations/20261112170000_pr_d_lab_results_rpc_write_boundary_candidate.sql").read_text(encoding="utf-8")
     assert "pr_d_lab_results_insert_requires_atomic_rpc" in atomic_boundary_migration
     assert "SECURITY DEFINER" in atomic_boundary_migration
+    assert "REVOKE TRUNCATE" in atomic_boundary_migration
+    assert "to_jsonb(OLD) - ARRAY['status', 'last_test']" in atomic_boundary_migration
+    assert "pr_d_lab_results_writer" in atomic_boundary_migration
     candidate_migration = (ROOT / "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql").read_text(encoding="utf-8")
     assert "pr_d_capture_views_once" in candidate_migration
+    assert "prd_capture_write_requires_rpc" in candidate_migration
+    assert "prd_capture_video_identity_is_immutable" in candidate_migration
+    assert "prd_capture_evidence_delete_prohibited" in candidate_migration
+    assert "REVOKE TRUNCATE" in candidate_migration
     assert "tests/test_pr_d_youtube_collector.py" in workflow_text
