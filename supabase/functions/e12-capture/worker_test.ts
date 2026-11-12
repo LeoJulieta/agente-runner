@@ -1,5 +1,6 @@
 import { handleE12Capture, verifyCronSignature } from "./worker.ts";
 import { parseRfc3339EpochMicros, YOUTUBE_UINT64_MAX } from "./collector.ts";
+import type { ObservationAttestationPayload } from "./provenance.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -26,6 +27,7 @@ const SECRET = "e12-test-cron-secret-with-more-than-32-bytes";
 const NOW_SECONDS = Math.floor(Date.parse("2026-10-30T05:30:00Z") / 1_000);
 const TIMESTAMP = String(NOW_SECONDS);
 const CAPTURE_MICROS = parseRfc3339EpochMicros("2026-10-30T05:30:00.123456Z");
+const TEST_PUBLIC_KEY = "MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
 function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string> = {}) {
   const values: Record<string, string> = {
@@ -33,6 +35,8 @@ function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string>
     SUPABASE_URL: "https://project.example.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "sb_secret_test_only_not_real",
     YOUTUBE_API_KEY: "youtube-test-key",
+    E12_PROVENANCE_KEY_ID: "e12-test-key",
+    E12_PROVENANCE_PUBLIC_KEY_SPKI_B64: TEST_PUBLIC_KEY,
     ...overrides,
   };
   return {
@@ -42,6 +46,18 @@ function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string>
     nowEpochSeconds: () => NOW_SECONDS,
     randomUUID: () => "11111111-2222-4333-8444-555555555555",
     leaseTtlSeconds: 90,
+    attestObservation: async (payload: ObservationAttestationPayload) => ({
+      version: "e12-observation-attestation/v1",
+      algorithm: "Ed25519",
+      keyId: payload.keyId,
+      payloadSha256: "a".repeat(64),
+      signatureBase64: "A".repeat(86) + "==",
+    }),
+    verifyAttestation: async (
+      payload: ObservationAttestationPayload,
+      attestation: { keyId: string },
+      publicKeySpkiBase64: string,
+    ) => attestation.keyId === payload.keyId && publicKeySpkiBase64 === TEST_PUBLIC_KEY,
   };
 }
 
@@ -224,6 +240,15 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(rpcBody.p_views === YOUTUBE_UINT64_MAX.toString(), "uint64 must remain an exact decimal string");
   assert(rpcBody.p_run_id === "11111111-2222-4333-8444-555555555555", "CAS must bind the lease owner");
   assert(rpcBody.p_fencing_token === "9007199254740993", "CAS must bind the exact fencing token");
+  assert(rpcBody.p_attestation_version === "e12-observation-attestation/v1", "CAS must store the versioned attestation");
+  assert(rpcBody.p_attestation_algorithm === "Ed25519", "CAS must store the signature algorithm");
+  assert(rpcBody.p_collector_key_id === "e12-test-key", "CAS must bind the registered collector key ID");
+  assert(rpcBody.p_collector_public_key_spki_base64 === TEST_PUBLIC_KEY, "CAS must bind the exact registered public key");
+  assert(rpcBody.p_collector_payload_sha256 === "a".repeat(64), "CAS must persist the signed payload digest");
+  assert(rpcBody.p_collector_signature === "A".repeat(86) + "==", "CAS must persist the Ed25519 signature");
+  assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_response_sha256)), "CAS must persist the raw response digest");
+  assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_requested_ids_sha256)), "CAS must persist the requested IDs digest");
+  assert(rpcBody.p_collector_build === "e12-collector/0.1.0", "CAS must persist collector build identity");
   assert(calls[8].url.endsWith("/rpc/pr_d_release_e12_worker_lease"), "worker must release its lease after completion");
   assert(rpcBody.p_published_at === "2026-10-30T02:30:00Z", "publishedAt must come from YouTube");
   assert(
