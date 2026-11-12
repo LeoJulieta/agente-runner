@@ -1,8 +1,4 @@
-import {
-  collectYouTubeBatch,
-  nowEpochMicros,
-  type ClockMicros,
-} from "./collector.ts";
+import { type ClockMicros, collectYouTubeBatch, nowEpochMicros } from "./collector.ts";
 
 export type WorkerDependencies = {
   env: (name: string) => string | undefined;
@@ -50,8 +46,10 @@ export async function verifyCronSignature(
     return false;
   }
   const timestampSeconds = Number(timestamp);
-  if (!Number.isSafeInteger(timestampSeconds) ||
-      Math.abs(nowEpochSeconds - timestampSeconds) > CRON_CLOCK_SKEW_SECONDS) {
+  if (
+    !Number.isSafeInteger(timestampSeconds) ||
+    Math.abs(nowEpochSeconds - timestampSeconds) > CRON_CLOCK_SKEW_SECONDS
+  ) {
     return false;
   }
 
