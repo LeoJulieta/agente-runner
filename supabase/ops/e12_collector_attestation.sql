@@ -30,6 +30,14 @@ BEGIN
         RAISE EXCEPTION 'prd_e12_attestation_preflight_failed: pgcrypto extension missing';
     END IF;
     EXECUTE pg_catalog.format('GRANT USAGE ON SCHEMA %I TO pr_d_capture_owner', v_crypto_schema);
+    EXECUTE pg_catalog.format(
+        'GRANT EXECUTE ON FUNCTION %I.digest(bytea, text) TO pr_d_capture_owner',
+        v_crypto_schema
+    );
+    EXECUTE pg_catalog.format(
+        'GRANT EXECUTE ON FUNCTION %I.hmac(bytea, bytea, text) TO pr_d_capture_owner',
+        v_crypto_schema
+    );
 END;
 $crypto_schema_grant$;
 
