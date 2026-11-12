@@ -64,7 +64,7 @@ def _cas(dsn, row_id, video_id, views):
             SELECT pr_d_test.pr_d_capture_views_once(
                 %s, %s, %s, %s::timestamptz, %s::timestamptz
             )
-        """, (row_id, video_id, views, "2026-10-30T02:30:00Z", "2026-10-30T06:30:00Z")).fetchone()[0]
+        """, (row_id, video_id, views, "2026-10-30T02:30:00Z", "2026-10-30T05:30:00Z")).fetchone()[0]
 
 
 def test_schema_types_and_legacy_rows(disposable_database):
@@ -110,13 +110,13 @@ def test_check_rejects_out_of_window_and_timestamps_without_metric(disposable_da
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
                     (youtube_video_id, views_primeras_3h, published_at, sync_captured_at)
-                VALUES ('out-of-window', 10, '2026-10-30T02:30:00Z', '2026-10-30T08:30:01Z')
+                VALUES ('out-of-window', 10, '2026-10-30T02:30:00Z', '2026-10-30T05:35:00.000001Z')
             """)
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
                     (youtube_video_id, published_at, sync_captured_at)
-                VALUES ('metric-missing', '2026-10-30T02:30:00Z', '2026-10-30T06:30:00Z')
+                VALUES ('metric-missing', '2026-10-30T02:30:00Z', '2026-10-30T05:30:00Z')
             """)
 
 
@@ -131,7 +131,7 @@ def test_two_concurrent_cas_writers_have_exactly_one_winner(disposable_database)
                     %s, %s, %s, %s::timestamptz, %s::timestamptz
                 )
             """, (row_id, "concurrent-video", metric,
-                  "2026-10-30T02:30:00Z", "2026-10-30T06:30:00Z")).fetchone()[0]
+                  "2026-10-30T02:30:00Z", "2026-10-30T05:30:00Z")).fetchone()[0]
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(writer, (100, 200)))
     assert sum(results) == 1
