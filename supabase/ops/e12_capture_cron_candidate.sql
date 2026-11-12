@@ -18,7 +18,7 @@ BEGIN
     RAISE EXCEPTION 'E12 cron prerequisites missing: pg_cron, pg_net, pgcrypto';
   END IF;
 
-  SELECT length(decrypted_secret)
+  SELECT octet_length(decrypted_secret)
     INTO v_secret_length
     FROM vault.decrypted_secrets
    WHERE name = 'e12_cron_hmac_secret';
