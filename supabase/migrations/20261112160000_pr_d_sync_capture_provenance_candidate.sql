@@ -36,16 +36,18 @@ $migration$;
 -- Abort rather than rewriting any historical value if invalid rows already exist.
 DO $views_nonnegative$
 DECLARE
-    v_negative_rows bigint;
+    v_invalid_rows bigint;
 BEGIN
-    SELECT count(*) INTO v_negative_rows
+    SELECT count(*) INTO v_invalid_rows
     FROM public.youtube_shorts_log
-    WHERE views_primeras_3h < 0;
+    WHERE views_primeras_3h < 0
+       OR views_primeras_3h > 18446744073709551615
+       OR views_primeras_3h <> trunc(views_primeras_3h);
 
-    IF v_negative_rows > 0 THEN
+    IF v_invalid_rows > 0 THEN
         RAISE EXCEPTION
-            'prd_sync_migration_preflight_failed: negative views_primeras_3h rows=%. No row values were changed; audit legacy records before retry.',
-            v_negative_rows
+            'prd_sync_migration_preflight_failed: invalid unsigned integer views_primeras_3h rows=%. No row values were changed; audit legacy records before retry.',
+            v_invalid_rows
             USING ERRCODE = '23514';
     END IF;
 
