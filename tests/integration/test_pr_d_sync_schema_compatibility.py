@@ -360,7 +360,7 @@ def test_capture_writer_isolated_non_login_owner(disposable_database):
             WHERE oid = 'pr_d_test.pr_d_capture_views_once(bigint,text,numeric,timestamptz,timestamptz)'::regprocedure
             """
         ).fetchone()[0]
-    assert writer == (False, False, True)
+    assert writer == (False, False, False)
     assert membership_count == 0
     assert owner == "pr_d_capture_writer"
 
