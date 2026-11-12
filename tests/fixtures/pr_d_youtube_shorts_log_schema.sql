@@ -25,5 +25,6 @@ CREATE TABLE pr_d_test.youtube_shorts_log (
 );
 
 GRANT USAGE ON SCHEMA pr_d_test TO anon, authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE ON TABLE pr_d_test.youtube_shorts_log TO service_role;
+ALTER TABLE pr_d_test.youtube_shorts_log ENABLE ROW LEVEL SECURITY;
+GRANT ALL PRIVILEGES ON TABLE pr_d_test.youtube_shorts_log TO anon, authenticated, service_role;
 GRANT USAGE, SELECT ON SEQUENCE pr_d_test.youtube_shorts_log_id_seq TO service_role;
