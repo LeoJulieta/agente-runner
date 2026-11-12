@@ -32,6 +32,11 @@ on:
       - "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
       - ".github/workflows/pr-d-sandbox-eligibility-schema.yml"
 
+# A newer push supersedes older sandbox validation runs on this same branch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
