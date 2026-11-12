@@ -144,3 +144,24 @@ jobs:
       - name: Stop disposable PostgREST container
         if: always()
         run: docker rm -f prd-postgrest || true
+
+
+  private-sync-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout private YouTube agent sandbox branch (read-only token)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: LeoJulieta/agente-autonomo
+          ref: sandbox/pr-d-e12-youtube-sync-integration-2026-11-12
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          path: private-agent
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install isolated integration test runner
+        run: python -m pip install --disable-pip-version-check pytest==8.3.5
+      - name: Test the actual private sync adapter without production credentials
+        working-directory: private-agent
+        run: python -m pytest -q test_pr_d_youtube_sync_integration.py
