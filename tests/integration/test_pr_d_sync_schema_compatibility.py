@@ -104,14 +104,29 @@ def test_wrong_youtube_id_cannot_claim_row(disposable_database):
     assert _cas(disposable_database, row_id, "wrong-video", 9) is False
 
 
-def test_check_rejects_out_of_window_and_timestamps_without_metric(disposable_database):
+def test_check_accepts_closed_tolerance_and_rejects_values_outside_it(disposable_database):
     with psycopg.connect(disposable_database) as conn:
-        with pytest.raises(psycopg.errors.CheckViolation):
-            conn.execute("""
-                INSERT INTO pr_d_test.youtube_shorts_log
-                    (youtube_video_id, views_primeras_3h, published_at, sync_captured_at)
-                VALUES ('out-of-window', 10, '2026-10-30T02:30:00Z', '2026-10-30T05:35:00.000001Z')
-            """)
+        conn.execute("""
+            INSERT INTO pr_d_test.youtube_shorts_log
+                (youtube_video_id, views_primeras_3h, published_at, sync_captured_at)
+            VALUES
+                ('lower-boundary', 10, '2026-10-30T02:30:00Z', '2026-10-30T05:25:00Z'),
+                ('upper-boundary', 11, '2026-10-30T02:30:00Z', '2026-10-30T05:35:00Z')
+        """)
+
+    for video_id, captured_at in (
+        ("below-lower-boundary", "2026-10-30T05:24:59.999999Z"),
+        ("above-upper-boundary", "2026-10-30T05:35:00.000001Z"),
+    ):
+        with psycopg.connect(disposable_database) as conn:
+            with pytest.raises(psycopg.errors.CheckViolation):
+                conn.execute("""
+                    INSERT INTO pr_d_test.youtube_shorts_log
+                        (youtube_video_id, views_primeras_3h, published_at, sync_captured_at)
+                    VALUES (%s, 10, '2026-10-30T02:30:00Z', %s)
+                """, (video_id, captured_at))
+
+    with psycopg.connect(disposable_database) as conn:
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
