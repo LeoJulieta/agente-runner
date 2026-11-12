@@ -10,6 +10,8 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+const HMAC_SECRET_BASE64 = btoa(String.fromCharCode(...new Uint8Array(32).fill(7)));
+
 const PAYLOAD: ObservationAttestationPayload = {
   keyId: "e12-collector-test-2026-01",
   runId: "11111111-2222-4333-8444-555555555555",
@@ -36,14 +38,20 @@ Deno.test("Ed25519 attestation verifies and binds exact observation values", asy
   const privateKey = toBase64(privateBytes);
   const publicKey = toBase64(publicBytes);
 
-  const attestation = await createObservationAttestation(PAYLOAD, privateKey);
+  const attestation = await createObservationAttestation(PAYLOAD, privateKey, HMAC_SECRET_BASE64);
   assert(attestation.payloadSha256.length === 64, "payload digest must be SHA-256 hex");
-  assert(await verifyObservationAttestation(PAYLOAD, attestation, publicKey), "signature should verify");
+  assert(await verifyObservationAttestation(PAYLOAD, attestation, publicKey, HMAC_SECRET_BASE64), "signature should verify");
 
   const altered = { ...PAYLOAD, viewCount: "18446744073709551614" };
-  assert(!await verifyObservationAttestation(altered, attestation, publicKey), "altered count must fail verification");
+  assert(!await verifyObservationAttestation(altered, attestation, publicKey, HMAC_SECRET_BASE64), "altered count must fail verification");
   const alteredResponse = { ...PAYLOAD, responseBodySha256: "c".repeat(64) };
-  assert(!await verifyObservationAttestation(alteredResponse, attestation, publicKey), "altered response digest must fail");
+  assert(!await verifyObservationAttestation(alteredResponse, attestation, publicKey, HMAC_SECRET_BASE64), "altered response digest must fail");
+  assert(!await verifyObservationAttestation(
+    PAYLOAD,
+    { ...attestation, hmacSignatureHex: "0".repeat(64) },
+    publicKey,
+    HMAC_SECRET_BASE64,
+  ), "altered database HMAC must fail verification");
 });
 
 Deno.test("canonicalization binds field order, run, fencing token, row and key identity", () => {
@@ -76,7 +84,7 @@ Deno.test("requested video IDs hash is order-independent and rejects duplicates"
 Deno.test("attestation rejects malformed payloads and mismatched key IDs", async () => {
   let invalidRejected = false;
   try {
-    await createObservationAttestation({ ...PAYLOAD, viewCount: "18446744073709551616" }, "AA==");
+    await createObservationAttestation({ ...PAYLOAD, viewCount: "18446744073709551616" }, "AA==", HMAC_SECRET_BASE64);
   } catch { invalidRejected = true; }
   assert(invalidRejected, "uint64 overflow must reject before key import");
 
@@ -88,10 +96,11 @@ Deno.test("attestation rejects malformed payloads and mismatched key IDs", async
     for (const byte of bytes) binary += String.fromCharCode(byte);
     return btoa(binary);
   };
-  const attestation = await createObservationAttestation(PAYLOAD, b64(privateBytes));
+  const attestation = await createObservationAttestation(PAYLOAD, b64(privateBytes), HMAC_SECRET_BASE64);
   assert(!await verifyObservationAttestation(
     { ...PAYLOAD, keyId: "different-key" },
     attestation,
     b64(publicBytes),
+    HMAC_SECRET_BASE64,
   ), "unknown key identity must fail verification");
 });
