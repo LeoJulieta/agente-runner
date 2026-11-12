@@ -1,0 +1,32 @@
+name: E12 Edge Worker Sandbox
+
+on:
+  push:
+    branches:
+      - sandbox/e12-edge-worker-2026-11-12
+    paths:
+      - supabase/functions/e12-capture/**
+      - supabase/config.toml
+      - .github/workflows/e12-edge-worker.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deno-e12-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout sandbox branch
+        uses: actions/checkout@v7
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Format check
+        run: deno fmt --check supabase/functions/e12-capture
+      - name: Lint
+        run: deno lint supabase/functions/e12-capture
+      - name: Unit and worker integration tests (fake HTTP only)
+        run: deno test supabase/functions/e12-capture
