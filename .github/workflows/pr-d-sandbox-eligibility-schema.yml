@@ -166,6 +166,6 @@ jobs:
       - name: Compile the actual private YouTube sync modules
         working-directory: private-agent
         run: python -m compileall -q pr_d_sync_contract.py pr_d_youtube_collector.py pr_d_youtube_sync.py youtube_shorts_agent.py
-      - name: Re-test current private sync adapter, dual write gates, and legacy-test quarantine
+      - name: Re-test CAS-only private sync, dual write gates, and legacy-test quarantine
         working-directory: private-agent
         run: python -m pytest -q test_pr_d_youtube_sync_integration.py
