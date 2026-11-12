@@ -22,6 +22,7 @@ on:
       - "tests/test_pr_d_statistical_edge_fixtures_candidate.py"
       - "tests/test_pr_d_statistical_fixtures.py"
       - "tests/integration/test_pr_d_engine_atomic_path.py"
+      - "tests/integration/test_pr_d_atomic_rpc.py"
       - "tests/integration/test_pr_d_sync_schema_compatibility.py"
       - "tests/fixtures/pr_d_youtube_shorts_log_schema.sql"
       - "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
