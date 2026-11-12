@@ -215,6 +215,7 @@ def test_e12_direct_http_dml_cannot_forge_or_replace_capture():
         "views_primeras_3h": "77",
         "published_at": "2026-10-30T02:30:00Z",
         "sync_captured_at": "2026-10-30T05:30:00Z",
+        "elapsed_seconds_e12": 10800,
         "hs_al_publicar_al_sync": 3,
     }
     status, _ = _request("PATCH", f"/youtube_shorts_log?{query}", payload=forged)
@@ -236,10 +237,10 @@ def test_e12_direct_http_dml_cannot_forge_or_replace_capture():
     with psycopg.connect(DATABASE_URL) as conn:
         stored = conn.execute("""
             SELECT views_primeras_3h, published_at, sync_captured_at,
-                   hs_al_publicar_al_sync, status
+                   elapsed_seconds_e12, hs_al_publicar_al_sync, status
             FROM public.youtube_shorts_log WHERE id = %s
         """, (row_id,)).fetchone()
-    assert stored == (None, None, None, None, "published")
+    assert stored == (None, None, None, None, None, "published")
 
 
 def test_e12_capture_rpc_over_http_is_cas_and_preserves_uint64_and_elapsed():
@@ -261,13 +262,14 @@ def test_e12_capture_rpc_over_http_is_cas_and_preserves_uint64_and_elapsed():
     with psycopg.connect(DATABASE_URL) as conn:
         stored = conn.execute("""
             SELECT views_primeras_3h, published_at, sync_captured_at,
-                   hs_al_publicar_al_sync
+                   elapsed_seconds_e12, hs_al_publicar_al_sync
             FROM public.youtube_shorts_log WHERE id = %s
         """, (row_id,)).fetchone()
     assert stored[0] == 18446744073709551615
     assert stored[1].isoformat() == "2026-10-30T02:30:00+00:00"
     assert stored[2].isoformat() == "2026-10-30T05:30:00+00:00"
-    assert stored[3] == Decimal("3")
+    assert stored[3] == Decimal("10800")
+    assert stored[4] is None
 
 
 def test_e12_captured_video_cannot_be_reassigned_or_deleted_over_http():
@@ -373,7 +375,7 @@ def test_e12_capture_rpc_concurrent_http_claim_has_one_winner():
     assert sorted(value for _, value in results) == [False, True]
     with psycopg.connect(DATABASE_URL) as conn:
         stored = conn.execute(
-            "SELECT views_primeras_3h, hs_al_publicar_al_sync FROM public.youtube_shorts_log WHERE id = %s",
+            "SELECT views_primeras_3h, elapsed_seconds_e12, hs_al_publicar_al_sync FROM public.youtube_shorts_log WHERE id = %s",
             (row_id,),
         ).fetchone()
-    assert stored == (2147483648, Decimal("3"))
+    assert stored == (2147483648, Decimal("10800"), None)
