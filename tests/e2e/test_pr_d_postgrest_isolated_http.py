@@ -487,3 +487,53 @@ def test_e12_captured_evidence_cannot_be_deleted_but_pending_row_can():
         ).fetchone()[0]
     assert captured_exists == 1
     assert pending_exists == 0
+
+
+def test_lab_results_immutability_guard_covers_id_and_later_columns():
+    lab_id = "E2E_IMMUTABILITY_SCHEMA_COMPLETE"
+    status, result = _request(
+        "POST",
+        "/rpc/rpc_insert_baseline_and_evidence",
+        payload=_payload(lab_id, "immutability-run"),
+    )
+    assert status == 200
+    evidence_id = result["id"]
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute(
+                "UPDATE public.lab_results SET status_extended='tampered' WHERE id=%s",
+                (evidence_id,),
+            )
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute(
+                "UPDATE public.lab_results SET id=id+1000000 WHERE id=%s",
+                (evidence_id,),
+            )
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute(
+                "DELETE FROM public.lab_results WHERE id=%s",
+                (evidence_id,),
+            )
+
+    # The pre-existing contract intentionally permits status and last_test updates.
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("SET ROLE service_role")
+        conn.execute(
+            "UPDATE public.lab_results SET status='STALE', last_test=now() WHERE id=%s",
+            (evidence_id,),
+        )
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute(
+            "SELECT status, status_extended FROM public.lab_results WHERE id=%s",
+            (evidence_id,),
+        ).fetchone()
+    assert stored == ("STALE", None)
