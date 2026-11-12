@@ -33,7 +33,6 @@ $migration$;
 -- YouTube documents viewCount as an unsigned 64-bit integer. numeric(20,0)
 -- preserves the full uint64 range; PostgreSQL integer/bigint cannot represent it.
 -- Preflight before widening so no legacy value is rewritten on a rejected migration.
--- Abort rather than rewriting any historical value if invalid rows already exist.
 DO $views_nonnegative$
 DECLARE
     v_invalid_rows bigint;
@@ -67,17 +66,91 @@ BEGIN
 END;
 $views_nonnegative$;
 
+-- A dedicated non-login owner is the only principal allowed to change the
+-- protected capture columns. service_role can call the RPC but cannot SET ROLE
+-- to this principal; no membership is granted to any login/API role.
+DO $capture_writer_role$
+DECLARE
+    v_role_oid oid;
+BEGIN
+    SELECT oid INTO v_role_oid FROM pg_roles WHERE rolname = 'pr_d_capture_writer';
+    IF v_role_oid IS NULL THEN
+        CREATE ROLE pr_d_capture_writer NOLOGIN NOINHERIT BYPASSRLS;
+    ELSE
+        IF EXISTS (
+            SELECT 1 FROM pg_roles
+            WHERE oid = v_role_oid
+              AND (rolcanlogin OR rolinherit OR NOT rolbypassrls)
+        ) OR EXISTS (
+            SELECT 1 FROM pg_auth_members
+            WHERE roleid = v_role_oid OR member = v_role_oid
+        ) THEN
+            RAISE EXCEPTION
+                'prd_capture_writer_role_misconfigured: dedicated role must be NOLOGIN, NOINHERIT, BYPASSRLS, and have no memberships';
+        END IF;
+    END IF;
+END;
+$capture_writer_role$;
+
+GRANT USAGE ON SCHEMA public TO pr_d_capture_writer;
+GRANT SELECT ON public.youtube_shorts_log TO pr_d_capture_writer;
+GRANT UPDATE (views_primeras_3h, published_at, sync_captured_at)
+    ON public.youtube_shorts_log TO pr_d_capture_writer;
+GRANT CREATE ON SCHEMA public TO pr_d_capture_writer;
+
+-- The guard preserves old rows and unrelated updates, but rejects every new
+-- direct write to the capture fields unless it runs as the dedicated RPC owner.
+CREATE OR REPLACE FUNCTION public.pr_d_guard_capture_write()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog
+AS $guard$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF (
+            NEW.views_primeras_3h IS NOT NULL
+            OR NEW.published_at IS NOT NULL
+            OR NEW.sync_captured_at IS NOT NULL
+        ) AND current_user <> 'pr_d_capture_writer' THEN
+            RAISE EXCEPTION 'prd_capture_write_requires_rpc'
+                USING ERRCODE = '42501';
+        END IF;
+        RETURN NEW;
+    END IF;
+
+    IF (
+        NEW.views_primeras_3h IS DISTINCT FROM OLD.views_primeras_3h
+        OR NEW.published_at IS DISTINCT FROM OLD.published_at
+        OR NEW.sync_captured_at IS DISTINCT FROM OLD.sync_captured_at
+    ) AND current_user <> 'pr_d_capture_writer' THEN
+        RAISE EXCEPTION 'prd_capture_write_requires_rpc'
+            USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+END;
+$guard$;
+
+DROP TRIGGER IF EXISTS youtube_shorts_log_capture_write_guard
+    ON public.youtube_shorts_log;
+CREATE TRIGGER youtube_shorts_log_capture_write_guard
+    BEFORE INSERT OR UPDATE OF views_primeras_3h, published_at, sync_captured_at
+    ON public.youtube_shorts_log
+    FOR EACH ROW EXECUTE FUNCTION public.pr_d_guard_capture_write();
+
 -- Remove the earlier int32 overload from this candidate if the migration is replayed.
 DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, integer, timestamptz, timestamptz);
 
--- Reusable compare-and-set operation. Both stable identifiers must match;
--- only an unpopulated metric/provenance row can be claimed exactly once.
+-- SECURITY DEFINER runs as the isolated writer role. The role has only SELECT
+-- and UPDATE on the three capture columns; it cannot log in or be assumed by
+-- service_role. A fixed search_path and qualified object names prevent shadowing.
 CREATE OR REPLACE FUNCTION public.pr_d_capture_views_once(
     p_row_id bigint, p_youtube_video_id text, p_views numeric,
     p_published_at timestamptz, p_sync_captured_at timestamptz
 )
 RETURNS boolean
 LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
 AS $function$
     WITH changed AS (
         UPDATE public.youtube_shorts_log
@@ -101,8 +174,12 @@ AS $function$
     SELECT EXISTS (SELECT 1 FROM changed);
 $function$;
 
+ALTER FUNCTION public.pr_d_capture_views_once(
+    bigint, text, numeric, timestamptz, timestamptz
+) OWNER TO pr_d_capture_writer;
+REVOKE CREATE ON SCHEMA public FROM pr_d_capture_writer;
+
 -- Least privilege: PostgreSQL grants EXECUTE on new functions to PUBLIC by default.
--- The capture RPC is an internal writer and must only be callable by the trusted runner role.
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz
 ) FROM PUBLIC, anon, authenticated;
