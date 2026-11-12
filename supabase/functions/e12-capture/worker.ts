@@ -3,7 +3,6 @@ import {
   canonicalizeObservationPayload,
   createObservationAttestation,
   verifyObservationAttestation,
-  type ObservationAttestation,
   type ObservationAttestationPayload,
 } from "./provenance.ts";
 import { claimWorkerLease, releaseWorkerLease, renewWorkerLease, type WorkerLease } from "./lease.ts";
