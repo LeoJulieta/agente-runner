@@ -84,6 +84,7 @@ DROP TRIGGER IF EXISTS a_pr_d_lab_results_atomic_insert_guard ON public.lab_resu
 CREATE TRIGGER a_pr_d_lab_results_atomic_insert_guard
     BEFORE INSERT ON public.lab_results
     FOR EACH ROW EXECUTE FUNCTION public.pr_d_guard_lab_results_insert();
+REVOKE ALL ON FUNCTION public.pr_d_guard_lab_results_insert() FROM PUBLIC, anon, authenticated, service_role;
 
 -- Keep the same public PostgREST RPC name and arguments. The wrapper enters
 -- the isolated writer role, then calls the original invoker implementation.
