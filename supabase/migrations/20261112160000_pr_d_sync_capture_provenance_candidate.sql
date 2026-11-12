@@ -30,6 +30,36 @@ BEGIN
 END;
 $migration$;
 
+-- A viewCount is never negative, including legacy-shaped rows without timestamps.
+-- Abort rather than rewriting any historical value if invalid rows already exist.
+DO $views_nonnegative$
+DECLARE
+    v_negative_rows bigint;
+BEGIN
+    SELECT count(*) INTO v_negative_rows
+    FROM public.youtube_shorts_log
+    WHERE views_primeras_3h < 0;
+
+    IF v_negative_rows > 0 THEN
+        RAISE EXCEPTION
+            'prd_sync_migration_preflight_failed: negative views_primeras_3h rows=%. No row values were changed; audit legacy records before retry.',
+            v_negative_rows
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'youtube_shorts_log_views_nonnegative_ck'
+          AND conrelid = 'public.youtube_shorts_log'::regclass
+    ) THEN
+        ALTER TABLE public.youtube_shorts_log
+            ADD CONSTRAINT youtube_shorts_log_views_nonnegative_ck
+            CHECK (views_primeras_3h IS NULL OR views_primeras_3h >= 0);
+    END IF;
+END;
+$views_nonnegative$;
+
 -- Reusable compare-and-set operation. Both stable identifiers must match;
 -- only an unpopulated metric/provenance row can be claimed exactly once.
 CREATE OR REPLACE FUNCTION public.pr_d_capture_views_once(
