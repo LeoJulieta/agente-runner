@@ -1,5 +1,6 @@
 import { type ClockMicros, type E12Observation, collectYouTubeBatch, nowEpochMicros } from "./collector.ts";
 import {
+  canonicalizeObservationPayload,
   createObservationAttestation,
   verifyObservationAttestation,
   type ObservationAttestation,
@@ -218,6 +219,7 @@ async function persistObservation(
       p_attestation_algorithm: attestation.algorithm,
       p_collector_key_id: attestation.keyId,
       p_collector_public_key_spki_base64: publicKeySpkiBase64,
+      p_collector_payload_canonical: new TextDecoder().decode(canonicalizeObservationPayload(payload)),
       p_collector_payload_sha256: attestation.payloadSha256,
       p_collector_signature: attestation.signatureBase64,
       p_collector_response_sha256: payload.responseBodySha256,
