@@ -5,12 +5,21 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 import psycopg
+import pytest
 
 
-SUPABASE_URL = os.environ["SUPABASE_URL"].rstrip("/")
-SUPABASE_KEY = os.environ["SUPABASE_KEY"]
-SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
-DATABASE_URL = os.environ["TEST_DATABASE_URL"]
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Unsafe legacy E2E: mutates public.lab_results and cannot attest that "
+        "the local Supabase API and database belong to the same disposable stack. "
+        "Do not enable until rewritten against an isolated disposable project/schema."
+    )
+)
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
 
 
 def _assert_disposable_local_target():
