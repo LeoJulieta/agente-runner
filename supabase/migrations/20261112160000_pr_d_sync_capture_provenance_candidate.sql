@@ -166,7 +166,8 @@ GRANT USAGE ON SCHEMA public TO pr_d_capture_owner;
 
 GRANT SELECT (
     id, youtube_video_id, views_primeras_3h,
-    published_at, sync_captured_at, elapsed_seconds_e12
+    published_at, sync_captured_at, elapsed_seconds_e12,
+    hs_al_publicar_al_sync
 ) ON public.youtube_shorts_log TO pr_d_capture_owner;
 GRANT UPDATE (
     views_primeras_3h, published_at, sync_captured_at, elapsed_seconds_e12
