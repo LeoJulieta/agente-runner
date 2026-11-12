@@ -138,6 +138,7 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     assert "GRANT anon, authenticated, service_role TO authenticator" in bootstrap_sql
     assert "PGRST_DB_URI=postgres://authenticator:" in workflow_text
     assert "PGRST_DB_URI=postgres://prd_test:" not in workflow_text
-    assert "pr_d_capture_views_once" in bootstrap
-    assert "youtube_shorts_log" in bootstrap
+    assert "20261112160000_pr_d_sync_capture_provenance_candidate.sql" in bootstrap
+    candidate_migration = (ROOT / "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql").read_text(encoding="utf-8")
+    assert "pr_d_capture_views_once" in candidate_migration
     assert "tests/test_pr_d_youtube_collector.py" in workflow_text
