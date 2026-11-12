@@ -120,8 +120,10 @@ def disposable_postgrest_database():
         conn.execute(
             "DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz)"
         )
-        conn.execute("DROP FUNCTION IF EXISTS public.pr_d_guard_capture_fields()")
+        # Drop the table first so its trigger dependency is removed before the
+        # trigger function itself is dropped.
         conn.execute("DROP TABLE IF EXISTS public.youtube_shorts_log CASCADE")
+        conn.execute("DROP FUNCTION IF EXISTS public.pr_d_guard_capture_fields()")
         conn.execute("DROP SCHEMA IF EXISTS pr_d_internal CASCADE")
         conn.execute("REVOKE ALL ON SCHEMA public FROM pr_d_capture_owner")
         conn.execute("DROP ROLE IF EXISTS pr_d_capture_owner")
