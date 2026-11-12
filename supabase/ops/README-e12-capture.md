@@ -1,0 +1,36 @@
+# E12 scheduled capture — sandbox candidate
+
+This directory contains an **unapplied operational candidate**. Nothing here creates a production job unless an operator explicitly executes the SQL.
+
+## Required Edge Function secrets
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (the current `sb_secret_` key may be stored as this Edge Function secret)
+- `YOUTUBE_API_KEY`
+- `E12_CRON_HMAC_SECRET` (at least 32 random characters)
+
+Store the HMAC secret and the function URL in Supabase Vault under exactly:
+
+- `e12_cron_hmac_secret`
+- `e12_capture_function_url`
+
+The service-role key belongs only in the Edge Function environment. **Never place it in pg_net headers, queue rows, cron SQL, or request bodies.** The current project's pg_net queue tables have broad PUBLIC ACLs.
+
+## Request authentication
+
+The Cron SQL signs the current Unix timestamp with HMAC-SHA256. The queue stores only the timestamp and signature. The Edge Function rejects timestamps older than 120 seconds and accepts only an empty body (or `{}`). The request cannot provide a video ID, view count, publication time, or row ID.
+
+## Candidate discovery and evidence
+
+The worker uses `created_at` only as a coarse candidate filter (last six hours); it never derives the outcome elapsed time from that field. It fetches `snippet.publishedAt`, `statistics.viewCount`, and `status.privacyStatus` from YouTube, records response-receipt time after the full body is read, validates the public video and uint64 count, and persists only through `pr_d_capture_views_once`.
+
+The SQL CAS remains the final first-write-wins authority. Legacy `hs_al_publicar_al_sync` is never updated.
+
+## Not yet done
+
+- No Edge Function deployed.
+- No Vault secret created or read.
+- No Cron job created.
+- No pg_net ACL changed.
+- No production DDL/DML or RPC write executed.
+- The worker integration branch in `agente-autonomo` must pass its own CI and remain unmerged until the complete pipeline is audited.
