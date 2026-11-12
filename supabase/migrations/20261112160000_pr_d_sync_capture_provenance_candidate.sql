@@ -21,8 +21,8 @@ BEGIN
                     published_at IS NOT NULL
                     AND sync_captured_at IS NOT NULL
                     AND views_primeras_3h IS NOT NULL
-                    AND sync_captured_at >= published_at + interval '3 hours'
-                    AND sync_captured_at <= published_at + interval '6 hours'
+                    AND sync_captured_at >= published_at + interval '2 hours 55 minutes'
+                    AND sync_captured_at <= published_at + interval '3 hours 5 minutes'
                 )
             );
     END IF;
@@ -50,8 +50,8 @@ AS $function$
           AND sync_captured_at IS NULL
           AND p_views IS NOT NULL
           AND p_published_at IS NOT NULL
-          AND p_sync_captured_at >= p_published_at + interval '3 hours'
-          AND p_sync_captured_at <= p_published_at + interval '6 hours'
+          AND p_sync_captured_at >= p_published_at + interval '2 hours 55 minutes'
+          AND p_sync_captured_at <= p_published_at + interval '3 hours 5 minutes'
         RETURNING id
     )
     SELECT EXISTS (SELECT 1 FROM changed);
