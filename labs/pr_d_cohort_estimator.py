@@ -10,7 +10,6 @@ import math
 from typing import Any, Mapping
 
 from labs.pr_d_family_ii import (
-    METHOD_FINGERPRINT_OLS_HC3,
     fit_ols_log_positive_hc3,
 )
 
@@ -56,7 +55,9 @@ def fit_eligible_cohort_hc3(
     if not isinstance(cohort, Mapping) or any(key not in cohort for key in required):
         raise ValueError("cohort_contract_incomplete")
 
-    _validate_e12_provenance(cohort)\n\n    ids = list(cohort["candidate_ids"])
+    _validate_e12_provenance(cohort)
+
+    ids = list(cohort["candidate_ids"])
     outcomes = list(cohort["outcomes"])
     design = list(cohort["design_matrix"])
     mask = list(cohort["eligible_mask"])
@@ -103,6 +104,7 @@ def fit_eligible_cohort_hc3(
             min_n_eff=min_n_eff,
         )
 
+    result["metrics"]["method_fingerprint"] = E12_METHOD_FINGERPRINT
     result["metrics"].update({
         "n_total": n,
         "n_eff": n_eff,
