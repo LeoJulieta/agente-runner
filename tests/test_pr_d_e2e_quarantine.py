@@ -101,6 +101,8 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
         "tests/e2e/bootstrap_pr_d_postgrest.py",
         "tests/e2e/test_pr_d_postgrest_isolated_http.py",
         "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql",
+        "labs/pr_d_youtube_collector.py",
+        "tests/test_pr_d_youtube_collector.py",
         "supabase/migrations/004_pr_d_v2_atomic_persistence.sql",
     }
     assert required_http_dependencies <= push_paths, (
@@ -136,3 +138,6 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     assert "GRANT anon, authenticated, service_role TO authenticator" in bootstrap_sql
     assert "PGRST_DB_URI=postgres://authenticator:" in workflow_text
     assert "PGRST_DB_URI=postgres://prd_test:" not in workflow_text
+    assert "pr_d_capture_views_once" in bootstrap
+    assert "youtube_shorts_log" in bootstrap
+    assert "tests/test_pr_d_youtube_collector.py" in workflow_text
