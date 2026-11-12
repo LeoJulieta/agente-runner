@@ -108,9 +108,6 @@ Deno.test("worker obtains source observation itself and persists only through th
     if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
       return Promise.resolve(new Response("true", { status: 200 }));
     }
-    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
-      return Promise.resolve(new Response("true", { status: 200 }));
-    }
     if (url.includes("/rest/v1/youtube_shorts_log")) {
       return Promise.resolve(
         new Response(
@@ -220,6 +217,9 @@ Deno.test("worker skips replayed signed minute before any YouTube request", asyn
 Deno.test("worker reports CAS first-write conflicts without overwriting outcomes", async () => {
   const fetchImpl: typeof fetch = (input) => {
     const url = String(input);
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
     if (url.includes("/rest/v1/youtube_shorts_log")) {
       return Promise.resolve(
         new Response(
