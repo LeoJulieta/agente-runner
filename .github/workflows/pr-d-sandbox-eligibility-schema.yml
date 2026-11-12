@@ -10,6 +10,7 @@ on:
       - "labs/pr_d_cohort_estimator.py"
       - "labs/pr_d_sync_contract.py"
       - "tests/test_pr_d_sync_cohort_estimator_e2e.py"
+      - "tests/test_pr_d_family_ii_validation.py"
       - "tests/test_pr_d_cohort_builder_eligibility.py"
       - "tests/integration/test_pr_d_sync_schema_compatibility.py"
       - "tests/fixtures/pr_d_youtube_shorts_log_schema.sql"
@@ -28,7 +29,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check pytest numpy statsmodels
+        run: python -m pip install --disable-pip-version-check pytest numpy statsmodels tzdata
       - name: Run eligibility-first cohort and estimator integration tests
         run: python -m pytest -q tests/test_pr_d_cohort_builder_eligibility.py tests/test_pr_d_sync_cohort_estimator_e2e.py
 
@@ -57,6 +58,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python -m pip install --disable-pip-version-check pytest "psycopg[binary]"
+        run: python -m pip install --disable-pip-version-check pytest "psycopg[binary]" tzdata
       - name: Apply candidate migration to disposable schema and test CAS
         run: python -m pytest -q tests/integration/test_pr_d_sync_schema_compatibility.py

@@ -20,6 +20,7 @@ BEGIN
                 OR (
                     published_at IS NOT NULL
                     AND sync_captured_at IS NOT NULL
+                    AND views_primeras_3h IS NOT NULL
                     AND sync_captured_at >= published_at + interval '3 hours'
                     AND sync_captured_at <= published_at + interval '6 hours'
                 )
@@ -28,9 +29,34 @@ BEGIN
 END;
 $migration$;
 
--- CAS must identify the existing bigint row id AND its YouTube text identifier.
--- A successful first write changes views_primeras_3h from NULL; all competing
--- writers then affect zero rows. Legacy populated rows are intentionally kept.
+-- Reusable compare-and-set operation. Both stable identifiers must match;
+-- only an unpopulated metric/provenance row can be claimed exactly once.
+CREATE OR REPLACE FUNCTION public.pr_d_capture_views_once(
+    p_row_id bigint, p_youtube_video_id text, p_views integer,
+    p_published_at timestamptz, p_sync_captured_at timestamptz
+)
+RETURNS boolean
+LANGUAGE sql
+AS $function$
+    WITH changed AS (
+        UPDATE public.youtube_shorts_log
+        SET views_primeras_3h = p_views,
+            published_at = p_published_at,
+            sync_captured_at = p_sync_captured_at
+        WHERE id = p_row_id
+          AND youtube_video_id = p_youtube_video_id
+          AND views_primeras_3h IS NULL
+          AND published_at IS NULL
+          AND sync_captured_at IS NULL
+          AND p_views IS NOT NULL
+          AND p_published_at IS NOT NULL
+          AND p_sync_captured_at >= p_published_at + interval '3 hours'
+          AND p_sync_captured_at <= p_published_at + interval '6 hours'
+        RETURNING id
+    )
+    SELECT EXISTS (SELECT 1 FROM changed);
+$function$;
+
 CREATE INDEX IF NOT EXISTS youtube_shorts_log_sync_capture_pending_idx
     ON public.youtube_shorts_log (id)
     WHERE views_primeras_3h IS NULL;

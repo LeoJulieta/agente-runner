@@ -37,13 +37,19 @@ def _view_count(response, expected_video_id):
 
 def _build(n_rows, *, include_out_of_window=False):
     rows = []
-    published = datetime.fromisoformat(PUBLISHED.replace("Z", "+00:00"))
     for i in range(n_rows):
         video_id = f"fixture-{i:03d}"
-        api = _api_resource(video_id, 20 + (i % 7) + (2 if i >= n_rows // 2 else 0))
+        publication_text = (
+            datetime(2026, 10, 30, 2, 30, tzinfo=timezone.utc)
+            + timedelta(days=i)
+        ).isoformat().replace("+00:00", "Z")
+        api = _api_resource(
+            video_id, 20 + (i % 7) + (2 if i >= n_rows // 2 else 0),
+            published=publication_text,
+        )
         publication = extract_published_at(api, expected_video_id=video_id)
         captured = parse_sync_captured_at(
-            (published + timedelta(hours=4 if not (include_out_of_window and i == n_rows - 1) else 2)).isoformat()
+            (publication + timedelta(hours=4 if not (include_out_of_window and i == n_rows - 1) else 2)).isoformat()
         )
         decision = evaluate_sync_window(publication, captured)
         row = {
@@ -167,3 +173,21 @@ def test_d_init_returns_insufficient_only_after_validating_all_present_counts():
     assert compute_d_init(None, None, 3, 10) == {
         "d_init": None, "d_init_reason": "insufficient_data"
     }
+
+
+def test_duplicate_youtube_resource_id_is_rejected():
+    from labs.pr_d_sync_contract import YouTubeReadError
+
+    response = _api_resource(VIDEO_ID, 10)
+    response["items"].append(response["items"][1].copy())
+    with pytest.raises(YouTubeReadError, match="youtube_video_resource_ambiguous"):
+        extract_published_at(response, expected_video_id=VIDEO_ID)
+
+
+def test_publication_datetime_uses_iana_ushuaia_zone():
+    from labs.pr_d_sync_contract import publication_datetime_ushuaia
+
+    converted = publication_datetime_ushuaia("2026-10-30T02:30:00Z")
+    assert converted.tzinfo is not None
+    assert converted.tzinfo.key == "America/Argentina/Ushuaia"
+    assert converted.hour == 23

@@ -78,12 +78,15 @@ def extract_published_at(
     if not isinstance(expected_video_id, str) or not expected_video_id.strip():
         raise ValueError("expected_video_id_invalid")
 
-    resource = next(
-        (item for item in items if isinstance(item, Mapping) and item.get("id") == expected_video_id),
-        None,
-    )
-    if resource is None:
+    matches = [
+        item for item in items
+        if isinstance(item, Mapping) and item.get("id") == expected_video_id
+    ]
+    if not matches:
         raise YouTubeReadError("youtube_video_resource_missing")
+    if len(matches) != 1:
+        raise YouTubeReadError("youtube_video_resource_ambiguous")
+    resource = matches[0]
 
     status = resource.get("status")
     snippet = resource.get("snippet")

@@ -144,9 +144,13 @@ def compute_d_init(
         raise ValueError("d_init_total_must_be_positive")
     if total_b is not None and total_b <= 0:
         raise ValueError("d_init_total_must_be_positive")
-    if positive_a is not None and total_a is not None and not 0 <= positive_a <= total_a:
+    if positive_a is not None and positive_a < 0:
         raise ValueError("d_init_positive_count_out_of_range")
-    if positive_b is not None and total_b is not None and not 0 <= positive_b <= total_b:
+    if positive_b is not None and positive_b < 0:
+        raise ValueError("d_init_positive_count_out_of_range")
+    if positive_a is not None and total_a is not None and positive_a > total_a:
+        raise ValueError("d_init_positive_count_out_of_range")
+    if positive_b is not None and total_b is not None and positive_b > total_b:
         raise ValueError("d_init_positive_count_out_of_range")
     if any(value is None for value in values):
         return {"d_init": None, "d_init_reason": "insufficient_data"}
