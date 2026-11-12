@@ -385,3 +385,47 @@ def test_service_role_cannot_truncate_capture_table_and_bypass_row_guards(dispos
         conn.execute("SET ROLE service_role")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute("TRUNCATE TABLE pr_d_test.youtube_shorts_log")
+
+def test_preexisting_superuser_capture_writer_role_is_rejected_atomically(disposable_database):
+    migration = MIGRATION.read_text(encoding="utf-8")
+    migration = migration.replace("public.youtube_shorts_log", "pr_d_test.youtube_shorts_log")
+    migration = migration.replace("public.pr_d_capture_views_once", "pr_d_test.pr_d_capture_views_once")
+    migration = migration.replace("public.pr_d_guard_capture_write", "pr_d_test.pr_d_guard_capture_write")
+    migration = migration.replace("ON SCHEMA public", "ON SCHEMA pr_d_test")
+
+    with psycopg.connect(disposable_database, autocommit=True) as conn:
+        conn.execute("BEGIN")
+        conn.execute("ALTER ROLE pr_d_capture_writer SUPERUSER")
+        conn.execute("SAVEPOINT candidate_migration")
+        with pytest.raises(
+            psycopg.errors.RaiseException,
+            match="prd_capture_writer_role_misconfigured",
+        ):
+            conn.execute(migration)
+        conn.execute("ROLLBACK TO SAVEPOINT candidate_migration")
+
+        # The failed candidate did not grant memberships or alter function ownership.
+        assert conn.execute(
+            "SELECT rolsuper FROM pg_roles WHERE rolname='pr_d_capture_writer'"
+        ).fetchone()[0] is True
+        assert conn.execute(
+            """
+            SELECT count(*) FROM pg_auth_members
+            WHERE roleid = (SELECT oid FROM pg_roles WHERE rolname='pr_d_capture_writer')
+               OR member = (SELECT oid FROM pg_roles WHERE rolname='pr_d_capture_writer')
+            """
+        ).fetchone()[0] == 0
+        owner = conn.execute(
+            """
+            SELECT pg_get_userbyid(proowner)
+            FROM pg_proc
+            WHERE oid = 'pr_d_test.pr_d_capture_views_once(bigint,text,numeric,timestamptz,timestamptz)'::regprocedure
+            """
+        ).fetchone()[0]
+        assert owner == "pr_d_capture_writer"
+        conn.execute("ROLLBACK")
+
+    with psycopg.connect(disposable_database) as conn:
+        assert conn.execute(
+            "SELECT rolsuper FROM pg_roles WHERE rolname='pr_d_capture_writer'"
+        ).fetchone()[0] is False
