@@ -149,12 +149,9 @@ async function readBoundedBody(
 ): Promise<{ bodyText: string; capturedAtMicros: bigint }> {
   const reader = response.body?.getReader();
   if (!reader) {
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const capturedAtMicros = clockMicros();
-    if (bytes.byteLength > YOUTUBE_MAX_RESPONSE_BYTES) {
-      throw new Error("youtube_response_too_large");
-    }
-    return { bodyText: new TextDecoder().decode(bytes), capturedAtMicros };
+    // A successful API response without a readable body is not a valid
+    // collector observation. Do not fall back to unbounded arrayBuffer().
+    throw new Error("youtube_response_body_missing");
   }
 
   const chunks: Uint8Array[] = [];
