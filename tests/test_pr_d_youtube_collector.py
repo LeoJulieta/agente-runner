@@ -34,8 +34,8 @@ class FakeResponse:
         return self
     def __exit__(self, *args):
         return False
-    def read(self):
-        return self.body
+    def read(self, size=-1):
+        return self.body if size < 0 else self.body[:size]
 
 
 def test_parse_observation_derives_elapsed_and_preserves_exact_counter():
