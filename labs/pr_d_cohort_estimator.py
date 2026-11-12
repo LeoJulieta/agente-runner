@@ -9,7 +9,40 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping
 
-from labs.pr_d_family_ii import fit_ols_log_positive_hc3
+from labs.pr_d_family_ii import (
+    METHOD_FINGERPRINT_OLS_HC3,
+    fit_ols_log_positive_hc3,
+)
+
+E12_FILTER_PROVENANCE = {
+    "elapsed_unit": "seconds",
+    "lower_seconds": 10500.0,
+    "upper_seconds": 11100.0,
+    "lower_inclusive": True,
+    "upper_inclusive": True,
+    "missing_policy": "exclude_with_reason",
+    "temporal_anchor": "publishedAt",
+}
+E12_METHOD_FINGERPRINT = (
+    "ols-ln-positive-y-hc3-t-two-sided-v1__"
+    "yt-viewcount-publishedat-10500-11100-closed-missing-excluded-v1"
+)
+
+
+def _validate_e12_provenance(cohort: Mapping[str, Any]) -> None:
+    provenance = cohort.get("filter_provenance")
+    if not isinstance(provenance, Mapping):
+        raise ValueError("e12_filter_provenance_required")
+    for key, expected in E12_FILTER_PROVENANCE.items():
+        actual = provenance.get(key)
+        if type(expected) is bool:
+            valid = type(actual) is bool and actual is expected
+        else:
+            valid = actual == expected and type(actual) is type(expected)
+        if not valid:
+            raise ValueError(f"e12_filter_provenance_mismatch:{key}")
+    if not isinstance(provenance.get("elapsed_field"), str) or not provenance["elapsed_field"].strip():
+        raise ValueError("e12_filter_provenance_mismatch:elapsed_field")
 
 
 def fit_eligible_cohort_hc3(
@@ -23,7 +56,7 @@ def fit_eligible_cohort_hc3(
     if not isinstance(cohort, Mapping) or any(key not in cohort for key in required):
         raise ValueError("cohort_contract_incomplete")
 
-    ids = list(cohort["candidate_ids"])
+    _validate_e12_provenance(cohort)\n\n    ids = list(cohort["candidate_ids"])
     outcomes = list(cohort["outcomes"])
     design = list(cohort["design_matrix"])
     mask = list(cohort["eligible_mask"])
@@ -59,7 +92,7 @@ def fit_eligible_cohort_hc3(
                 "ci_low": None, "ci_high": None,
                 "non_estimability_reason": None,
                 "insufficient_power_reason": "n_eff_below_minimum",
-                "method_fingerprint": "ols-ln-positive-y-hc3-t-two-sided-v1",
+                "method_fingerprint": E12_METHOD_FINGERPRINT,
             },
             "bh_input_p": 1.0,
         }
