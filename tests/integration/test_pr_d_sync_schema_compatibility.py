@@ -60,13 +60,20 @@ def insert_video(dsn, video_id="yt-fixture-001"):
         ).fetchone()[0]
 
 
-def _cas(dsn, row_id, video_id, views):
+def _cas(
+    dsn,
+    row_id,
+    video_id,
+    views,
+    published_at="2026-10-30T02:30:00Z",
+    captured_at="2026-10-30T05:30:00Z",
+):
     with psycopg.connect(dsn) as conn:
         return conn.execute("""
             SELECT pr_d_test.pr_d_capture_views_once(
                 %s, %s, %s, %s::timestamptz, %s::timestamptz
             )
-        """, (row_id, video_id, views, "2026-10-30T02:30:00Z", "2026-10-30T05:30:00Z")).fetchone()[0]
+        """, (row_id, video_id, views, published_at, captured_at)).fetchone()[0]
 
 
 def test_schema_types_and_legacy_rows(disposable_database):
@@ -75,14 +82,10 @@ def test_schema_types_and_legacy_rows(disposable_database):
             SELECT column_name, data_type FROM information_schema.columns
             WHERE table_schema = 'pr_d_test' AND table_name = 'youtube_shorts_log'
         """).fetchall())
-        row_id = conn.execute("""
-            INSERT INTO pr_d_test.youtube_shorts_log (youtube_video_id, views_primeras_3h)
-            VALUES ('legacy-fixture', 123) RETURNING id
-        """).fetchone()[0]
         stored = conn.execute("""
             SELECT views_primeras_3h, published_at, sync_captured_at
-            FROM pr_d_test.youtube_shorts_log WHERE id = %s
-        """, (row_id,)).fetchone()
+            FROM pr_d_test.youtube_shorts_log WHERE youtube_video_id = 'legacy-fixture'
+        """).fetchone()
     assert columns["id"] == "bigint"
     assert columns["youtube_video_id"] == "text"
     assert columns["views_primeras_3h"] == "numeric"
@@ -146,28 +149,31 @@ def test_wrong_youtube_id_cannot_claim_row(disposable_database):
 
 
 def test_check_accepts_closed_tolerance_and_rejects_values_outside_it(disposable_database):
-    with psycopg.connect(disposable_database) as conn:
-        conn.execute("""
-            INSERT INTO pr_d_test.youtube_shorts_log
-                (youtube_video_id, views_primeras_3h, published_at, sync_captured_at)
-            VALUES
-                ('lower-boundary', 10, '2026-10-30T02:30:00Z', '2026-10-30T05:25:00Z'),
-                ('upper-boundary', 11, '2026-10-30T02:30:00Z', '2026-10-30T05:35:00Z')
-        """)
+    lower_id = insert_video(disposable_database, "lower-boundary")
+    upper_id = insert_video(disposable_database, "upper-boundary")
+    assert _cas(
+        disposable_database, lower_id, "lower-boundary", 10,
+        captured_at="2026-10-30T05:25:00Z",
+    ) is True
+    assert _cas(
+        disposable_database, upper_id, "upper-boundary", 11,
+        captured_at="2026-10-30T05:35:00Z",
+    ) is True
 
     for video_id, captured_at in (
         ("below-lower-boundary", "2026-10-30T05:24:59.999999Z"),
         ("above-upper-boundary", "2026-10-30T05:35:00.000001Z"),
     ):
-        with psycopg.connect(disposable_database) as conn:
-            with pytest.raises(psycopg.errors.CheckViolation):
-                conn.execute("""
-                    INSERT INTO pr_d_test.youtube_shorts_log
-                        (youtube_video_id, views_primeras_3h, published_at, sync_captured_at)
-                    VALUES (%s, 10, '2026-10-30T02:30:00Z', %s)
-                """, (video_id, captured_at))
+        row_id = insert_video(disposable_database, video_id)
+        assert _cas(
+            disposable_database, row_id, video_id, 10,
+            captured_at=captured_at,
+        ) is False
 
+    # Exercise the CHECK itself with triggers bypassed only inside this
+    # disposable superuser-owned test transaction; production paths never do this.
     with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET LOCAL session_replication_role = replica")
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
@@ -187,6 +193,7 @@ def test_negative_view_count_cannot_be_captured_or_inserted(disposable_database)
     assert stored is None
 
     with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET LOCAL session_replication_role = replica")
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
@@ -198,6 +205,7 @@ def test_negative_view_count_cannot_be_captured_or_inserted(disposable_database)
     # Legacy-shaped rows without provenance are still allowed when valid,
     # but the metric invariant itself must never be bypassed by omitting timestamps.
     with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET LOCAL session_replication_role = replica")
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
@@ -214,6 +222,7 @@ def test_migration_preflight_refuses_negative_legacy_values_without_rewriting(di
     # Commit a pre-existing legacy-invalid row before attempting the migration.
     # This distinguishes preservation of existing data from rollback of test setup.
     with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET LOCAL session_replication_role = replica")
         conn.execute("""
             ALTER TABLE pr_d_test.youtube_shorts_log
             DROP CONSTRAINT youtube_shorts_log_views_nonnegative_ck
@@ -251,6 +260,7 @@ def test_migration_preflight_refuses_negative_legacy_values_without_rewriting(di
     finally:
         # Restore the disposable fixture so later tests see the original invariant.
         with psycopg.connect(disposable_database) as conn:
+            conn.execute("SET LOCAL session_replication_role = replica")
             conn.execute("""
                 DELETE FROM pr_d_test.youtube_shorts_log
                 WHERE youtube_video_id = 'negative-legacy-row'
@@ -304,6 +314,7 @@ def test_uint64_view_count_round_trips_without_integer_overflow(disposable_datab
 
 def test_view_count_above_uint64_is_rejected_by_constraint(disposable_database):
     with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET LOCAL session_replication_role = replica")
         with pytest.raises(psycopg.errors.CheckViolation):
             conn.execute("""
                 INSERT INTO pr_d_test.youtube_shorts_log
