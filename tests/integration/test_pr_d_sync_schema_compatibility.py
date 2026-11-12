@@ -208,6 +208,8 @@ def test_migration_preflight_refuses_negative_legacy_values_without_rewriting(di
     migration = migration.replace("public.youtube_shorts_log", "pr_d_test.youtube_shorts_log")
     migration = migration.replace("public.pr_d_capture_views_once", "pr_d_test.pr_d_capture_views_once")
 
+    # Commit a pre-existing legacy-invalid row before attempting the migration.
+    # This distinguishes preservation of existing data from rollback of test setup.
     with psycopg.connect(disposable_database) as conn:
         conn.execute("""
             ALTER TABLE pr_d_test.youtube_shorts_log
@@ -218,29 +220,44 @@ def test_migration_preflight_refuses_negative_legacy_values_without_rewriting(di
                 (youtube_video_id, views_primeras_3h)
             VALUES ('negative-legacy-row', -7)
         """)
+        conn.commit()
+
+    with psycopg.connect(disposable_database) as conn:
         with pytest.raises(
             psycopg.errors.CheckViolation,
             match="prd_sync_migration_preflight_failed",
         ):
             conn.execute(migration)
-        # Roll back the synthetic legacy corruption and the attempted migration.
         conn.rollback()
 
-    with psycopg.connect(disposable_database) as conn:
-        negative_rows = conn.execute("""
-            SELECT count(*) FROM pr_d_test.youtube_shorts_log
-            WHERE views_primeras_3h < 0
-        """).fetchone()[0]
-        constraint_exists = conn.execute("""
-            SELECT EXISTS (
-                SELECT 1 FROM pg_constraint
-                WHERE conname = 'youtube_shorts_log_views_nonnegative_ck'
-                  AND conrelid = 'pr_d_test.youtube_shorts_log'::regclass
-            )
-        """).fetchone()[0]
-    assert negative_rows == 0
-    assert constraint_exists is True
-
+    try:
+        with psycopg.connect(disposable_database) as conn:
+            legacy_value = conn.execute("""
+                SELECT views_primeras_3h FROM pr_d_test.youtube_shorts_log
+                WHERE youtube_video_id = 'negative-legacy-row'
+            """).fetchone()[0]
+            constraint_exists = conn.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conname = 'youtube_shorts_log_views_nonnegative_ck'
+                      AND conrelid = 'pr_d_test.youtube_shorts_log'::regclass
+                )
+            """).fetchone()[0]
+        assert legacy_value == -7, "migration preflight must never rewrite existing legacy values"
+        assert constraint_exists is False, "failed migration must not leave a partial constraint change"
+    finally:
+        # Restore the disposable fixture so later tests see the original invariant.
+        with psycopg.connect(disposable_database) as conn:
+            conn.execute("""
+                DELETE FROM pr_d_test.youtube_shorts_log
+                WHERE youtube_video_id = 'negative-legacy-row'
+            """)
+            conn.execute("""
+                ALTER TABLE pr_d_test.youtube_shorts_log
+                ADD CONSTRAINT youtube_shorts_log_views_nonnegative_ck
+                CHECK (views_primeras_3h IS NULL OR views_primeras_3h >= 0)
+            """)
+            conn.commit()
 
 def test_two_concurrent_cas_writers_have_exactly_one_winner(disposable_database):
     row_id = insert_video(disposable_database, "concurrent-video")
