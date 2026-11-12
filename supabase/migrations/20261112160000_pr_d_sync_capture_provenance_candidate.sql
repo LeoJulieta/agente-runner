@@ -30,7 +30,9 @@ BEGIN
 END;
 $migration$;
 
--- A viewCount is never negative, including legacy-shaped rows without timestamps.
+-- YouTube documents viewCount as an unsigned 64-bit integer. numeric(20,0)
+-- preserves the full uint64 range; PostgreSQL integer/bigint cannot represent it.
+-- Preflight before widening so no legacy value is rewritten on a rejected migration.
 -- Abort rather than rewriting any historical value if invalid rows already exist.
 DO $views_nonnegative$
 DECLARE
@@ -47,6 +49,10 @@ BEGIN
             USING ERRCODE = '23514';
     END IF;
 
+    ALTER TABLE public.youtube_shorts_log
+        ALTER COLUMN views_primeras_3h TYPE numeric(20,0)
+        USING views_primeras_3h::numeric(20,0);
+
     IF NOT EXISTS (
         SELECT 1
         FROM pg_constraint
@@ -55,7 +61,7 @@ BEGIN
     ) THEN
         ALTER TABLE public.youtube_shorts_log
             ADD CONSTRAINT youtube_shorts_log_views_nonnegative_ck
-            CHECK (views_primeras_3h IS NULL OR views_primeras_3h >= 0);
+            CHECK (views_primeras_3h IS NULL OR (views_primeras_3h >= 0 AND views_primeras_3h <= 18446744073709551615));
     END IF;
 END;
 $views_nonnegative$;
@@ -63,7 +69,7 @@ $views_nonnegative$;
 -- Reusable compare-and-set operation. Both stable identifiers must match;
 -- only an unpopulated metric/provenance row can be claimed exactly once.
 CREATE OR REPLACE FUNCTION public.pr_d_capture_views_once(
-    p_row_id bigint, p_youtube_video_id text, p_views integer,
+    p_row_id bigint, p_youtube_video_id text, p_views numeric(20,0),
     p_published_at timestamptz, p_sync_captured_at timestamptz
 )
 RETURNS boolean
@@ -92,7 +98,7 @@ $function$;
 -- Least privilege: PostgreSQL grants EXECUTE on new functions to PUBLIC by default.
 -- The capture RPC is an internal writer and must only be callable by the trusted runner role.
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
-    bigint, text, integer, timestamptz, timestamptz
+    bigint, text, numeric, timestamptz, timestamptz
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, integer, timestamptz, timestamptz
