@@ -182,51 +182,44 @@ async function fetchPendingCandidates(
   return rows;
 }
 
-async function persistObservation(
+async function persistObservationsBatch(
   supabaseUrl: string,
   serviceRoleKey: string,
-  row: CandidateRow,
-  observation: E12Observation,
+  observations: Record<string, unknown>[],
   fetchImpl: typeof fetch,
-  lease: WorkerLease,
-  payload: ObservationAttestationPayload,
-  attestation: ObservationAttestation,
-  publicKeySpkiBase64: string,
-): Promise<boolean> {
+): Promise<{ attempted: number; captured: number; notCaptured: number }> {
   const baseUrl = supabaseUrl.replace(/\/+$/, "");
-  const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/pr_d_capture_views_once`, {
+  const response = await fetchImpl(baseUrl + "/rest/v1/rpc/pr_d_capture_views_batch", {
     method: "POST",
     headers: {
       apikey: serviceRoleKey,
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      p_row_id: String(row.id),
-      p_youtube_video_id: observation.videoId,
-      p_views: observation.viewCount,
-      p_published_at: observation.publishedAt,
-      p_sync_captured_at: observation.syncCapturedAt,
-      p_run_id: lease.runId,
-      p_fencing_token: lease.fencingToken,
-      p_attestation_version: attestation.version,
-      p_attestation_algorithm: attestation.algorithm,
-      p_collector_key_id: attestation.keyId,
-      p_collector_public_key_spki_base64: publicKeySpkiBase64,
-      p_collector_payload_canonical: new TextDecoder().decode(canonicalizeObservationPayload(payload)),
-      p_collector_payload_sha256: attestation.payloadSha256,
-      p_collector_signature: attestation.signatureBase64,
-      p_collector_hmac_signature: attestation.hmacSignatureHex,
-      p_collector_response_sha256: payload.responseBodySha256,
-      p_collector_requested_ids_sha256: payload.requestedVideoIdsSha256,
-      p_collector_build: payload.collectorBuild,
-    }),
-    signal: AbortSignal.timeout(15_000),
+    body: JSON.stringify({ p_observations: observations }),
+    signal: AbortSignal.timeout(20_000),
   });
-  if (!response.ok) throw new Error(`supabase_capture_rpc_http_${response.status}`);
+  if (!response.ok) throw new Error("supabase_capture_batch_rpc_http_" + response.status);
   const result: unknown = await response.json();
-  if (typeof result !== "boolean") throw new Error("supabase_capture_rpc_response_invalid");
-  return result;
+  if (typeof result !== "object" || result === null || Array.isArray(result)) {
+    throw new Error("supabase_capture_batch_rpc_response_invalid");
+  }
+  const counts = result as Record<string, unknown>;
+  const attempted = Number(counts.attempted);
+  const captured = Number(counts.captured);
+  const notCaptured = Number(counts.not_captured);
+  if (
+    !Number.isSafeInteger(attempted) ||
+    !Number.isSafeInteger(captured) ||
+    !Number.isSafeInteger(notCaptured) ||
+    attempted !== observations.length ||
+    captured < 0 ||
+    notCaptured < 0 ||
+    captured + notCaptured !== attempted
+  ) {
+    throw new Error("supabase_capture_batch_rpc_counts_invalid");
+  }
+  return { attempted, captured, notCaptured };
 }
 
 export async function handleE12Capture(
