@@ -245,6 +245,12 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(rpcBody.p_collector_key_id === "e12-test-key", "CAS must bind the registered collector key ID");
   assert(rpcBody.p_collector_public_key_spki_base64 === TEST_PUBLIC_KEY, "CAS must bind the exact registered public key");
   assert(rpcBody.p_collector_payload_sha256 === "a".repeat(64), "CAS must persist the signed payload digest");
+  const canonicalPayload = JSON.parse(String(rpcBody.p_collector_payload_canonical)) as string[];
+  assert(canonicalPayload.length === 12, "CAS must persist the complete canonical payload");
+  assert(canonicalPayload[1] === "e12-test-key", "canonical payload must bind key ID");
+  assert(canonicalPayload[2] === "11111111-2222-4333-8444-555555555555", "canonical payload must bind run ID");
+  assert(canonicalPayload[3] === "9007199254740993", "canonical payload must bind exact fencing token");
+  assert(canonicalPayload[5] === "video-1" && canonicalPayload[7] === YOUTUBE_UINT64_MAX.toString(), "canonical payload must bind video and exact uint64 count");
   assert(rpcBody.p_collector_signature === "A".repeat(86) + "==", "CAS must persist the Ed25519 signature");
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_response_sha256)), "CAS must persist the raw response digest");
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_requested_ids_sha256)), "CAS must persist the requested IDs digest");
