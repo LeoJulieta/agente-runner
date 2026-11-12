@@ -30,6 +30,11 @@ GRANT SELECT, INSERT ON public.lab_results TO pr_d_lab_results_writer;
 GRANT USAGE, SELECT ON SEQUENCE public.lab_results_id_seq TO pr_d_lab_results_writer;
 GRANT CREATE ON SCHEMA public TO pr_d_lab_results_writer;
 
+-- TRUNCATE bypasses the existing row-level DELETE protection trigger.
+REVOKE TRUNCATE, TRIGGER, REFERENCES
+    ON TABLE public.lab_results
+    FROM PUBLIC, anon, authenticated, service_role;
+
 -- Move the existing implementation behind the new security-definer boundary.
 -- The conditional rename makes replay safe while preserving the public RPC name.
 DO $rename_impl$
