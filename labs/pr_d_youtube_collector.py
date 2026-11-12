@@ -114,7 +114,7 @@ def collect_public_video_observation(
     try:
         with opener(request, timeout=timeout_seconds) as response:
             body = response.read(MAX_RESPONSE_BYTES + 1)
-        captured_at = clock()
+            captured_at = clock()
         if len(body) > MAX_RESPONSE_BYTES:
             raise YouTubeReadError("youtube_api_response_too_large")
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
