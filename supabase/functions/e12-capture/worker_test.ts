@@ -499,13 +499,13 @@ Deno.test("worker never calls CAS when independent attestation verification fail
   const deps = dependencies(fetchImpl, { E12_PROVENANCE_PUBLIC_KEY_SPKI_B64: mismatchedPublicKey });
   const response = await handleE12Capture(await signedRequest(), deps);
   assert(response.status === 502, "invalid attestation must fail the worker cycle");
-  assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_once")), "CAS must not run for an invalid attestation");
+  assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_batch")), "CAS must not run for an invalid attestation");
   assert(calls.some((url) => url.includes("/rpc/pr_d_release_e12_worker_lease")), "lease must still be released");
 });
 
 
 Deno.test(
-  "500-candidate baseline quantifies per-observation Supabase RPC amplification",
+  "500-candidate batched path reduces Supabase RPC amplification",
   { timeout: 30_000 },
   async () => {
     const counts = {
@@ -563,9 +563,10 @@ Deno.test(
           })),
         }), { status: 200 });
       }
-      if (url.pathname.endsWith("/rpc/pr_d_capture_views_once")) {
+      if (url.pathname.endsWith("/rpc/pr_d_capture_views_batch")) {
         counts.casWrite++;
-        return new Response("true", { status: 200 });
+        const body = await new Response(await (async () => "")()).text();
+        return new Response(JSON.stringify({ attempted: 50, captured: 50, not_captured: 0 }), { status: 200 });
       }
       throw new Error(`unexpected_500_candidate_request:${url.pathname}`);
     };
@@ -578,9 +579,9 @@ Deno.test(
     const result = await response.json() as { captured: number; eligible: number };
     assert(result.eligible === 500 && result.captured === 500, "all 500 candidates should be captured");
     assert(counts.youtubeFetch === 10, "500 videos should use ten YouTube batches of 50");
-    assert(counts.leaseRenew === 511, "baseline performs one post-query, ten per-batch and 500 per-row renewals");
-    assert(counts.casWrite === 500, "baseline performs one CAS HTTP request per observation");
+    assert(counts.leaseRenew === 11, "batched path performs one post-query and ten pre-CAS renewals");
+    assert(counts.casWrite === 10, "batched path performs one CAS HTTP request per 50 observations");
     const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
-    assert(total === 1025, "baseline request count should be reproducible");
+    assert(total === 35, "batched request count should be reproducible");
   },
 );
