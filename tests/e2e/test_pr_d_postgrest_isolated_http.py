@@ -392,3 +392,21 @@ def test_atomic_lab_results_rpc_is_the_only_service_role_insert_capability():
     assert implementation_execute is False
     assert wrapper_owner == "pr_d_lab_results_writer"
     assert writer_memberships == 0
+
+
+def test_service_role_cannot_truncate_protected_lab_tables():
+    with psycopg.connect(DATABASE_URL) as conn:
+        lab_truncate = conn.execute(
+            "SELECT has_table_privilege('service_role', 'public.lab_results', 'TRUNCATE')"
+        ).fetchone()[0]
+        capture_truncate = conn.execute(
+            "SELECT has_table_privilege('service_role', 'public.youtube_shorts_log', 'TRUNCATE')"
+        ).fetchone()[0]
+        assert lab_truncate is False
+        assert capture_truncate is False
+
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("TRUNCATE TABLE public.lab_results")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("TRUNCATE TABLE public.youtube_shorts_log")
