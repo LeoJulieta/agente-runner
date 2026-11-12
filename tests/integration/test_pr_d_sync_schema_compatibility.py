@@ -80,6 +80,9 @@ def disposable_database():
             "public.pr_d_guard_capture_fields", "pr_d_test.pr_d_guard_capture_fields"
         )
         migration = migration.replace(
+            "table_schema = 'public'", "table_schema = 'pr_d_test'"
+        )
+        migration = migration.replace(
             "ON SCHEMA public TO pr_d_capture_owner",
             "ON SCHEMA pr_d_test TO pr_d_capture_owner",
         )
@@ -388,6 +391,9 @@ def test_migration_preflight_refuses_negative_legacy_values_without_rewriting(di
     )
     migration = migration.replace(
         "public.pr_d_guard_capture_fields", "pr_d_test.pr_d_guard_capture_fields"
+    )
+    migration = migration.replace(
+        "table_schema = 'public'", "table_schema = 'pr_d_test'"
     )
     migration = migration.replace(
         "ON SCHEMA public TO pr_d_capture_owner",
