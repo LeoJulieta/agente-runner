@@ -519,7 +519,7 @@ Deno.test(
     };
     const candidates = Array.from({ length: 500 }, (_, index) => ({
       id: index + 1,
-      youtube_video_id: \`video-\${String(index + 1).padStart(4, "0")}\`,
+      youtube_video_id: `video-${String(index + 1).padStart(4, "0")}`,
       created_at: "2026-10-30T05:00:00Z",
     }));
     const fetchImpl: typeof fetch = async (input) => {
@@ -567,7 +567,7 @@ Deno.test(
         counts.casWrite++;
         return new Response("true", { status: 200 });
       }
-      throw new Error(\`unexpected_500_candidate_request:\${url.pathname}\`);
+      throw new Error(`unexpected_500_candidate_request:${url.pathname}`);
     };
 
     const response = await handleE12Capture(
