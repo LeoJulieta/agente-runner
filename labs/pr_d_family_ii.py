@@ -44,6 +44,7 @@ def fit_ols_log_positive_hc3(
     raw_design = list(design_matrix)
     if any(isinstance(value, bool) or not isinstance(value, Real) for value in raw_outcomes):
         raise ValueError("ols_input_numeric_types_invalid")
+    normalized_design = []
     for row in raw_design:
         if isinstance(row, (str, bytes)):
             raise ValueError("ols_input_numeric_types_invalid")
@@ -53,8 +54,9 @@ def fit_ols_log_positive_hc3(
             raise ValueError("ols_input_numeric_types_invalid") from exc
         if any(isinstance(value, bool) or not isinstance(value, Real) for value in values):
             raise ValueError("ols_input_numeric_types_invalid")
+        normalized_design.append(values)
     y_all = np.asarray(raw_outcomes, dtype=np.float64)
-    design_all = np.asarray([list(row) for row in raw_design], dtype=np.float64)
+    design_all = np.asarray(normalized_design, dtype=np.float64)
     if y_all.ndim != 1 or design_all.ndim != 2 or design_all.shape[0] != y_all.size:
         raise ValueError("ols_input_shape_invalid")
     if y_all.size == 0 or not np.isfinite(y_all).all() or not np.isfinite(design_all).all():
