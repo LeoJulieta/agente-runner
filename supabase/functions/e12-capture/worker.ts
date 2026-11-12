@@ -367,9 +367,6 @@ export async function handleE12Capture(
 
       const videoIds = [...byVideoId.keys()];
       for (let offset = 0; offset < videoIds.length; offset += YOUTUBE_BATCH_SIZE) {
-        if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
-          throw new Error("e12_worker_lease_lost");
-        }
         const batchIds = videoIds.slice(offset, offset + YOUTUBE_BATCH_SIZE);
         const observations = await collectYouTubeBatch(
           batchIds,
@@ -377,6 +374,7 @@ export async function handleE12Capture(
           fetchImpl,
           clockMicros,
         );
+        const batchCasItems: Record<string, unknown>[] = [];
 
         for (const observation of observations) {
           if (!observation.eligible) {
@@ -385,9 +383,6 @@ export async function handleE12Capture(
           }
           const row = byVideoId.get(observation.videoId);
           if (!row) continue;
-          if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
-            throw new Error("e12_worker_lease_lost");
-          }
           eligible++;
           const payload: ObservationAttestationPayload = {
             keyId: provenanceKeyId,
@@ -414,19 +409,49 @@ export async function handleE12Capture(
             provenanceHmacSecret,
           );
           if (!signatureValid) throw new Error("e12_observation_attestation_invalid");
-          const didCapture = await persistObservation(
+
+          batchCasItems.push({
+            p_row_id: String(row.id),
+            p_youtube_video_id: observation.videoId,
+            p_views: observation.viewCount,
+            p_published_at: observation.publishedAt,
+            p_sync_captured_at: observation.syncCapturedAt,
+            p_run_id: lease.runId,
+            p_fencing_token: lease.fencingToken,
+            p_attestation_version: attestation.version,
+            p_attestation_algorithm: attestation.algorithm,
+            p_collector_key_id: attestation.keyId,
+            p_collector_public_key_spki_base64: provenancePublicKey,
+            p_collector_payload_canonical: new TextDecoder().decode(
+              canonicalizeObservationPayload(payload),
+            ),
+            p_collector_payload_sha256: attestation.payloadSha256,
+            p_collector_signature: attestation.signatureBase64,
+            p_collector_hmac_signature: attestation.hmacSignatureHex,
+            p_collector_response_sha256: payload.responseBodySha256,
+            p_collector_requested_ids_sha256: payload.requestedVideoIdsSha256,
+            p_collector_build: payload.collectorBuild,
+          });
+        }
+
+        if (batchCasItems.length > 0) {
+          if (!await renewWorkerLease(
             supabaseUrl,
             serviceRoleKey,
-            row,
-            observation,
-            fetchImpl,
             lease,
-            payload,
-            attestation,
-            provenancePublicKey,
+            leaseTtlSeconds,
+            fetchImpl,
+          )) {
+            throw new Error("e12_worker_lease_lost");
+          }
+          const batchResult = await persistObservationsBatch(
+            supabaseUrl,
+            serviceRoleKey,
+            batchCasItems,
+            fetchImpl,
           );
-          if (didCapture) captured++;
-          else casLost++;
+          captured += batchResult.captured;
+          casLost += batchResult.notCaptured;
         }
       }
 
