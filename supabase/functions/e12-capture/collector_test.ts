@@ -68,7 +68,6 @@ Deno.test("RFC3339 timezone offsets and microseconds are preserved", () => {
   assert(formatEpochMicros(utc) === "2026-10-30T02:30:00.123456Z", "microsecond formatting must round-trip");
 });
 
-
 Deno.test("RFC3339 parser rejects normalized invalid calendar dates and offsets", () => {
   for (
     const invalid of [
