@@ -13,6 +13,7 @@ function assert(condition: unknown, message: string): asserts condition {
 const PAYLOAD: ObservationAttestationPayload = {
   keyId: "e12-collector-test-2026-01",
   runId: "11111111-2222-4333-8444-555555555555",
+  fencingToken: "9007199254740993",
   rowId: "42",
   videoId: "video-1",
   publishedAt: "2026-10-30T02:30:00Z",
@@ -45,13 +46,17 @@ Deno.test("Ed25519 attestation verifies and binds exact observation values", asy
   assert(!await verifyObservationAttestation(alteredResponse, attestation, publicKey), "altered response digest must fail");
 });
 
-Deno.test("canonicalization binds field order, run, row and key identity", () => {
+Deno.test("canonicalization binds field order, run, fencing token, row and key identity", () => {
   const first = canonicalizeObservationPayload(PAYLOAD);
   const second = canonicalizeObservationPayload({ ...PAYLOAD });
   assert(new TextDecoder().decode(first) === new TextDecoder().decode(second), "same values must canonicalize deterministically");
   assert(
     new TextDecoder().decode(first) !== new TextDecoder().decode(canonicalizeObservationPayload({ ...PAYLOAD, rowId: "43" })),
     "row identity must be part of the signed payload",
+  );
+  assert(
+    new TextDecoder().decode(first) !== new TextDecoder().decode(canonicalizeObservationPayload({ ...PAYLOAD, fencingToken: "9007199254740994" })),
+    "fencing token must be part of the signed payload",
   );
   assert(
     new TextDecoder().decode(first) !== new TextDecoder().decode(canonicalizeObservationPayload({ ...PAYLOAD, keyId: "e12-collector-test-2026-02" })),
