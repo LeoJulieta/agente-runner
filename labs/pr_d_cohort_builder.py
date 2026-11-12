@@ -121,6 +121,7 @@ def build_preregistered_cohort(
     masks = _normalize_masks(preregistered_masks, len(rows))
     candidate_ids: list[str | int] = []
     sync_reasons: list[str | None] = []
+    sync_elapsed_seconds: list[float | None] = []
     eligible_mask: list[bool] = []
     seen_ids: set[str | int] = set()
 
@@ -145,11 +146,13 @@ def build_preregistered_cohort(
             if sync_window.missing_policy == MISSING_RAISE:
                 raise CohortInputError("sync_elapsed_missing")
             sync_reasons.append("missing_sync_elapsed")
+            sync_elapsed_seconds.append(None)
             temporal_ok = False
         else:
             elapsed = _numeric(raw_elapsed, "sync_elapsed_invalid")
             if elapsed < 0:
                 raise CohortInputError("sync_elapsed_negative")
+            sync_elapsed_seconds.append(elapsed)
             temporal_ok = _inside_window(elapsed, sync_window)
             sync_reasons.append(None if temporal_ok else "outside_sync_window")
 
@@ -197,7 +200,7 @@ def build_preregistered_cohort(
     )
     if not (
         len(candidate_ids) == len(outcomes) == len(design_matrix)
-        == len(eligible_mask) == n_total
+        == len(sync_elapsed_seconds) == len(eligible_mask) == n_total
     ):
         raise CohortInputError("cohort_alignment_invariant_failed")
 
@@ -205,6 +208,7 @@ def build_preregistered_cohort(
         "candidate_ids": candidate_ids,
         "outcomes": outcomes,
         "design_matrix": design_matrix,
+        "sync_elapsed_seconds": sync_elapsed_seconds,
         "eligible_mask": eligible_mask,
         "eligible_candidate_ids": [
             candidate_id for candidate_id, eligible in zip(candidate_ids, eligible_mask) if eligible
