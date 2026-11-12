@@ -7,12 +7,21 @@ import json
 import os
 import subprocess
 import sys
+import pytest
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-API_URL = os.environ["SUPABASE_URL"].rstrip("/")
-SERVICE_KEY = os.environ["SUPABASE_KEY"]
-DATABASE_URL = os.environ["TEST_DATABASE_URL"]
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Unsafe legacy engine E2E: local-host checks do not attest a disposable "
+        "Supabase stack and the test persists rows in public.lab_results. "
+        "Rewrite against an isolated disposable project before re-enabling."
+    )
+)
+
+API_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SERVICE_KEY = os.environ.get("SUPABASE_KEY", "")
+DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "")
 HYPOTHESIS = "H990_PRD_TEST_INIT"
 LAB_ID = HYPOTHESIS
 
