@@ -56,3 +56,36 @@ def test_quarantined_modules_never_appear_in_any_candidate_ci_test_command():
         assert all(forbidden_path not in command for command in pytest_commands), (
             f"{forbidden_path} must not be executed by any candidate CI pytest command"
         )
+
+
+def test_candidate_ci_keeps_database_image_and_actions_immutable():
+    workflow_path = ROOT / ".github" / "workflows" / "pr-d-sandbox-eligibility-schema.yml"
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    postgres = workflow["jobs"]["disposable-postgres-schema"]["services"]["postgres"]["image"]
+    image, separator, digest = postgres.partition("@sha256:")
+    assert separator and image.startswith("postgres:17."), "PostgreSQL service must use a versioned tag plus digest"
+    assert len(digest) == 64 and all(char in "0123456789abcdef" for char in digest), (
+        "PostgreSQL service must be pinned to a complete immutable sha256 digest"
+    )
+
+    windows_job = workflow["jobs"].get("windows-iana-timezone")
+    assert windows_job is not None, "Windows IANA timezone coverage must remain enabled"
+    windows_runs = [
+        step.get("run", "")
+        for step in windows_job.get("steps", [])
+        if isinstance(step, dict)
+    ]
+    assert any("tests/test_pr_d_sync_cohort_estimator_e2e.py" in command for command in windows_runs), (
+        "Windows job must execute the temporal/IANA integration test file"
+    )
+
+    for job in workflow["jobs"].values():
+        for step in job.get("steps", []):
+            if not isinstance(step, dict):
+                continue
+            uses = step.get("uses")
+            if uses and (uses.startswith("actions/checkout@") or uses.startswith("actions/setup-python@")):
+                ref = uses.rsplit("@", 1)[1]
+                assert len(ref) == 40 and all(char in "0123456789abcdef" for char in ref), (
+                    f"GitHub action must be pinned to a full commit SHA: {uses}"
+                )
