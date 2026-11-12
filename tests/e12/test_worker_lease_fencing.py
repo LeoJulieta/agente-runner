@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import psycopg
 import pytest
+import pytest
 
 DATABASE_URL = os.environ["TEST_DATABASE_URL"]
 MIGRATION = os.environ["E12_LEASE_SQL_PATH"]
@@ -85,6 +86,12 @@ def apply_migration():
         sql = source.read()
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute(sql)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def prepared_database():
+    bootstrap()
+    apply_migration()
 
 
 @pytest.fixture(scope="module", autouse=True)
