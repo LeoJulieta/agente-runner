@@ -75,7 +75,7 @@ DECLARE
 BEGIN
     SELECT oid INTO v_role_oid FROM pg_roles WHERE rolname = 'pr_d_capture_writer';
     IF v_role_oid IS NULL THEN
-        CREATE ROLE pr_d_capture_writer NOLOGIN NOINHERIT BYPASSRLS;
+        EXECUTE 'CREATE ROLE pr_d_capture_writer NOLOGIN NOINHERIT BYPASSRLS';
     ELSE
         IF EXISTS (
             SELECT 1 FROM pg_roles
