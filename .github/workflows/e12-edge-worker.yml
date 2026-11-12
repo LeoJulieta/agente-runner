@@ -7,6 +7,7 @@ on:
     paths:
       - supabase/functions/e12-capture/**
       - supabase/config.toml
+      - deno.json
       - .github/workflows/e12-edge-worker.yml
   workflow_dispatch:
 
