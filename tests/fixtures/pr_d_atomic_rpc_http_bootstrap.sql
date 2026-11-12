@@ -32,3 +32,14 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.lab_results TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.lab_results_id_seq TO service_role;
 
 -- The caller runs this bootstrap, then applies migration 004 and reloads PostgREST.
+
+-- PostgREST connects as a non-superuser authenticator and can switch only to
+-- the explicitly granted API roles.
+DO $authenticator$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticator') THEN
+        CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD 'prd_test_auth';
+    END IF;
+END
+$authenticator$;
+GRANT anon, authenticated, service_role TO authenticator;
