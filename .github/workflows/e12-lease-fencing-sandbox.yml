@@ -7,6 +7,7 @@ on:
     paths:
       - "supabase/functions/e12-capture/**"
       - "supabase/ops/e12_worker_lease_fencing.sql"
+      - "supabase/migrations/*_e12_worker_lease_fencing.sql"
       - "tests/e12/**"
       - ".github/workflows/e12-lease-fencing-sandbox.yml"
 
@@ -56,7 +57,7 @@ jobs:
           supabase migration new e12_worker_lease_fencing
           migration="$(find supabase/migrations -maxdepth 1 -name '*_e12_worker_lease_fencing.sql' -print -quit)"
           test -n "$migration"
-          cp "$GITHUB_WORKSPACE/supabase/ops/e12_worker_lease_fencing.sql" "$migration"
+          cp "$GITHUB_WORKSPACE/supabase/migrations/20261112231203_e12_worker_lease_fencing.sql" "$migration"
           test -s "$migration"
           echo "Generated disposable migration path: $migration"
           sha256sum "$migration"
@@ -65,5 +66,5 @@ jobs:
       - name: Run real PostgreSQL lease/fencing adversarial tests
         env:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/e12_lease_test
-          E12_LEASE_SQL_PATH: ${{ github.workspace }}/supabase/ops/e12_worker_lease_fencing.sql
+          E12_LEASE_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261112231203_e12_worker_lease_fencing.sql
         run: python -m pytest -q tests/e12/test_worker_lease_fencing.py
