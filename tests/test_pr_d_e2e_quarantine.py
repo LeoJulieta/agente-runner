@@ -104,6 +104,7 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
         "labs/pr_d_youtube_collector.py",
         "tests/test_pr_d_youtube_collector.py",
         "supabase/migrations/004_pr_d_v2_atomic_persistence.sql",
+        "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql",
     }
     assert required_http_dependencies <= push_paths, (
         "every disposable PostgREST E2E dependency must trigger the workflow"
