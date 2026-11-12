@@ -138,3 +138,32 @@ def test_sync_window_normalizes_equivalent_timezone_offsets():
     decision = evaluate_sync_window(published_utc, captured_with_offset)
     assert decision.eligible is True
     assert decision.elapsed_seconds == 4 * 60 * 60
+
+
+@pytest.mark.parametrize(
+    ("counts", "error"),
+    [
+        ((-1, 10, None, 10), "d_init_positive_count_out_of_range"),
+        ((11, 10, None, 10), "d_init_positive_count_out_of_range"),
+        ((1, 0, None, 10), "d_init_total_must_be_positive"),
+        ((1, 10, None, 0), "d_init_total_must_be_positive"),
+        ((True, 10, None, 10), "d_init_counts_must_be_integers"),
+        ((1, 10, 2.0, 10), "d_init_counts_must_be_integers"),
+    ],
+)
+def test_d_init_invalid_present_counts_are_not_hidden_by_missing_values(counts, error):
+    from labs.pr_d_family_ii import compute_d_init
+
+    with pytest.raises(ValueError, match=error):
+        compute_d_init(*counts)
+
+
+def test_d_init_returns_insufficient_only_after_validating_all_present_counts():
+    from labs.pr_d_family_ii import compute_d_init
+
+    assert compute_d_init(2, 10, None, 10) == {
+        "d_init": None, "d_init_reason": "insufficient_data"
+    }
+    assert compute_d_init(None, None, 3, 10) == {
+        "d_init": None, "d_init_reason": "insufficient_data"
+    }
