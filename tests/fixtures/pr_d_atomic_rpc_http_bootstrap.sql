@@ -24,8 +24,46 @@ CREATE TABLE public.lab_results (
     evidence_count integer DEFAULT 0,
     reproducible boolean DEFAULT false,
     last_test timestamptz,
-    creado_en timestamptz DEFAULT now()
+    creado_en timestamptz DEFAULT now(),
+    status_extended text,
+    failure_reason text,
+    pivot_hint text,
+    population_type text,
+    category text,
+    assumption_under_test text,
+    expected_direction text
 );
+
+
+-- Reproduce the currently deployed row-protection trigger before the candidate
+-- migration hardens it to cover every column except status and last_test.
+CREATE OR REPLACE FUNCTION public.trg_lab_results_proteccion()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $legacy_guard$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'lab_results: DELETE prohibido (regla 2)';
+    END IF;
+    IF TG_OP = 'UPDATE' THEN
+        IF OLD.lab_id IS DISTINCT FROM NEW.lab_id
+            OR OLD.gen IS DISTINCT FROM NEW.gen
+            OR OLD.params IS DISTINCT FROM NEW.params
+            OR OLD.metrics IS DISTINCT FROM NEW.metrics
+            OR OLD.evidence_count IS DISTINCT FROM NEW.evidence_count
+            OR OLD.reproducible IS DISTINCT FROM NEW.reproducible
+            OR OLD.creado_en IS DISTINCT FROM NEW.creado_en
+        THEN
+            RAISE EXCEPTION 'lab_results: UPDATE prohibido en columnas inmutables (regla 2/5). Solo status/last_test pueden modificarse.';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$legacy_guard$;
+
+CREATE TRIGGER trg_lab_results_proteccion
+    BEFORE DELETE OR UPDATE ON public.lab_results
+    FOR EACH ROW EXECUTE FUNCTION public.trg_lab_results_proteccion();
 
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 ALTER TABLE public.lab_results ENABLE ROW LEVEL SECURITY;
