@@ -21,6 +21,7 @@ BEGIN
                     published_at IS NOT NULL
                     AND sync_captured_at IS NOT NULL
                     AND views_primeras_3h IS NOT NULL
+                    AND views_primeras_3h >= 0
                     AND sync_captured_at >= published_at + interval '2 hours 55 minutes'
                     AND sync_captured_at <= published_at + interval '3 hours 5 minutes'
                 )
@@ -49,6 +50,7 @@ AS $function$
           AND published_at IS NULL
           AND sync_captured_at IS NULL
           AND p_views IS NOT NULL
+          AND p_views >= 0
           AND p_published_at IS NOT NULL
           AND p_sync_captured_at >= p_published_at + interval '2 hours 55 minutes'
           AND p_sync_captured_at <= p_published_at + interval '3 hours 5 minutes'
