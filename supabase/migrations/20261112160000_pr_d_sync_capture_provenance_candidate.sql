@@ -55,16 +55,15 @@ BEGIN
         ALTER COLUMN views_primeras_3h TYPE numeric(20,0)
         USING views_primeras_3h::numeric(20,0);
 
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'youtube_shorts_log_views_nonnegative_ck'
-          AND conrelid = 'public.youtube_shorts_log'::regclass
-    ) THEN
-        ALTER TABLE public.youtube_shorts_log
-            ADD CONSTRAINT youtube_shorts_log_views_nonnegative_ck
-            CHECK (views_primeras_3h IS NULL OR (views_primeras_3h >= 0 AND views_primeras_3h <= 18446744073709551615));
-    END IF;
+    ALTER TABLE public.youtube_shorts_log
+        DROP CONSTRAINT IF EXISTS youtube_shorts_log_views_nonnegative_ck;
+    ALTER TABLE public.youtube_shorts_log
+        ADD CONSTRAINT youtube_shorts_log_views_nonnegative_ck
+        CHECK (views_primeras_3h IS NULL OR (
+            views_primeras_3h >= 0
+            AND views_primeras_3h <= 18446744073709551615
+            AND views_primeras_3h = trunc(views_primeras_3h)
+        ));
 END;
 $views_nonnegative$;
 
