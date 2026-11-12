@@ -84,6 +84,10 @@ def test_e12_api_to_eligibility_first_cohort_to_hc3_estimator():
     assert cohort["n_total"] == 40
     assert cohort["n_eff"] == 40
     assert cohort["n_events"] == 40
+    assert cohort["filter_provenance"]["lower_seconds"] == LOWER_SYNC_SECONDS == 10_500
+    assert cohort["filter_provenance"]["upper_seconds"] == UPPER_SYNC_SECONDS == 11_100
+    assert cohort["filter_provenance"]["lower_inclusive"] is True
+    assert cohort["filter_provenance"]["upper_inclusive"] is True
     result = fit_eligible_cohort_hc3(cohort, coefficient_index=1, min_n_eff=30)
     assert result["status"] == "ESTIMABLE"
     assert result["metrics"]["covariance_type"] == "HC3"
