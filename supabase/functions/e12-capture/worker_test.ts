@@ -551,7 +551,7 @@ Deno.test(
           headers: { "content-range": "0-499/500" },
         });
       }
-      if (url.hostname === "youtube.googleapis.com") {
+      if (url.hostname === "www.googleapis.com") {
         counts.youtubeFetch++;
         const ids = (url.searchParams.get("id") ?? "").split(",").filter(Boolean);
         return new Response(JSON.stringify({
