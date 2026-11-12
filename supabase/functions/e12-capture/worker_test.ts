@@ -5,7 +5,7 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-async function sign(secret: string, timestamp: string): Promise<string> {
+async function sign(secret: string, timestamp: string, body = "{}"): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -13,8 +13,11 @@ async function sign(secret: string, timestamp: string): Promise<string> {
     false,
     ["sign"],
   );
+  const bodyHash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)));
+  const bodyHashHex = Array.from(bodyHash, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const canonical = `POST\\n/e12-capture\\n${timestamp}\\n${bodyHashHex}`;
   const bytes = new Uint8Array(
-    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(timestamp)),
+    await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(canonical)),
   );
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -45,7 +48,7 @@ async function signedRequest(body = "{}"): Promise<Request> {
     method: "POST",
     headers: {
       "x-e12-timestamp": TIMESTAMP,
-      "x-e12-signature": await sign(SECRET, TIMESTAMP),
+      "x-e12-signature": await sign(SECRET, TIMESTAMP, body),
     },
     body,
   });
@@ -54,6 +57,8 @@ async function signedRequest(body = "{}"): Promise<Request> {
 Deno.test("cron HMAC accepts fresh signatures and rejects stale or altered ones", async () => {
   const signature = await sign(SECRET, TIMESTAMP);
   assert(await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS), "valid HMAC should pass");
+  assert(!await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS, "POST", "/other", "{}"), "path substitution must fail");
+  assert(!await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS, "POST", "/e12-capture", "{ }"), "body substitution must fail");
   assert(!await verifyCronSignature(TIMESTAMP, "0".repeat(64), SECRET, NOW_SECONDS), "altered HMAC should fail");
   assert(!await verifyCronSignature(TIMESTAMP, signature, SECRET, NOW_SECONDS + 121), "stale HMAC should fail");
   assert(!await verifyCronSignature(TIMESTAMP, signature, "short", NOW_SECONDS), "weak secret should fail");
@@ -289,3 +294,28 @@ Deno.test("worker reports CAS first-write conflicts without overwriting outcomes
     "CAS conflict must be reported without retrying a write",
   );
 });
+
+Deno.test("worker enforces a streaming body cap when Content-Length is absent", async () => {
+  let calls = 0;
+  const oversized = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode("{}"));
+      controller.enqueue(new TextEncoder().encode("x"));
+      controller.close();
+    },
+  });
+  const request = new Request("https://edge.example/e12-capture", {
+    method: "POST",
+    headers: { "x-e12-timestamp": TIMESTAMP, "x-e12-signature": await sign(SECRET, TIMESTAMP, "{}x") },
+    body: oversized,
+    // No Content-Length: exercise the streaming bound itself.
+    duplex: "half",
+  } as RequestInit);
+  const response = await handleE12Capture(request, dependencies(() => {
+    calls++;
+    return Promise.resolve(new Response("[]", { status: 200 }));
+  }));
+  assert(response.status === 400, "oversized streamed body must be rejected");
+  assert(calls === 0, "oversized body must not reach upstream services");
+});
+
