@@ -183,6 +183,8 @@ def collect_public_video_observations_batch(
         raise ValueError("youtube_video_ids_required")
     if len(video_ids) > 50:
         raise ValueError("youtube_batch_limit_exceeded")
+    if any(not isinstance(video_id, str) or not video_id.strip() for video_id in video_ids):
+        raise ValueError("youtube_video_id_invalid")
     if len(set(video_ids)) != len(video_ids):
         raise ValueError("youtube_video_ids_duplicate")
     if not isinstance(api_key, str) or not api_key.strip():
