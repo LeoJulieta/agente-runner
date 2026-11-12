@@ -2,7 +2,16 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 import psycopg
+import pytest
 
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        "Unsafe legacy integration test: setup_database drops and recreates "
+        "public.lab_results with CASCADE and has no disposable-database identity guard. "
+        "Rewrite against an isolated disposable schema before re-enabling."
+    )
+)
 
 MIGRATION = "supabase/migrations/004_pr_d_v2_atomic_persistence.sql"
 
