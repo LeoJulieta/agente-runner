@@ -118,3 +118,10 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     assert "postgrest_api_must_be_loopback" in bootstrap
     assert 'Request("GET", "/")' in safe_test, "readiness probe must not mutate database state"
     assert "readiness-probe" not in safe_test
+
+    bootstrap_sql = (ROOT / "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql").read_text(encoding="utf-8")
+    workflow_text = workflow_path.read_text(encoding="utf-8")
+    assert "CREATE ROLE authenticator NOINHERIT LOGIN" in bootstrap_sql
+    assert "GRANT anon, authenticated, service_role TO authenticator" in bootstrap_sql
+    assert "PGRST_DB_URI=postgres://authenticator:" in workflow_text
+    assert "PGRST_DB_URI=postgres://prd_test:" not in workflow_text
