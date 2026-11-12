@@ -114,6 +114,8 @@ def disposable_postgrest_database():
     # defense in depth. The service container is destroyed after the job too.
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("DROP TABLE IF EXISTS public.lab_results CASCADE")
+        conn.execute("DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz)")
+        conn.execute("DROP TABLE IF EXISTS public.youtube_shorts_log CASCADE")
 
 
 def _rows(lab_id):
@@ -247,3 +249,30 @@ def test_e12_capture_rpc_rejects_wrong_id_outside_window_and_anon():
             (row_id,),
         ).fetchone()[0]
     assert stored is None
+
+
+def test_e12_capture_rpc_concurrent_http_claim_has_one_winner():
+    from concurrent.futures import ThreadPoolExecutor
+
+    video_id = "e12-http-concurrent"
+    row_id = _insert_e12_video(video_id)
+    payload = {
+        "p_row_id": row_id,
+        "p_youtube_video_id": video_id,
+        "p_views": "2147483648",
+        "p_published_at": "2026-10-30T02:30:00Z",
+        "p_sync_captured_at": "2026-10-30T05:30:00Z",
+    }
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(
+            lambda _: _request("POST", "/rpc/pr_d_capture_views_once", payload=payload),
+            range(2),
+        ))
+    assert all(status == 200 for status, _ in results)
+    assert sorted(value for _, value in results) == [False, True]
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute(
+            "SELECT views_primeras_3h FROM public.youtube_shorts_log WHERE id = %s",
+            (row_id,),
+        ).fetchone()[0]
+    assert stored == 2147483648
