@@ -59,6 +59,15 @@ AS $function$
     SELECT EXISTS (SELECT 1 FROM changed);
 $function$;
 
+-- Least privilege: PostgreSQL grants EXECUTE on new functions to PUBLIC by default.
+-- The capture RPC is an internal writer and must only be callable by the trusted runner role.
+REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
+    bigint, text, integer, timestamptz, timestamptz
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
+    bigint, text, integer, timestamptz, timestamptz
+) TO service_role;
+
 CREATE INDEX IF NOT EXISTS youtube_shorts_log_sync_capture_pending_idx
     ON public.youtube_shorts_log (id)
     WHERE views_primeras_3h IS NULL;
