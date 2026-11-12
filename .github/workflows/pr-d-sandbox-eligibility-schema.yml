@@ -35,6 +35,7 @@ on:
       - "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
       - "supabase/migrations/20261112170000_pr_d_lab_results_rpc_write_boundary_candidate.sql"
       - ".github/workflows/pr-d-sandbox-eligibility-schema.yml"
+      - ".github/workflows/youtube_shorts.yml"
 
 # A newer push supersedes older sandbox validation runs on this same branch.
 concurrency:
