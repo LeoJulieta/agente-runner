@@ -68,6 +68,25 @@ Deno.test("RFC3339 timezone offsets and microseconds are preserved", () => {
   assert(formatEpochMicros(utc) === "2026-10-30T02:30:00.123456Z", "microsecond formatting must round-trip");
 });
 
+
+Deno.test("RFC3339 parser rejects normalized invalid calendar dates and offsets", () => {
+  for (const invalid of [
+    "2026-02-30T00:00:00Z",
+    "2026-13-01T00:00:00Z",
+    "2026-10-30T24:00:00Z",
+    "2026-10-30T00:00:60Z",
+    "2026-10-30T00:00:00+25:00",
+  ]) {
+    let threw = false;
+    try {
+      parseRfc3339EpochMicros(invalid);
+    } catch {
+      threw = true;
+    }
+    assert(threw, `invalid source timestamp should reject: ${invalid}`);
+  }
+});
+
 Deno.test("viewCount preserves the exact unsigned 64-bit value", () => {
   const result = parseYouTubeVideosResponse(
     JSON.stringify(videoPayload({ statistics: { viewCount: YOUTUBE_UINT64_MAX.toString() } })),
