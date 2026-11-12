@@ -355,7 +355,7 @@ def test_service_role_cannot_bypass_capture_rpc_with_direct_sql(disposable_datab
 def test_capture_writer_isolated_non_login_owner(disposable_database):
     with psycopg.connect(disposable_database) as conn:
         writer = conn.execute(
-            "SELECT rolcanlogin, rolinherit, rolbypassrls FROM pg_roles WHERE rolname='pr_d_capture_writer'"
+            "SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolinherit, rolreplication, rolbypassrls FROM pg_roles WHERE rolname='pr_d_capture_writer'"
         ).fetchone()
         membership_count = conn.execute(
             """
