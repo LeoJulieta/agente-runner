@@ -95,3 +95,12 @@ def test_http_collector_requests_exact_id_and_captures_clock_after_body():
     assert query["key"] == ["test-secret"]
     assert timeout == 10.0
     assert result.view_count == 2147483648
+
+
+def test_http_collector_rejects_oversized_response_body():
+    def opener(request, timeout):
+        return FakeResponse(b"x" * (1024 * 1024 + 1))
+    with pytest.raises(YouTubeReadError, match="youtube_api_response_too_large"):
+        collect_public_video_observation(
+            VIDEO_ID, api_key="test-secret", opener=opener, clock=lambda: CAPTURED
+        )
