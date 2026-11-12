@@ -156,16 +156,19 @@ def prepared_database():
 
 def claim(run_id):
     with connect() as conn:
+        conn.execute("SET ROLE service_role")
         return conn.execute("SELECT * FROM public.pr_d_claim_e12_worker_lease(%s, 90)", (run_id,)).fetchone()
 
 
 def renew(run_id, token):
     with connect() as conn:
+        conn.execute("SET ROLE service_role")
         return conn.execute("SELECT public.pr_d_renew_e12_worker_lease(%s, %s, 90)", (run_id, token)).fetchone()[0]
 
 
 def release(run_id, token):
     with connect() as conn:
+        conn.execute("SET ROLE service_role")
         return conn.execute("SELECT public.pr_d_release_e12_worker_lease(%s, %s)", (run_id, token)).fetchone()[0]
 
 
@@ -174,6 +177,7 @@ def capture(run_id, token, row_id=1, video_id="video-1", hmac_override=None):
     payload_sha = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     hmac_signature = hmac_override or hmac.new(HMAC_SECRET, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
     with connect() as conn:
+        conn.execute("SET ROLE service_role")
         return conn.execute(
             """SELECT public.pr_d_capture_views_once(
                 %s,%s,123,%s,%s,%s,%s,
@@ -234,6 +238,7 @@ def capture_record(run_id, token, row_id, video_id, hmac_override=None):
 
 def capture_batch(records):
     with connect() as conn:
+        conn.execute("SET ROLE service_role")
         return conn.execute(
             "SELECT public.pr_d_capture_views_batch(%s::jsonb)",
             (json.dumps(records),),
