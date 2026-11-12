@@ -178,7 +178,7 @@ Deno.test("worker obtains source observation itself and persists only through th
     result.candidates === 1 && result.eligible === 1 && result.captured === 1,
     "one eligible row should be captured",
   );
-  assert(calls.length === 8, "worker should claim slot and lease, renew, query YouTube, CAS, then release");
+  assert(calls.length === 9, "worker should claim slot and lease, renew, query YouTube, renew before CAS, then release");
 
   const slotCall = calls[0];
   const slotBody = JSON.parse(slotCall.body);
@@ -201,7 +201,8 @@ Deno.test("worker obtains source observation itself and persists only through th
 
   const renewalCall = calls[3];
   assert(renewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew before source collection");
-  const youtubeCall = calls[4];
+  assert(calls[4].url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew before each YouTube batch");
+  const youtubeCall = calls[5];
   const youtubeUrl = new URL(youtubeCall.url);
   assert(
     youtubeUrl.searchParams.get("part") === "snippet,statistics,status",
@@ -213,9 +214,9 @@ Deno.test("worker obtains source observation itself and persists only through th
     "YouTube key must be used only for the source request",
   );
 
-  const casRenewalCall = calls[5];
+  const casRenewalCall = calls[6];
   assert(casRenewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew immediately before CAS");
-  const rpcCall = calls[6];
+  const rpcCall = calls[7];
   const rpcBody = JSON.parse(rpcCall.body);
   assert(rpcCall.url.endsWith("/rpc/pr_d_capture_views_once"), "persistence must use the CAS RPC");
   assert(rpcBody.p_row_id === "42", "row id must be exact");
@@ -223,7 +224,7 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(rpcBody.p_views === YOUTUBE_UINT64_MAX.toString(), "uint64 must remain an exact decimal string");
   assert(rpcBody.p_run_id === "11111111-2222-4333-8444-555555555555", "CAS must bind the lease owner");
   assert(rpcBody.p_fencing_token === "9007199254740993", "CAS must bind the exact fencing token");
-  assert(calls[7].url.endsWith("/rpc/pr_d_release_e12_worker_lease"), "worker must release its lease after completion");
+  assert(calls[8].url.endsWith("/rpc/pr_d_release_e12_worker_lease"), "worker must release its lease after completion");
   assert(rpcBody.p_published_at === "2026-10-30T02:30:00Z", "publishedAt must come from YouTube");
   assert(
     rpcBody.p_sync_captured_at === "2026-10-30T05:30:00.123456Z",
