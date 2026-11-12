@@ -256,7 +256,7 @@ Deno.test("worker obtains source observation itself and persists only through th
     keyId: "e12-test-key",
     runId: "11111111-2222-4333-8444-555555555555",
     fencingToken: "9007199254740993",
-    rowId: "7",
+    rowId: "42",
     videoId: "video-1",
     publishedAt: "2026-10-30T02:30:00Z",
     viewCount: YOUTUBE_UINT64_MAX.toString(),
