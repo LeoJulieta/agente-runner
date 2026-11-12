@@ -41,7 +41,6 @@ SET lock_timeout = '5s'
 AS $claim$
 DECLARE
     v_claims jsonb;
-    v_now timestamptz;
     v_token bigint;
     v_expiry timestamptz;
 BEGIN
@@ -52,20 +51,19 @@ BEGIN
     IF p_run_id IS NULL OR p_ttl_seconds IS NULL OR p_ttl_seconds < 30 OR p_ttl_seconds > 300 THEN
         RAISE EXCEPTION 'prd_e12_lease_arguments_invalid' USING ERRCODE = '22023';
     END IF;
-    v_now := clock_timestamp();
 
     INSERT INTO pr_d_internal.e12_worker_lease AS lease (
         singleton, owner_run_id, lease_expires_at, fencing_token, heartbeat_at, updated_at
     ) VALUES (
-        true, p_run_id, v_now + make_interval(secs => p_ttl_seconds), 1, v_now, v_now
+        true, p_run_id, clock_timestamp() + make_interval(secs => p_ttl_seconds), 1, clock_timestamp(), clock_timestamp()
     )
     ON CONFLICT (singleton) DO UPDATE
        SET owner_run_id = EXCLUDED.owner_run_id,
            lease_expires_at = EXCLUDED.lease_expires_at,
            fencing_token = CASE WHEN lease.lease_expires_at <= clock_timestamp()
                                 THEN lease.fencing_token + 1 ELSE lease.fencing_token END,
-           heartbeat_at = v_now,
-           updated_at = v_now
+           heartbeat_at = clock_timestamp(),
+           updated_at = clock_timestamp()
      WHERE (lease.lease_expires_at <= clock_timestamp() AND lease.fencing_token < 9223372036854775807)
         OR (lease.owner_run_id = EXCLUDED.owner_run_id AND lease.lease_expires_at > clock_timestamp())
     RETURNING lease.fencing_token, lease.lease_expires_at INTO v_token, v_expiry;
@@ -98,8 +96,8 @@ BEGIN
     END IF;
     v_now := clock_timestamp();
     UPDATE pr_d_internal.e12_worker_lease
-       SET lease_expires_at = v_now + make_interval(secs => p_ttl_seconds),
-           heartbeat_at = v_now, updated_at = v_now
+       SET lease_expires_at = clock_timestamp() + make_interval(secs => p_ttl_seconds),
+           heartbeat_at = clock_timestamp(), updated_at = clock_timestamp()
      WHERE singleton AND owner_run_id = p_run_id AND fencing_token = p_fencing_token
        AND lease_expires_at > clock_timestamp();
     GET DIAGNOSTICS v_updated = ROW_COUNT;
@@ -124,7 +122,7 @@ BEGIN
     END IF;
     v_now := clock_timestamp();
     UPDATE pr_d_internal.e12_worker_lease
-       SET lease_expires_at = v_now, heartbeat_at = v_now, updated_at = v_now
+       SET lease_expires_at = clock_timestamp(), heartbeat_at = clock_timestamp(), updated_at = clock_timestamp()
      WHERE singleton AND owner_run_id = p_run_id AND fencing_token = p_fencing_token
        AND lease_expires_at > clock_timestamp();
     GET DIAGNOSTICS v_updated = ROW_COUNT;
