@@ -21,8 +21,6 @@ from psycopg.conninfo import conninfo_to_dict
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BOOTSTRAP = ROOT / "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql"
-MIGRATION = ROOT / "supabase/migrations/004_pr_d_v2_atomic_persistence.sql"
 API_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 DATABASE_URL = os.getenv("TEST_DATABASE_URL", "")
 JWT_SECRET = os.getenv("PR_D_TEST_JWT_SECRET", "")
@@ -99,11 +97,6 @@ def _payload(lab_id, run_id):
 @pytest.fixture(scope="module", autouse=True)
 def disposable_postgrest_database():
     _assert_disposable_target()
-    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        conn.execute(BOOTSTRAP.read_text(encoding="utf-8"))
-        conn.execute(MIGRATION.read_text(encoding="utf-8"))
-        conn.execute("NOTIFY pgrst, 'reload schema'")
-
     # Wait for the API to finish startup and load the RPC schema cache.
     last_error = None
     for _ in range(40):
