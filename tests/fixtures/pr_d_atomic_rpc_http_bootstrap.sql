@@ -42,21 +42,45 @@ END
 $authenticator$;
 GRANT anon, authenticated, service_role TO authenticator;
 
--- Start from the actual legacy type. The candidate migration must widen it.
+-- Minimal production-shaped legacy table: int4 metric, numeric elapsed field,
+-- public RLS policies and the existing updated_at trigger.
 CREATE TABLE public.youtube_shorts_log (
     id bigserial PRIMARY KEY,
-    youtube_video_id text NOT NULL,
+    youtube_video_id text,
     views_primeras_3h integer,
     hs_al_publicar_al_sync numeric,
-    status text NOT NULL DEFAULT 'pending'
+    status text DEFAULT 'pending',
+    created_at timestamptz DEFAULT now(),
+    updated_at timestamptz DEFAULT now()
 );
+
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $updated_at$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$updated_at$;
+
+CREATE TRIGGER shorts_updated_at
+    BEFORE UPDATE ON public.youtube_shorts_log
+    FOR EACH ROW
+    EXECUTE FUNCTION public.update_updated_at();
+
 ALTER TABLE public.youtube_shorts_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY anon_read
+    ON public.youtube_shorts_log
+    FOR SELECT TO anon
+    USING (true);
 CREATE POLICY service_all
     ON public.youtube_shorts_log
     FOR ALL TO service_role
     USING (true)
     WITH CHECK (true);
+
 GRANT SELECT, INSERT, UPDATE, DELETE
-    ON TABLE public.youtube_shorts_log TO service_role;
+    ON TABLE public.youtube_shorts_log TO anon, authenticated, service_role;
 GRANT USAGE, SELECT
     ON SEQUENCE public.youtube_shorts_log_id_seq TO service_role;
