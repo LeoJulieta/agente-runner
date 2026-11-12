@@ -25,8 +25,13 @@ jobs:
         uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Format check
-        run: deno fmt --check supabase/functions/e12-capture
+      - name: Format check (show exact formatter diff on failure)
+        run: |
+          deno fmt --check supabase/functions/e12-capture || {
+            deno fmt supabase/functions/e12-capture
+            git diff -- supabase/functions/e12-capture
+            exit 1
+          }
       - name: Lint
         run: deno lint supabase/functions/e12-capture
       - name: Unit and worker integration tests (fake HTTP only)
