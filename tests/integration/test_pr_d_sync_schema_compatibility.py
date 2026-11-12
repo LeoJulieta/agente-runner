@@ -203,6 +203,45 @@ def test_negative_view_count_cannot_be_captured_or_inserted(disposable_database)
             """)
 
 
+def test_migration_preflight_refuses_negative_legacy_values_without_rewriting(disposable_database):
+    migration = MIGRATION.read_text(encoding="utf-8")
+    migration = migration.replace("public.youtube_shorts_log", "pr_d_test.youtube_shorts_log")
+    migration = migration.replace("public.pr_d_capture_views_once", "pr_d_test.pr_d_capture_views_once")
+
+    with psycopg.connect(disposable_database) as conn:
+        conn.execute("""
+            ALTER TABLE pr_d_test.youtube_shorts_log
+            DROP CONSTRAINT youtube_shorts_log_views_nonnegative_ck
+        """)
+        conn.execute("""
+            INSERT INTO pr_d_test.youtube_shorts_log
+                (youtube_video_id, views_primeras_3h)
+            VALUES ('negative-legacy-row', -7)
+        """)
+        with pytest.raises(
+            psycopg.errors.CheckViolation,
+            match="prd_sync_migration_preflight_failed",
+        ):
+            conn.execute(migration)
+        # Roll back the synthetic legacy corruption and the attempted migration.
+        conn.rollback()
+
+    with psycopg.connect(disposable_database) as conn:
+        negative_rows = conn.execute("""
+            SELECT count(*) FROM pr_d_test.youtube_shorts_log
+            WHERE views_primeras_3h < 0
+        """).fetchone()[0]
+        constraint_exists = conn.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'youtube_shorts_log_views_nonnegative_ck'
+                  AND conrelid = 'pr_d_test.youtube_shorts_log'::regclass
+            )
+        """).fetchone()[0]
+    assert negative_rows == 0
+    assert constraint_exists is True
+
+
 def test_two_concurrent_cas_writers_have_exactly_one_winner(disposable_database):
     row_id = insert_video(disposable_database, "concurrent-video")
     barrier = Barrier(2)
