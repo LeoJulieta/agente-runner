@@ -197,7 +197,7 @@ async function persistObservationsBatch(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ p_observations: observations }),
-    signal: AbortSignal.timeout(20_000),
+    signal: AbortSignal.timeout(25_000),
   });
   if (!response.ok) throw new Error("supabase_capture_batch_rpc_http_" + response.status);
   const result: unknown = await response.json();
