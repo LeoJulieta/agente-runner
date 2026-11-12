@@ -46,6 +46,8 @@ def disposable_database():
         migration = MIGRATION.read_text(encoding="utf-8")
         migration = migration.replace("public.youtube_shorts_log", "pr_d_test.youtube_shorts_log")
         migration = migration.replace("public.pr_d_capture_views_once", "pr_d_test.pr_d_capture_views_once")
+        migration = migration.replace("public.pr_d_guard_capture_write", "pr_d_test.pr_d_guard_capture_write")
+        migration = migration.replace("ON SCHEMA public", "ON SCHEMA pr_d_test")
         conn.execute(migration)
     yield DATABASE_URL
 
@@ -308,3 +310,56 @@ def test_view_count_above_uint64_is_rejected_by_constraint(disposable_database):
                     (youtube_video_id, views_primeras_3h)
                 VALUES ('above-uint64', 18446744073709551616)
             """)
+
+
+def test_service_role_cannot_bypass_capture_rpc_with_direct_sql(disposable_database):
+    row_id = insert_video(disposable_database, "direct-write-denied")
+    with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege, match="prd_capture_write_requires_rpc"):
+            conn.execute(
+                "UPDATE pr_d_test.youtube_shorts_log SET views_primeras_3h = 777 WHERE id = %s",
+                (row_id,),
+            )
+
+    with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege, match="prd_capture_write_requires_rpc"):
+            conn.execute(
+                """
+                INSERT INTO pr_d_test.youtube_shorts_log
+                    (youtube_video_id, views_primeras_3h)
+                VALUES ('direct-insert-denied', 777)
+                """
+            )
+
+    # The same service role remains allowed to create an unpopulated pending row.
+    with psycopg.connect(disposable_database) as conn:
+        conn.execute("SET ROLE service_role")
+        conn.execute(
+            "INSERT INTO pr_d_test.youtube_shorts_log (youtube_video_id) VALUES ('pending-row-allowed')"
+        )
+
+
+def test_capture_writer_isolated_non_login_owner(disposable_database):
+    with psycopg.connect(disposable_database) as conn:
+        writer = conn.execute(
+            "SELECT rolcanlogin, rolinherit, rolbypassrls FROM pg_roles WHERE rolname='pr_d_capture_writer'"
+        ).fetchone()
+        membership_count = conn.execute(
+            """
+            SELECT count(*) FROM pg_auth_members
+            WHERE roleid = (SELECT oid FROM pg_roles WHERE rolname='pr_d_capture_writer')
+               OR member = (SELECT oid FROM pg_roles WHERE rolname='pr_d_capture_writer')
+            """
+        ).fetchone()[0]
+        owner = conn.execute(
+            """
+            SELECT pg_get_userbyid(proowner)
+            FROM pg_proc
+            WHERE oid = 'pr_d_test.pr_d_capture_views_once(bigint,text,numeric,timestamptz,timestamptz)'::regprocedure
+            """
+        ).fetchone()[0]
+    assert writer == (False, False, True)
+    assert membership_count == 0
+    assert owner == "pr_d_capture_writer"
