@@ -86,6 +86,7 @@ def build_preregistered_cohort(
     sync_elapsed_seconds_field: str,
     sync_window: SyncWindow,
     preregistered_masks: Mapping[str, Iterable[bool]],
+    temporal_anchor: str = "externally_preregistered_not_inferred",
 ) -> dict[str, Any]:
     """Build aligned arrays and provenance without validating excluded analytics.
 
@@ -116,6 +117,8 @@ def build_preregistered_cohort(
         raise CohortInputError("cohort_field_names_must_be_distinct")
     if not isinstance(sync_window, SyncWindow):
         raise CohortInputError("sync_window_required")
+    if not isinstance(temporal_anchor, str) or not temporal_anchor.strip():
+        raise CohortInputError("temporal_anchor_invalid")
 
     rows = list(candidate_rows)
     masks = _normalize_masks(preregistered_masks, len(rows))
@@ -225,7 +228,7 @@ def build_preregistered_cohort(
             "lower_inclusive": sync_window.lower_inclusive,
             "upper_inclusive": sync_window.upper_inclusive,
             "missing_policy": sync_window.missing_policy,
-            "temporal_anchor": "externally_preregistered_not_inferred",
+            "temporal_anchor": temporal_anchor,
             "additional_preregistered_filters": list(masks),
             "analytic_validation": "eligible_rows_only",
             "excluded_analytic_placeholders": None,
