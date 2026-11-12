@@ -13,8 +13,10 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
-LOWER_SYNC_SECONDS = 3 * 60 * 60
-UPPER_SYNC_SECONDS = 6 * 60 * 60
+TARGET_SYNC_SECONDS = 3 * 60 * 60
+SYNC_TOLERANCE_SECONDS = 5 * 60
+LOWER_SYNC_SECONDS = TARGET_SYNC_SECONDS - SYNC_TOLERANCE_SECONDS
+UPPER_SYNC_SECONDS = TARGET_SYNC_SECONDS + SYNC_TOLERANCE_SECONDS
 USHUAIA_ZONE = "America/Argentina/Ushuaia"
 
 
@@ -112,7 +114,7 @@ def parse_sync_captured_at(value: Any) -> datetime:
 
 
 def evaluate_sync_window(published_at: Any, sync_captured_at: Any) -> SyncEligibility:
-    """Evaluate the closed [3 h, 6 h] window using exact timedelta boundaries."""
+    """Evaluate the closed [2 h 55 min, 3 h 05 min] window around 3 h."""
     published = _parse_aware_timestamp(
         published_at,
         missing_code="MISSING_PUBLICATION_TIMESTAMP",
