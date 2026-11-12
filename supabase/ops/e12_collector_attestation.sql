@@ -362,7 +362,8 @@ BEGIN
      WHERE key_id = p_collector_key_id
        AND algorithm = p_attestation_algorithm
        AND status = 'active'
-       AND revoked_at IS NULL;
+       AND revoked_at IS NULL
+     FOR SHARE;
     IF NOT FOUND THEN
         RETURN false;
     END IF;
@@ -472,3 +473,125 @@ GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
     text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
+
+
+-- One HTTP request per YouTube batch; every observation still passes the
+-- exact same fenced, HMAC-verified first-write-wins CAS.
+CREATE FUNCTION pr_d_internal.pr_d_capture_views_batch(p_observations jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pr_d_internal
+SET statement_timeout = '20s'
+SET lock_timeout = '5s'
+AS $batch$
+DECLARE
+    v_item record;
+    v_attempted integer := 0;
+    v_captured integer := 0;
+    v_first_run_id uuid;
+    v_first_fencing_token bigint;
+    v_seen_row_ids bigint[] := ARRAY[]::bigint[];
+    v_seen_video_ids text[] := ARRAY[]::text[];
+BEGIN
+    IF pg_catalog.jsonb_typeof(p_observations) IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'prd_capture_batch_invalid: observations must be a JSON array';
+    END IF;
+    IF pg_catalog.jsonb_array_length(p_observations) < 1
+       OR pg_catalog.jsonb_array_length(p_observations) > 50 THEN
+        RAISE EXCEPTION 'prd_capture_batch_invalid: batch size must be between 1 and 50';
+    END IF;
+
+    FOR v_item IN
+        SELECT *
+          FROM pg_catalog.jsonb_to_recordset(p_observations) AS item(
+            p_row_id bigint,
+            p_youtube_video_id text,
+            p_views numeric,
+            p_published_at timestamptz,
+            p_sync_captured_at timestamptz,
+            p_run_id uuid,
+            p_fencing_token bigint,
+            p_attestation_version text,
+            p_attestation_algorithm text,
+            p_collector_key_id text,
+            p_collector_public_key_spki_base64 text,
+            p_collector_payload_canonical text,
+            p_collector_payload_sha256 text,
+            p_collector_signature text,
+            p_collector_hmac_signature text,
+            p_collector_response_sha256 text,
+            p_collector_requested_ids_sha256 text,
+            p_collector_build text
+          )
+    LOOP
+        IF v_item.p_row_id IS NULL OR v_item.p_youtube_video_id IS NULL
+           OR v_item.p_run_id IS NULL OR v_item.p_fencing_token IS NULL THEN
+            RAISE EXCEPTION 'prd_capture_batch_invalid: row identity and lease are required';
+        END IF;
+
+        IF v_attempted = 0 THEN
+            v_first_run_id := v_item.p_run_id;
+            v_first_fencing_token := v_item.p_fencing_token;
+        ELSIF v_item.p_run_id IS DISTINCT FROM v_first_run_id
+           OR v_item.p_fencing_token IS DISTINCT FROM v_first_fencing_token THEN
+            RAISE EXCEPTION 'prd_capture_batch_invalid: mixed run IDs or fencing tokens';
+        END IF;
+
+        IF v_item.p_row_id = ANY(v_seen_row_ids)
+           OR v_item.p_youtube_video_id = ANY(v_seen_video_ids) THEN
+            RAISE EXCEPTION 'prd_capture_batch_invalid: duplicate row or video identity';
+        END IF;
+        v_seen_row_ids := pg_catalog.array_append(v_seen_row_ids, v_item.p_row_id);
+        v_seen_video_ids := pg_catalog.array_append(v_seen_video_ids, v_item.p_youtube_video_id);
+
+        v_attempted := v_attempted + 1;
+        IF pr_d_internal.pr_d_capture_views_once(
+            v_item.p_row_id,
+            v_item.p_youtube_video_id,
+            v_item.p_views,
+            v_item.p_published_at,
+            v_item.p_sync_captured_at,
+            v_item.p_run_id,
+            v_item.p_fencing_token,
+            v_item.p_attestation_version,
+            v_item.p_attestation_algorithm,
+            v_item.p_collector_key_id,
+            v_item.p_collector_public_key_spki_base64,
+            v_item.p_collector_payload_canonical,
+            v_item.p_collector_payload_sha256,
+            v_item.p_collector_signature,
+            v_item.p_collector_hmac_signature,
+            v_item.p_collector_response_sha256,
+            v_item.p_collector_requested_ids_sha256,
+            v_item.p_collector_build
+        ) THEN
+            v_captured := v_captured + 1;
+        END IF;
+    END LOOP;
+
+    RETURN pg_catalog.jsonb_build_object(
+        'attempted', v_attempted,
+        'captured', v_captured,
+        'not_captured', v_attempted - v_captured
+    );
+END;
+$batch$;
+
+ALTER FUNCTION pr_d_internal.pr_d_capture_views_batch(jsonb) OWNER TO pr_d_capture_owner;
+REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_batch(jsonb)
+    FROM PUBLIC, anon, authenticated, service_role;
+
+CREATE FUNCTION public.pr_d_capture_views_batch(p_observations jsonb)
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = pg_catalog, pr_d_internal
+AS $batch_wrapper$
+    SELECT pr_d_internal.pr_d_capture_views_batch(p_observations);
+$batch_wrapper$;
+
+ALTER FUNCTION public.pr_d_capture_views_batch(jsonb) OWNER TO pr_d_capture_owner;
+REVOKE ALL ON FUNCTION public.pr_d_capture_views_batch(jsonb)
+    FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_batch(jsonb) TO service_role;
