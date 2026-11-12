@@ -36,7 +36,7 @@ def bootstrap():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("CREATE SCHEMA extensions")
         conn.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions")
-        conn.execute("DO $ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+        conn.execute("DO $role$ BEGIN CREATE ROLE anon NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $role$;")
         conn.execute("DO $$ BEGIN CREATE ROLE authenticated NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
         conn.execute("DO $$ BEGIN CREATE ROLE service_role NOLOGIN BYPASSRLS; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
         conn.execute("ALTER ROLE service_role BYPASSRLS")
