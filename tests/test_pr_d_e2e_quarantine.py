@@ -70,6 +70,7 @@ def test_candidate_ci_keeps_database_image_and_actions_immutable():
 
     windows_job = workflow["jobs"].get("windows-iana-timezone")
     assert windows_job is not None, "Windows IANA timezone coverage must remain enabled"
+    assert windows_job.get("runs-on") == "windows-2025", "Windows runner generation must not follow windows-latest"
     windows_runs = [
         step.get("run", "")
         for step in windows_job.get("steps", [])
