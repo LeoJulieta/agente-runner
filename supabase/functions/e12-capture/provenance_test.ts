@@ -75,7 +75,7 @@ Deno.test("attestation rejects malformed payloads and mismatched key IDs", async
   } catch { invalidRejected = true; }
   assert(invalidRejected, "uint64 overflow must reject before key import");
 
-  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]);
+  const pair = await crypto.subtle.generateKey({ name: "Ed25519" }, true, ["sign", "verify"]) as CryptoKeyPair;
   const privateBytes = new Uint8Array(await crypto.subtle.exportKey("pkcs8", pair.privateKey));
   const publicBytes = new Uint8Array(await crypto.subtle.exportKey("spki", pair.publicKey));
   const b64 = (bytes: Uint8Array) => {
