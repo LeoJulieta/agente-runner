@@ -382,7 +382,7 @@ def test_atomic_lab_results_rpc_is_the_only_service_role_insert_capability():
             (wrapper_signature,),
         ).fetchone()[0]
         writer_role = conn.execute(
-            "SELECT rolcanlogin, rolinherit, rolbypassrls FROM pg_roles WHERE rolname='pr_d_lab_results_writer'"
+            "SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolinherit, rolreplication, rolbypassrls FROM pg_roles WHERE rolname='pr_d_lab_results_writer'"
         ).fetchone()
         writer_memberships = conn.execute(
             """
