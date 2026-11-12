@@ -43,3 +43,15 @@ BEGIN
 END
 $authenticator$;
 GRANT anon, authenticated, service_role TO authenticator;
+
+
+-- Candidate E12 capture RPC is exercised over HTTP on this disposable table.
+CREATE TABLE public.youtube_shorts_log (
+    id bigserial PRIMARY KEY,
+    youtube_video_id text NOT NULL,
+    views_primeras_3h numeric(20,0),
+    published_at timestamptz,
+    sync_captured_at timestamptz
+);
+GRANT SELECT, UPDATE ON TABLE public.youtube_shorts_log TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.youtube_shorts_log_id_seq TO service_role;
