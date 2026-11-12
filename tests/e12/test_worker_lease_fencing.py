@@ -198,6 +198,12 @@ def test_legacy_capture_row_survives_attestation_upgrade():
         assert row[1] is not None and row[2] is not None
         assert row[3] is None and row[4] is None
 
+    with connect() as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("UPDATE public.youtube_shorts_log SET youtube_video_id='rewritten' WHERE id=3")
+        conn.rollback()
+
 
 def test_exclusive_claim_renew_takeover_and_stale_owner_rejection():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
