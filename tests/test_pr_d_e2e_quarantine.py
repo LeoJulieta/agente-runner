@@ -143,3 +143,46 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     candidate_migration = (ROOT / "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql").read_text(encoding="utf-8")
     assert "pr_d_capture_views_once" in candidate_migration
     assert "tests/test_pr_d_youtube_collector.py" in workflow_text
+
+
+def test_e12_capture_boundary_has_private_definer_and_direct_dml_guards():
+    migration = (
+        ROOT / "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
+    ).read_text(encoding="utf-8")
+    sql_fixture = (
+        ROOT / "tests/fixtures/pr_d_youtube_shorts_log_schema.sql"
+    ).read_text(encoding="utf-8")
+    http_bootstrap = (
+        ROOT / "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql"
+    ).read_text(encoding="utf-8")
+    integration = (
+        ROOT / "tests/integration/test_pr_d_sync_schema_compatibility.py"
+    ).read_text(encoding="utf-8")
+    http_e2e = (
+        ROOT / "tests/e2e/test_pr_d_postgrest_isolated_http.py"
+    ).read_text(encoding="utf-8")
+
+    assert "CREATE ROLE pr_d_capture_owner" in migration
+    assert "NOBYPASSRLS" in migration and "NOLOGIN" in migration
+    assert "CREATE SCHEMA pr_d_internal AUTHORIZATION pr_d_capture_owner" in migration
+    assert "SECURITY DEFINER" in migration
+    assert "SECURITY INVOKER" in migration
+    assert "GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once" in migration
+    assert "GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once" in migration
+    assert "youtube_shorts_log_pr_d_capture_guard" in migration
+    assert "BEFORE INSERT OR UPDATE OR DELETE" in migration
+    assert "hs_al_publicar_al_sync" in migration
+    assert "request.jwt.claims" in migration
+
+    # Both disposable fixtures must start from the audited legacy int4 schema.
+    assert "views_primeras_3h integer" in sql_fixture
+    assert "hs_al_publicar_al_sync numeric" in sql_fixture
+    assert "views_primeras_3h integer" in http_bootstrap
+    assert "hs_al_publicar_al_sync numeric" in http_bootstrap
+
+    # Regression tests must exercise direct SQL and actual HTTP bypass attempts.
+    assert "test_service_role_cannot_bypass_cas_but_can_update_unrelated_columns" in integration
+    assert "test_service_role_cannot_insert_forged_capture_or_delete_captured_row" in integration
+    assert "test_e12_direct_http_dml_cannot_forge_or_replace_capture" in http_e2e
+    assert "test_e12_captured_video_cannot_be_reassigned_or_deleted_over_http" in http_e2e
+    assert "test_e12_private_helper_schema_is_not_exposed_to_postgrest" in http_e2e
