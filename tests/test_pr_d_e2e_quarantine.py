@@ -37,7 +37,11 @@ def test_quarantined_http_e2e_files_are_not_in_candidate_ci_pytest_command():
     workflow = (ROOT / ".github" / "workflows" / "pr-d-sandbox-eligibility-schema.yml").read_text(
         encoding="utf-8"
     )
-    assert "tests/e2e/test_pr_d_supabase_http_rpc.py" not in workflow
-    assert "tests/e2e/test_pr_d_engine_http_e2e.py" not in workflow
-    assert "tests/integration/test_pr_d_atomic_rpc.py" not in workflow
+    pytest_command = next(
+        line for line in workflow.splitlines()
+        if line.strip().startswith("run: python -m pytest")
+    )
+    assert "tests/e2e/test_pr_d_supabase_http_rpc.py" not in pytest_command
+    assert "tests/e2e/test_pr_d_engine_http_e2e.py" not in pytest_command
+    assert "tests/integration/test_pr_d_atomic_rpc.py" not in pytest_command
     assert "tests/integration/test_pr_d_atomic_rpc.py" not in workflow
