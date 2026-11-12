@@ -1,10 +1,13 @@
 import { type ClockMicros, collectYouTubeBatch, nowEpochMicros } from "./collector.ts";
+import { claimWorkerLease, releaseWorkerLease, renewWorkerLease, type WorkerLease } from "./lease.ts";
 
 export type WorkerDependencies = {
   env: (name: string) => string | undefined;
   fetchImpl?: typeof fetch;
   clockMicros?: ClockMicros;
   nowEpochSeconds?: () => number;
+  randomUUID?: () => string;
+  leaseTtlSeconds?: number;
 };
 
 type CandidateRow = {
@@ -183,6 +186,7 @@ async function persistObservation(
     syncCapturedAt: string;
   },
   fetchImpl: typeof fetch,
+  lease: WorkerLease,
 ): Promise<boolean> {
   const baseUrl = supabaseUrl.replace(/\/+$/, "");
   const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/pr_d_capture_views_once`, {
@@ -198,6 +202,8 @@ async function persistObservation(
       p_views: observation.viewCount,
       p_published_at: observation.publishedAt,
       p_sync_captured_at: observation.syncCapturedAt,
+      p_run_id: lease.runId,
+      p_fencing_token: lease.fencingToken,
     }),
     signal: AbortSignal.timeout(15_000),
   });
@@ -297,70 +303,110 @@ export async function handleE12Capture(
       });
     }
 
-    const candidates = await fetchPendingCandidates(
+    const runId = (dependencies.randomUUID ?? (() => crypto.randomUUID()))();
+    const leaseTtlSeconds = dependencies.leaseTtlSeconds ?? 90;
+    const leaseClaim = await claimWorkerLease(
       supabaseUrl,
       serviceRoleKey,
+      runId,
+      leaseTtlSeconds,
       fetchImpl,
-      nowSeconds,
     );
-
-    const byVideoId = new Map<string, CandidateRow>();
-    const duplicateVideoIds = new Set<string>();
-    for (const row of candidates) {
-      if (byVideoId.has(row.youtube_video_id)) {
-        duplicateVideoIds.add(row.youtube_video_id);
-      } else {
-        byVideoId.set(row.youtube_video_id, row);
-      }
+    if (!leaseClaim.acquired) {
+      return jsonResponse(200, {
+        skippedActiveLease: true,
+        minuteBucket,
+      });
     }
-    for (const duplicate of duplicateVideoIds) byVideoId.delete(duplicate);
+    const lease = leaseClaim.lease;
 
-    let eligible = 0;
-    let captured = 0;
-    let casLost = 0;
-    let nonEligible = 0;
-    const duplicateRows = duplicateVideoIds.size;
-
-    const videoIds = [...byVideoId.keys()];
-    for (let offset = 0; offset < videoIds.length; offset += YOUTUBE_BATCH_SIZE) {
-      const batchIds = videoIds.slice(offset, offset + YOUTUBE_BATCH_SIZE);
-      const observations = await collectYouTubeBatch(
-        batchIds,
-        youtubeApiKey,
+    try {
+      const candidates = await fetchPendingCandidates(
+        supabaseUrl,
+        serviceRoleKey,
         fetchImpl,
-        clockMicros,
+        nowSeconds,
       );
 
-      for (const observation of observations) {
-        if (!observation.eligible) {
-          nonEligible++;
-          continue;
+      if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
+        throw new Error("e12_worker_lease_lost");
+      }
+
+      const byVideoId = new Map<string, CandidateRow>();
+      const duplicateVideoIds = new Set<string>();
+      for (const row of candidates) {
+        if (byVideoId.has(row.youtube_video_id)) {
+          duplicateVideoIds.add(row.youtube_video_id);
+        } else {
+          byVideoId.set(row.youtube_video_id, row);
         }
-        const row = byVideoId.get(observation.videoId);
-        if (!row) continue;
-        eligible++;
-        const didCapture = await persistObservation(
-          supabaseUrl,
-          serviceRoleKey,
-          row,
-          observation,
+      }
+      for (const duplicate of duplicateVideoIds) byVideoId.delete(duplicate);
+
+      let eligible = 0;
+      let captured = 0;
+      let casLost = 0;
+      let nonEligible = 0;
+      const duplicateRows = duplicateVideoIds.size;
+
+      const videoIds = [...byVideoId.keys()];
+      for (let offset = 0; offset < videoIds.length; offset += YOUTUBE_BATCH_SIZE) {
+        if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
+          throw new Error("e12_worker_lease_lost");
+        }
+        const batchIds = videoIds.slice(offset, offset + YOUTUBE_BATCH_SIZE);
+        const observations = await collectYouTubeBatch(
+          batchIds,
+          youtubeApiKey,
           fetchImpl,
+          clockMicros,
         );
-        if (didCapture) captured++;
-        else casLost++;
+
+        for (const observation of observations) {
+          if (!observation.eligible) {
+            nonEligible++;
+            continue;
+          }
+          const row = byVideoId.get(observation.videoId);
+          if (!row) continue;
+          if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
+            throw new Error("e12_worker_lease_lost");
+          }
+          eligible++;
+          const didCapture = await persistObservation(
+            supabaseUrl,
+            serviceRoleKey,
+            row,
+            observation,
+            fetchImpl,
+            lease,
+          );
+          if (didCapture) captured++;
+          else casLost++;
+        }
+      }
+
+      return jsonResponse(200, {
+        candidates: candidates.length,
+        uniqueCandidates: videoIds.length,
+        duplicateRows,
+        slotClaimed: true,
+        leaseClaimed: true,
+        fencingToken: lease.fencingToken,
+        eligible,
+        captured,
+        casLost,
+        nonEligible,
+      });
+    } finally {
+      // A failed release is safe: the database expiry recovers the lease.
+      // The fencing token prevents this run from releasing a successor's lease.
+      try {
+        await releaseWorkerLease(supabaseUrl, serviceRoleKey, lease, fetchImpl);
+      } catch {
+        // Do not expose upstream details or credentials in the worker response.
       }
     }
-
-    return jsonResponse(200, {
-      candidates: candidates.length,
-      uniqueCandidates: videoIds.length,
-      duplicateRows,
-      slotClaimed: true,
-      eligible,
-      captured,
-      casLost,
-      nonEligible,
-    });
   } catch (_error) {
     // Never return request URLs, API keys, Supabase keys, or upstream bodies.
     return jsonResponse(502, { error: "e12_capture_cycle_failed" });
