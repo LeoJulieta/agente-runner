@@ -86,6 +86,15 @@ elegibles para el análisis después de aplicar todos los filtros
 preregistrados, incluido el filtro de sincronización alrededor de las 3 horas
 cuando corresponda: intervalo cerrado de 2 h 55 min a 3 h 05 min (3 h ± 5 min).
 
+En esta enmienda, `views_primeras_3h` representa el `statistics.viewCount`
+acumulado observado en un único instante entre 2 h 55 min y 3 h 05 min
+después de `publishedAt`. No representa una suma de vistas ocurridas
+exclusivamente dentro de un intervalo exacto de tres horas ni un valor
+extrapolado. Se conservarán `published_at` y `sync_captured_at` para
+auditar el instante y el tiempo transcurrido exactos. Las capturas fuera
+de la ventana se excluirán antes del análisis; no se corregirán ni
+extrapolarán para hacerlas parecer mediciones de tres horas.
+
 Para Familia II se registrará `n_events`, cantidad de observaciones
 elegibles con `Y > 0`. `n_eff` y `n_events` no son intercambiables: una
 muestra puede tener muchos ceros y pocos eventos positivos.
