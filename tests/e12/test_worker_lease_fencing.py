@@ -351,6 +351,12 @@ def test_batch_cas_checks_each_hmac_and_bounds_batch_size():
     first = capture_record(RUN_A, token, 4, "video-4")
     second_invalid = capture_record(RUN_A, token, 5, "video-5", hmac_override="0" * 64)
 
+    with connect() as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("SELECT pr_d_internal.pr_d_capture_views_batch('[]'::jsonb)")
+        conn.rollback()
+
     with pytest.raises(psycopg.errors.RaiseException):
         capture_batch([first, first])
 
