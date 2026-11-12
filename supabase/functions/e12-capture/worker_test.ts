@@ -52,6 +52,7 @@ function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string>
       keyId: payload.keyId,
       payloadSha256: "a".repeat(64),
       signatureBase64: "A".repeat(86) + "==",
+      hmacSignatureHex: "d".repeat(64),
     }),
     verifyAttestation: async (
       payload: ObservationAttestationPayload,
@@ -252,6 +253,7 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(canonicalPayload[3] === "9007199254740993", "canonical payload must bind exact fencing token");
   assert(canonicalPayload[5] === "video-1" && canonicalPayload[7] === YOUTUBE_UINT64_MAX.toString(), "canonical payload must bind video and exact uint64 count");
   assert(rpcBody.p_collector_signature === "A".repeat(86) + "==", "CAS must persist the Ed25519 signature");
+  assert(rpcBody.p_collector_hmac_signature === "d".repeat(64), "CAS must persist the database-verifiable HMAC");
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_response_sha256)), "CAS must persist the raw response digest");
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_requested_ids_sha256)), "CAS must persist the requested IDs digest");
   assert(rpcBody.p_collector_build === "e12-collector/0.1.0", "CAS must persist collector build identity");
