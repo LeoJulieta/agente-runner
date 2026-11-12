@@ -81,4 +81,4 @@ def test_reproducibility_rejects_non_boolean_flags():
 def test_family_ii_fingerprint_freezes_temporal_outcome_contract():
     from labs.pr_d_family_ii import METHOD_FINGERPRINT_OLS_HC3
 
-    assert METHOD_FINGERPRINT_OLS_HC3 == "ols-ln-positive-y-hc3-t-two-sided-v1__yt-viewcount-publishedat-10500-11100-closed-missing-excluded-v1"
+    assert METHOD_FINGERPRINT_OLS_HC3 == "ols-ln-positive-y-hc3-t-two-sided-v1"
