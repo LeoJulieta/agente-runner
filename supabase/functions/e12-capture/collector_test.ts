@@ -127,20 +127,30 @@ Deno.test("collector rejects unrequested and duplicate video IDs", () => {
 Deno.test("collector captures timestamp after complete HTTP body read", async () => {
   let bodyComplete = false;
   let clockCalledAfterBody = false;
-  const body = JSON.stringify(videoPayload());
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(new TextEncoder().encode(body));
-      controller.close();
-      bodyComplete = true;
+  const bodyBytes = new TextEncoder().encode(JSON.stringify(videoPayload()));
+  const fakeResponse = {
+    ok: true,
+    body: {
+      getReader: () => {
+        let readCount = 0;
+        return {
+          read: async () => {
+            readCount++;
+            if (readCount === 1) return { done: false, value: bodyBytes };
+            bodyComplete = true;
+            return { done: true, value: undefined };
+          },
+          cancel: async () => {},
+        };
+      },
     },
-  });
+  } as unknown as Response;
   const fixedCapture = parseRfc3339EpochMicros("2026-10-30T05:30:00.123456Z");
 
   const result = await collectYouTubeBatch(
     ["video-1"],
     "test-key",
-    async () => new Response(stream, { status: 200 }),
+    async () => fakeResponse,
     () => {
       clockCalledAfterBody = bodyComplete;
       return fixedCapture;
