@@ -171,7 +171,7 @@ Deno.test("collector captures timestamp after complete HTTP body read", async ()
   const result = await collectYouTubeBatch(
     ["video-1"],
     "test-key",
-    async () => fakeResponse,
+    () => Promise.resolve(fakeResponse),
     () => {
       clockCalledAfterBody = bodyComplete;
       return fixedCapture;
@@ -189,7 +189,7 @@ Deno.test("collector enforces the one-megabyte response limit", async () => {
     await collectYouTubeBatch(
       ["video-1"],
       "test-key",
-      async () => new Response(oversized, { status: 200 }),
+      () => Promise.resolve(new Response(oversized, { status: 200 })),
       () => 1_800_000_000_000_000n,
     );
   } catch (error) {
