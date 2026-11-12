@@ -363,3 +363,14 @@ def test_capture_writer_isolated_non_login_owner(disposable_database):
     assert writer == (False, False, True)
     assert membership_count == 0
     assert owner == "pr_d_capture_writer"
+
+
+def test_service_role_cannot_truncate_capture_table_and_bypass_row_guards(disposable_database):
+    with psycopg.connect(disposable_database) as conn:
+        allowed = conn.execute(
+            "SELECT has_table_privilege('service_role', 'pr_d_test.youtube_shorts_log', 'TRUNCATE')"
+        ).fetchone()[0]
+        assert allowed is False
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("TRUNCATE TABLE pr_d_test.youtube_shorts_log")
