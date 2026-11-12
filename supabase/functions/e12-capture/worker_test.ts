@@ -403,3 +403,64 @@ Deno.test("worker enforces a streaming body cap when Content-Length is absent", 
   assert(response.status === 400, "oversized streamed body must be rejected");
   assert(calls === 0, "oversized body must not reach upstream services");
 });
+
+
+Deno.test("worker fails closed when provenance key material is missing", async () => {
+  let fetchCalls = 0;
+  const fetchImpl: typeof fetch = async () => {
+    fetchCalls++;
+    return new Response("true", { status: 200 });
+  };
+  const response = await handleE12Capture(
+    await signedRequest(),
+    dependencies(fetchImpl, { E12_PROVENANCE_PUBLIC_KEY_SPKI_B64: "" }),
+  );
+  assert(response.status === 500, "missing public key must fail closed");
+  assert(fetchCalls === 0, "missing provenance configuration must fail before network calls");
+});
+
+Deno.test("worker never calls CAS when independent attestation verification fails", async () => {
+  const calls: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return new Response("true", { status: 200 });
+    }
+    if (url.includes("/rpc/pr_d_claim_e12_worker_lease")) {
+      return new Response(JSON.stringify([{
+        acquired: true,
+        fencing_token: "7",
+        lease_expires_at: "2026-10-30T05:31:30Z",
+      }]), { status: 200 });
+    }
+    if (url.includes("/rpc/pr_d_renew_e12_worker_lease") ||
+        url.includes("/rpc/pr_d_release_e12_worker_lease")) {
+      return new Response("true", { status: 200 });
+    }
+    if (url.includes("/rest/v1/youtube_shorts_log")) {
+      return new Response(JSON.stringify([{
+        id: 7,
+        youtube_video_id: "video-1",
+        published_at: "2026-10-30T02:30:00Z",
+      }]), { status: 200 });
+    }
+    if (url.includes("youtube.googleapis.com")) {
+      return new Response(JSON.stringify({
+        items: [{
+          id: "video-1",
+          status: { privacyStatus: "public" },
+          snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+          statistics: { viewCount: YOUTUBE_UINT64_MAX.toString() },
+        }],
+      }), { status: 200 });
+    }
+    throw new Error("unexpected_test_fetch_url");
+  };
+  const deps = dependencies(fetchImpl);
+  deps.verifyAttestation = async () => false;
+  const response = await handleE12Capture(await signedRequest(), deps);
+  assert(response.status === 502, "invalid attestation must fail the worker cycle");
+  assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_once")), "CAS must not run for an invalid attestation");
+  assert(calls.some((url) => url.includes("/rpc/pr_d_release_e12_worker_lease")), "lease must still be released");
+});
