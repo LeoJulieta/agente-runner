@@ -142,6 +142,7 @@ CREATE TRIGGER youtube_shorts_log_capture_write_guard
     BEFORE INSERT OR UPDATE OF views_primeras_3h, published_at, sync_captured_at
     ON public.youtube_shorts_log
     FOR EACH ROW EXECUTE FUNCTION public.pr_d_guard_capture_write();
+REVOKE ALL ON FUNCTION public.pr_d_guard_capture_write() FROM PUBLIC, anon, authenticated, service_role;
 
 -- Remove the earlier int32 overload from this candidate if the migration is replayed.
 DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, integer, timestamptz, timestamptz);
