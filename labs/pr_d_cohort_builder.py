@@ -40,7 +40,7 @@ class SyncWindow:
             raise CohortInputError("sync_window_bounds_invalid")
         if type(self.lower_inclusive) is not bool or type(self.upper_inclusive) is not bool:
             raise CohortInputError("sync_window_inclusivity_must_be_explicit_boolean")
-        if self.missing_policy not in MISSING_POLICIES:
+        if not isinstance(self.missing_policy, str) or self.missing_policy not in MISSING_POLICIES:
             raise CohortInputError("sync_window_missing_policy_unsupported")
 
 
