@@ -520,3 +520,46 @@ def test_view_count_above_uint64_is_rejected_by_database_constraint(disposable_d
                        elapsed_seconds_e12 = 10800
                  WHERE id = %s
             """, (PUBLISHED_AT, CAPTURED_AT, row_id))
+
+
+def test_legacy_rows_are_never_backfilled_into_e12(disposable_database):
+    with psycopg.connect(disposable_database) as conn:
+        row_id = conn.execute("""
+            SELECT id FROM pr_d_test.youtube_shorts_log
+            WHERE youtube_video_id = 'legacy-fixture'
+        """).fetchone()[0]
+
+    assert _cas(disposable_database, row_id, "legacy-fixture", 999) is False
+
+    with psycopg.connect(disposable_database) as conn:
+        stored = conn.execute("""
+            SELECT views_primeras_3h, hs_al_publicar_al_sync,
+                   published_at, sync_captured_at, elapsed_seconds_e12
+            FROM pr_d_test.youtube_shorts_log WHERE id = %s
+        """, (row_id,)).fetchone()
+    assert stored == (123, Decimal("3.01"), None, None, None)
+
+
+def test_closed_window_edges_store_exact_elapsed_seconds(disposable_database):
+    lower_id = insert_video(disposable_database, "lower-edge-elapsed")
+    upper_id = insert_video(disposable_database, "upper-edge-elapsed")
+    assert _cas(
+        disposable_database, lower_id, "lower-edge-elapsed", 1,
+        "2026-10-30T02:30:00Z", "2026-10-30T05:25:00Z",
+    ) is True
+    assert _cas(
+        disposable_database, upper_id, "upper-edge-elapsed", 2,
+        "2026-10-30T02:30:00Z", "2026-10-30T05:35:00Z",
+    ) is True
+
+    with psycopg.connect(disposable_database) as conn:
+        stored = conn.execute("""
+            SELECT youtube_video_id, elapsed_seconds_e12, hs_al_publicar_al_sync
+            FROM pr_d_test.youtube_shorts_log
+            WHERE id IN (%s, %s)
+            ORDER BY youtube_video_id
+        """, (lower_id, upper_id)).fetchall()
+    assert stored == [
+        ("lower-edge-elapsed", Decimal("10500.000000"), None),
+        ("upper-edge-elapsed", Decimal("11100.000000"), None),
+    ]
