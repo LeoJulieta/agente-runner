@@ -328,7 +328,10 @@ BEGIN
        AND algorithm = p_attestation_algorithm
        AND status = 'active'
        AND revoked_at IS NULL;
-    IF NOT FOUND OR v_key.public_key_spki_base64 IS DISTINCT FROM p_collector_public_key_spki_base64 THEN
+    IF NOT FOUND THEN
+        RETURN false;
+    END IF;
+    IF v_key.public_key_spki_base64 IS DISTINCT FROM p_collector_public_key_spki_base64 THEN
         RETURN false;
     END IF;
 
