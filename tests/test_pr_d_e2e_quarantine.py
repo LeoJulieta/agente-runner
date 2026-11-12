@@ -186,3 +186,15 @@ def test_e12_capture_boundary_has_private_definer_and_direct_dml_guards():
     assert "test_e12_direct_http_dml_cannot_forge_or_replace_capture" in http_e2e
     assert "test_e12_captured_video_cannot_be_reassigned_or_deleted_over_http" in http_e2e
     assert "test_e12_private_helper_schema_is_not_exposed_to_postgrest" in http_e2e
+
+
+def test_e12_http_job_exposes_only_public_schema_and_cleans_privileged_role():
+    workflow = (ROOT / ".github/workflows/pr-d-sandbox-eligibility-schema.yml").read_text(
+        encoding="utf-8"
+    )
+    http_test = (ROOT / "tests/e2e/test_pr_d_postgrest_isolated_http.py").read_text(
+        encoding="utf-8"
+    )
+    assert "PGRST_DB_SCHEMAS=public" in workflow
+    assert 'REVOKE ALL ON SCHEMA public FROM pr_d_capture_owner' in http_test
+    assert 'DROP ROLE IF EXISTS pr_d_capture_owner' in http_test
