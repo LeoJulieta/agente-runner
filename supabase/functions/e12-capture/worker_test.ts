@@ -40,6 +40,8 @@ function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string>
     fetchImpl,
     clockMicros: () => CAPTURE_MICROS,
     nowEpochSeconds: () => NOW_SECONDS,
+    randomUUID: () => "11111111-2222-4333-8444-555555555555",
+    leaseTtlSeconds: 90,
   };
 }
 
@@ -119,6 +121,16 @@ Deno.test("worker obtains source observation itself and persists only through th
     if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
       return Promise.resolve(new Response("true", { status: 200 }));
     }
+    if (url.includes("/rpc/pr_d_claim_e12_worker_lease")) {
+      return Promise.resolve(new Response(JSON.stringify([{
+        acquired: true,
+        fencing_token: "9007199254740993",
+        lease_expires_at: "2026-10-30T05:31:30Z",
+      }]), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_renew_e12_worker_lease")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
     if (url.includes("/rest/v1/youtube_shorts_log")) {
       return Promise.resolve(
         new Response(
@@ -149,6 +161,9 @@ Deno.test("worker obtains source observation itself and persists only through th
     if (url.includes("/rest/v1/rpc/pr_d_capture_views_once")) {
       return Promise.resolve(new Response("true", { status: 200, headers: { "content-type": "application/json" } }));
     }
+    if (url.includes("/rpc/pr_d_release_e12_worker_lease")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
     throw new Error("unexpected_test_fetch_url");
   };
 
@@ -163,14 +178,16 @@ Deno.test("worker obtains source observation itself and persists only through th
     result.candidates === 1 && result.eligible === 1 && result.captured === 1,
     "one eligible row should be captured",
   );
-  assert(calls.length === 4, "worker should claim slot, query candidates, call YouTube, then CAS");
+  assert(calls.length === 8, "worker should claim slot and lease, renew, query YouTube, CAS, then release");
 
   const slotCall = calls[0];
   const slotBody = JSON.parse(slotCall.body);
   assert(slotCall.url.endsWith("/rpc/pr_d_claim_e12_worker_slot"), "worker must claim an idempotency slot first");
   assert(slotBody.p_minute_bucket === "2026-10-30T05:30:00.000Z", "slot must derive from the signed cron minute");
 
-  const candidateCall = calls[1];
+  const leaseClaimCall = calls[1];
+  assert(leaseClaimCall.url.endsWith("/rpc/pr_d_claim_e12_worker_lease"), "worker must claim lease after replay slot");
+  const candidateCall = calls[2];
   assert(candidateCall.url.includes("created_at=gte."), "created_at may be used only as a coarse candidate filter");
   assert(candidateCall.url.includes("status=eq.published"), "only published rows are candidates");
   assert(
@@ -182,7 +199,9 @@ Deno.test("worker obtains source observation itself and persists only through th
     "service key must not be copied into Authorization header",
   );
 
-  const youtubeCall = calls[2];
+  const renewalCall = calls[3];
+  assert(renewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew before source collection");
+  const youtubeCall = calls[4];
   const youtubeUrl = new URL(youtubeCall.url);
   assert(
     youtubeUrl.searchParams.get("part") === "snippet,statistics,status",
@@ -194,12 +213,17 @@ Deno.test("worker obtains source observation itself and persists only through th
     "YouTube key must be used only for the source request",
   );
 
-  const rpcCall = calls[3];
+  const casRenewalCall = calls[5];
+  assert(casRenewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew immediately before CAS");
+  const rpcCall = calls[6];
   const rpcBody = JSON.parse(rpcCall.body);
   assert(rpcCall.url.endsWith("/rpc/pr_d_capture_views_once"), "persistence must use the CAS RPC");
   assert(rpcBody.p_row_id === "42", "row id must be exact");
   assert(rpcBody.p_youtube_video_id === "video-1", "video id must be exact");
   assert(rpcBody.p_views === YOUTUBE_UINT64_MAX.toString(), "uint64 must remain an exact decimal string");
+  assert(rpcBody.p_run_id === "11111111-2222-4333-8444-555555555555", "CAS must bind the lease owner");
+  assert(rpcBody.p_fencing_token === "9007199254740993", "CAS must bind the exact fencing token");
+  assert(calls[7].url.endsWith("/rpc/pr_d_release_e12_worker_lease"), "worker must release its lease after completion");
   assert(rpcBody.p_published_at === "2026-10-30T02:30:00Z", "publishedAt must come from YouTube");
   assert(
     rpcBody.p_sync_captured_at === "2026-10-30T05:30:00.123456Z",
@@ -238,6 +262,14 @@ Deno.test("worker fails closed instead of silently truncating more than 500 cand
     if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
       return Promise.resolve(new Response("true", { status: 200 }));
     }
+    if (url.includes("/rpc/pr_d_claim_e12_worker_lease")) {
+      return Promise.resolve(new Response(JSON.stringify([{
+        acquired: true, fencing_token: "2", lease_expires_at: "2026-10-30T05:31:30Z",
+      }]), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_release_e12_worker_lease")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
     if (url.includes("/rest/v1/youtube_shorts_log")) {
       return Promise.resolve(
         new Response(JSON.stringify(candidates), {
@@ -251,13 +283,24 @@ Deno.test("worker fails closed instead of silently truncating more than 500 cand
 
   const response = await handleE12Capture(await signedRequest(), dependencies(fetchImpl));
   assert(response.status === 502, "candidate truncation must fail closed");
-  assert(calls === 2, "worker must stop after detecting more than 500 candidates");
+  assert(calls === 4, "worker must stop after detecting more than 500 candidates and release its lease");
 });
 
 Deno.test("worker reports CAS first-write conflicts without overwriting outcomes", async () => {
   const fetchImpl: typeof fetch = (input) => {
     const url = String(input);
     if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_claim_e12_worker_lease")) {
+      return Promise.resolve(new Response(JSON.stringify([{
+        acquired: true, fencing_token: "3", lease_expires_at: "2026-10-30T05:31:30Z",
+      }]), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_renew_e12_worker_lease")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_release_e12_worker_lease")) {
       return Promise.resolve(new Response("true", { status: 200 }));
     }
     if (url.includes("/rest/v1/youtube_shorts_log")) {
