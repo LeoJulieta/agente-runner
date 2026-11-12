@@ -69,17 +69,25 @@ export function canonicalizeObservationPayload(payload: ObservationAttestationPa
   return new TextEncoder().encode(canonical);
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", toArrayBuffer(bytes)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function decodeBase64(value: string): Uint8Array {
+function decodeBase64(value: string): ArrayBuffer {
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) {
     throw new Error("e12_attestation_base64_invalid");
   }
   const binary = atob(value);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes.buffer;
 }
 
 function encodeBase64(bytes: Uint8Array): string {
@@ -109,7 +117,7 @@ export async function createObservationAttestation(
     false,
     ["sign"],
   );
-  const signature = new Uint8Array(await crypto.subtle.sign("Ed25519", privateKey, canonical));
+  const signature = new Uint8Array(await crypto.subtle.sign("Ed25519", privateKey, toArrayBuffer(canonical)));
   return {
     version: E12_ATTESTATION_VERSION,
     algorithm: E12_ATTESTATION_ALGORITHM,
@@ -142,7 +150,7 @@ export async function verifyObservationAttestation(
       "Ed25519",
       publicKey,
       decodeBase64(attestation.signatureBase64),
-      canonical,
+      toArrayBuffer(canonical),
     );
   } catch {
     return false;
