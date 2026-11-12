@@ -5,7 +5,7 @@
 -- before any YouTube request, so replay cannot repeat the worker cycle.
 --
 -- IMPORTANT: pg_net request queues are readable under the current project ACL.
--- This job sends only a short-lived HMAC signature, never sb_secret/service_role.
+-- This job signs method, path, timestamp and SHA-256 body digest; it never sends sb_secret/service_role.
 
 DO $preflight$
 DECLARE
@@ -68,7 +68,12 @@ SELECT cron.schedule(
         'x-e12-timestamp', request_clock.timestamp,
         'x-e12-signature',
           encode(extensions.hmac(
-            request_clock.timestamp,
+            convert_to(
+              'POST' || E'\\n' || '/functions/v1/e12-capture' || E'\\n' ||
+              request_clock.timestamp || E'\\n' ||
+              encode(extensions.digest(convert_to('{}', 'UTF8'), 'sha256'), 'hex'),
+              'UTF8'
+            ),
             signing_secret.secret,
             'sha256'
           ), 'hex')
