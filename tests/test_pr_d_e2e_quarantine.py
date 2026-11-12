@@ -8,14 +8,15 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HTTP_E2E = (
+LEGACY_UNSAFE_TESTS = (
     ROOT / "tests" / "e2e" / "test_pr_d_supabase_http_rpc.py",
     ROOT / "tests" / "e2e" / "test_pr_d_engine_http_e2e.py",
+    ROOT / "tests" / "integration" / "test_pr_d_atomic_rpc.py",
 )
 
 
-def test_legacy_public_schema_http_e2e_files_are_explicitly_skipped():
-    for path in HTTP_E2E:
+def test_legacy_shared_public_schema_tests_are_explicitly_skipped():
+    for path in LEGACY_UNSAFE_TESTS:
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         module_skip = False
@@ -38,3 +39,4 @@ def test_quarantined_http_e2e_files_are_not_in_candidate_ci_pytest_command():
     )
     assert "tests/e2e/test_pr_d_supabase_http_rpc.py" not in workflow
     assert "tests/e2e/test_pr_d_engine_http_e2e.py" not in workflow
+    assert "tests/integration/test_pr_d_atomic_rpc.py" not in workflow
