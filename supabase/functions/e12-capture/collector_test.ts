@@ -155,13 +155,15 @@ Deno.test("collector captures timestamp after complete HTTP body read", async ()
       getReader: () => {
         let readCount = 0;
         return {
-          read: async () => {
+          read: () => {
             readCount++;
-            if (readCount === 1) return { done: false, value: bodyBytes };
+            if (readCount === 1) {
+              return Promise.resolve({ done: false, value: bodyBytes });
+            }
             bodyComplete = true;
-            return { done: true, value: undefined };
+            return Promise.resolve({ done: true, value: undefined });
           },
-          cancel: async () => {},
+          cancel: () => Promise.resolve(),
         };
       },
     },
