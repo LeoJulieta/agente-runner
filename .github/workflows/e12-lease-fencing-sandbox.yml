@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - sandbox/e12-lease-provenance-2026-11-12
+      - sandbox/e12-batch-cas-perf-2026-11-12
     paths:
       - "supabase/functions/e12-capture/**"
       - "supabase/ops/e12_worker_lease_fencing.sql"
