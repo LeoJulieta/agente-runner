@@ -369,15 +369,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -417,11 +417,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_signature ~ '^[A-Za-z0-9+/]{86}==
@@ -650,15 +650,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -698,11 +698,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_response_sha256 ~ '^[a-f0-9]{64}
@@ -931,15 +931,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -979,11 +979,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_requested_ids_sha256 ~ '^[a-f0-9]{64}
@@ -1212,15 +1212,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -1260,11 +1260,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_build ~ '^[A-Za-z0-9._+/-]{1,96}
@@ -1493,15 +1493,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -1541,11 +1541,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
         )
@@ -1775,15 +1775,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -1823,11 +1823,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
        OR length(decode(p_collector_signature, 'base64')) <> 64
@@ -1913,15 +1913,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -1961,11 +1961,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_signature ~ '^[A-Za-z0-9+/]{86}==
@@ -2194,15 +2194,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -2242,11 +2242,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_response_sha256 ~ '^[a-f0-9]{64}
@@ -2475,15 +2475,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -2523,11 +2523,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_requested_ids_sha256 ~ '^[a-f0-9]{64}
@@ -2756,15 +2756,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -2804,11 +2804,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_build ~ '^[A-Za-z0-9._+/-]{1,96}
@@ -3037,15 +3037,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -3085,11 +3085,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
         )
@@ -3319,15 +3319,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -3367,11 +3367,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
        OR p_collector_response_sha256 !~ '^[a-f0-9]{64}$'
@@ -3456,15 +3456,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -3504,11 +3504,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_signature ~ '^[A-Za-z0-9+/]{86}==
@@ -3737,15 +3737,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -3785,11 +3785,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_response_sha256 ~ '^[a-f0-9]{64}
@@ -4018,15 +4018,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -4066,11 +4066,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_requested_ids_sha256 ~ '^[a-f0-9]{64}
@@ -4299,15 +4299,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -4347,11 +4347,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
             AND collector_build ~ '^[A-Za-z0-9._+/-]{1,96}
@@ -4580,15 +4580,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -4628,11 +4628,11 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
         )
@@ -4862,15 +4862,15 @@ $capture$;
 
 ALTER FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) OWNER TO pr_d_capture_owner;
 REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
@@ -4910,9 +4910,9 @@ $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
-    text, text, text, text, text, text, text, text, text, text
+    text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
