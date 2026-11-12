@@ -256,7 +256,7 @@ def test_migration_preflight_refuses_negative_legacy_values_without_rewriting(di
             conn.execute("""
                 ALTER TABLE pr_d_test.youtube_shorts_log
                 ADD CONSTRAINT youtube_shorts_log_views_nonnegative_ck
-                CHECK (views_primeras_3h IS NULL OR views_primeras_3h >= 0)
+                CHECK (views_primeras_3h IS NULL OR (views_primeras_3h >= 0 AND views_primeras_3h <= 18446744073709551615))
             """)
             conn.commit()
 
