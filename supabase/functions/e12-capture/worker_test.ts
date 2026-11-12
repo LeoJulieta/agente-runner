@@ -1,6 +1,10 @@
 import { handleE12Capture, verifyCronSignature } from "./worker.ts";
 import { parseRfc3339EpochMicros, YOUTUBE_UINT64_MAX } from "./collector.ts";
-import type { ObservationAttestationPayload } from "./provenance.ts";
+import {
+  verifyObservationAttestation,
+  type ObservationAttestation,
+  type ObservationAttestationPayload,
+} from "./provenance.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -27,7 +31,21 @@ const SECRET = "e12-test-cron-secret-with-more-than-32-bytes";
 const NOW_SECONDS = Math.floor(Date.parse("2026-10-30T05:30:00Z") / 1_000);
 const TIMESTAMP = String(NOW_SECONDS);
 const CAPTURE_MICROS = parseRfc3339EpochMicros("2026-10-30T05:30:00.123456Z");
-const TEST_PUBLIC_KEY = "MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+const TEST_KEY_PAIR = await crypto.subtle.generateKey(
+  { name: "Ed25519" },
+  true,
+  ["sign", "verify"],
+) as CryptoKeyPair;
+const TEST_PRIVATE_KEY = toBase64(new Uint8Array(await crypto.subtle.exportKey("pkcs8", TEST_KEY_PAIR.privateKey)));
+const TEST_PUBLIC_KEY = toBase64(new Uint8Array(await crypto.subtle.exportKey("spki", TEST_KEY_PAIR.publicKey)));
+const TEST_HMAC_SECRET_BYTES = new Uint8Array(32).fill(7);
+const TEST_HMAC_SECRET = toBase64(TEST_HMAC_SECRET_BYTES);
 
 function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string> = {}) {
   const values: Record<string, string> = {
@@ -36,7 +54,9 @@ function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string>
     SUPABASE_SERVICE_ROLE_KEY: "sb_secret_test_only_not_real",
     YOUTUBE_API_KEY: "youtube-test-key",
     E12_PROVENANCE_KEY_ID: "e12-test-key",
+    E12_PROVENANCE_PRIVATE_KEY_PKCS8_B64: TEST_PRIVATE_KEY,
     E12_PROVENANCE_PUBLIC_KEY_SPKI_B64: TEST_PUBLIC_KEY,
+    E12_PROVENANCE_HMAC_SECRET_B64: TEST_HMAC_SECRET,
     ...overrides,
   };
   return {
@@ -46,19 +66,6 @@ function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string>
     nowEpochSeconds: () => NOW_SECONDS,
     randomUUID: () => "11111111-2222-4333-8444-555555555555",
     leaseTtlSeconds: 90,
-    attestObservation: async (payload: ObservationAttestationPayload) => ({
-      version: "e12-observation-attestation/v1",
-      algorithm: "Ed25519",
-      keyId: payload.keyId,
-      payloadSha256: "a".repeat(64),
-      signatureBase64: "A".repeat(86) + "==",
-      hmacSignatureHex: "d".repeat(64),
-    }),
-    verifyAttestation: async (
-      payload: ObservationAttestationPayload,
-      attestation: { keyId: string },
-      publicKeySpkiBase64: string,
-    ) => attestation.keyId === payload.keyId && publicKeySpkiBase64 === TEST_PUBLIC_KEY,
   };
 }
 
@@ -245,7 +252,31 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(rpcBody.p_attestation_algorithm === "Ed25519", "CAS must store the signature algorithm");
   assert(rpcBody.p_collector_key_id === "e12-test-key", "CAS must bind the registered collector key ID");
   assert(rpcBody.p_collector_public_key_spki_base64 === TEST_PUBLIC_KEY, "CAS must bind the exact registered public key");
-  assert(rpcBody.p_collector_payload_sha256 === "a".repeat(64), "CAS must persist the signed payload digest");
+  const attestationPayload: ObservationAttestationPayload = {
+    keyId: "e12-test-key",
+    runId: "11111111-2222-4333-8444-555555555555",
+    fencingToken: "9007199254740993",
+    rowId: "7",
+    videoId: "video-1",
+    publishedAt: "2026-10-30T02:30:00Z",
+    viewCount: YOUTUBE_UINT64_MAX.toString(),
+    syncCapturedAt: "2026-10-30T05:30:00.123456Z",
+    responseBodySha256: String(rpcBody.p_collector_response_sha256),
+    requestedVideoIdsSha256: String(rpcBody.p_collector_requested_ids_sha256),
+    collectorBuild: "e12-collector/0.1.0",
+  };
+  const attestation: ObservationAttestation = {
+    version: String(rpcBody.p_attestation_version) as ObservationAttestation["version"],
+    algorithm: String(rpcBody.p_attestation_algorithm) as ObservationAttestation["algorithm"],
+    keyId: String(rpcBody.p_collector_key_id),
+    payloadSha256: String(rpcBody.p_collector_payload_sha256),
+    signatureBase64: String(rpcBody.p_collector_signature),
+    hmacSignatureHex: String(rpcBody.p_collector_hmac_signature),
+  };
+  assert(
+    await verifyObservationAttestation(attestationPayload, attestation, TEST_PUBLIC_KEY, TEST_HMAC_SECRET),
+    "worker must send a valid Ed25519 signature and HMAC over the exact canonical payload",
+  );
   const canonicalPayload = JSON.parse(String(rpcBody.p_collector_payload_canonical)) as string[];
   assert(canonicalPayload.length === 12, "CAS must persist the complete canonical payload");
   assert(canonicalPayload[1] === "e12-test-key", "canonical payload must bind key ID");
@@ -457,8 +488,15 @@ Deno.test("worker never calls CAS when independent attestation verification fail
     }
     throw new Error("unexpected_test_fetch_url");
   };
-  const deps = dependencies(fetchImpl);
-  deps.verifyAttestation = async () => false;
+  const otherPair = await crypto.subtle.generateKey(
+    { name: "Ed25519" },
+    true,
+    ["sign", "verify"],
+  ) as CryptoKeyPair;
+  const mismatchedPublicKey = toBase64(
+    new Uint8Array(await crypto.subtle.exportKey("spki", otherPair.publicKey)),
+  );
+  const deps = dependencies(fetchImpl, { E12_PROVENANCE_PUBLIC_KEY_SPKI_B64: mismatchedPublicKey });
   const response = await handleE12Capture(await signedRequest(), deps);
   assert(response.status === 502, "invalid attestation must fail the worker cycle");
   assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_once")), "CAS must not run for an invalid attestation");
