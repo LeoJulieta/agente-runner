@@ -41,6 +41,9 @@ export async function verifyCronSignature(
   suppliedSignature: string,
   secret: string,
   nowEpochSeconds: number,
+  method = "POST",
+  pathname = "/e12-capture",
+  body = "{}",
 ): Promise<boolean> {
   if (
     new TextEncoder().encode(secret).byteLength < 32 ||
@@ -64,10 +67,13 @@ export async function verifyCronSignature(
     false,
     ["sign"],
   );
+  const bodyHash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)));
+  const bodyHashHex = toHex(bodyHash);
+  const canonical = `${method.toUpperCase()}\\n${pathname}\\n${timestamp}\\n${bodyHashHex}`;
   const signed = await crypto.subtle.sign(
     "HMAC",
     key,
-    new TextEncoder().encode(timestamp),
+    new TextEncoder().encode(canonical),
   );
   return constantTimeEqual(toHex(new Uint8Array(signed)), suppliedSignature.toLowerCase());
 }
@@ -210,6 +216,42 @@ export async function handleE12Capture(
   const cronSecret = dependencies.env("E12_CRON_HMAC_SECRET");
   const timestamp = request.headers.get("x-e12-timestamp") ?? "";
   const signature = request.headers.get("x-e12-signature") ?? "";
+
+  // Reject oversized bodies before buffering. This endpoint accepts only "{}"
+  // (the scheduled command) or an empty body. Stream limit also covers missing
+  // or dishonest Content-Length headers.
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength !== null && (!/^\\d+$/.test(declaredLength) || Number(declaredLength) > 2)) {
+    return jsonResponse(400, { error: "request_body_must_be_empty" });
+  }
+  let body = "";
+  if (request.body) {
+    const reader = request.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > 2) {
+          await reader.cancel();
+          return jsonResponse(400, { error: "request_body_must_be_empty" });
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    body = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  }
+  if (body !== "" && body !== "{}") {
+    return jsonResponse(400, { error: "request_body_must_be_empty" });
+  }
+  const requestPath = new URL(request.url).pathname;
   if (
     !cronSecret ||
     !await verifyCronSignature(
@@ -217,18 +259,12 @@ export async function handleE12Capture(
       signature,
       cronSecret,
       (dependencies.nowEpochSeconds ?? (() => Math.floor(Date.now() / 1_000)))(),
+      request.method,
+      requestPath,
+      body,
     )
   ) {
     return jsonResponse(401, { error: "unauthorized" });
-  }
-
-  const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (Number.isFinite(contentLength) && contentLength > 2) {
-    return jsonResponse(400, { error: "request_body_must_be_empty" });
-  }
-  const body = await request.text();
-  if (body.length > 2 || (body.trim() !== "" && body.trim() !== "{}")) {
-    return jsonResponse(400, { error: "request_body_must_be_empty" });
   }
 
   const supabaseUrl = dependencies.env("SUPABASE_URL");
