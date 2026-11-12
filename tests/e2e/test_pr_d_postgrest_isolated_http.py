@@ -1,8 +1,8 @@
 """Real HTTP/PostgREST E2E against an ephemeral PostgreSQL service only.
 
-Unlike the quarantined legacy tests, this module proves the target identity
-before connecting and is run only in a dedicated GitHub Actions service stack.
-No Supabase project, production URL, or user credential is accepted.
+This module proves that service_role cannot forge, replace, or delete an E12
+capture through direct table DML, while the public CAS wrapper succeeds and
+the restricted helper remains outside PostgREST's exposed schema.
 """
 import base64
 import hashlib
@@ -10,6 +10,7 @@ import hmac
 import json
 import os
 import time
+from decimal import Decimal
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlparse
 from urllib.request import Request, urlopen
@@ -54,12 +55,14 @@ def _jwt(role):
     return f"{header}.{payload}.{signature}"
 
 
-def _request(method, path, role="service_role", payload=None):
+def _request(method, path, role="service_role", payload=None, extra_headers=None):
     token = _jwt(role)
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
     }
+    if extra_headers:
+        headers.update(extra_headers)
     data = None
     if payload is not None:
         headers["Content-Type"] = "application/json"
@@ -110,12 +113,17 @@ def disposable_postgrest_database():
 
     yield
 
-    # The database is ephemeral; remove all objects created by this module as
-    # defense in depth. The service container is destroyed after the job too.
+    # The DB is ephemeral; clean the E12 objects before the service container
+    # is destroyed. This teardown is never pointed at a hosted Supabase project.
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("DROP TABLE IF EXISTS public.lab_results CASCADE")
-        conn.execute("DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz)")
+        conn.execute(
+            "DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz)"
+        )
+        conn.execute("DROP FUNCTION IF EXISTS public.pr_d_guard_capture_fields()")
         conn.execute("DROP TABLE IF EXISTS public.youtube_shorts_log CASCADE")
+        conn.execute("DROP SCHEMA IF EXISTS pr_d_internal CASCADE")
+        conn.execute("DROP ROLE IF EXISTS pr_d_capture_owner")
 
 
 def _rows(lab_id):
@@ -199,7 +207,41 @@ def _insert_e12_video(video_id):
         ).fetchone()[0]
 
 
-def test_e12_capture_rpc_over_http_is_cas_and_preserves_uint64():
+def test_e12_direct_http_dml_cannot_forge_or_replace_capture():
+    row_id = _insert_e12_video("e12-http-direct-bypass")
+    query = urlencode({"id": f"eq.{row_id}"})
+    forged = {
+        "views_primeras_3h": "77",
+        "published_at": "2026-10-30T02:30:00Z",
+        "sync_captured_at": "2026-10-30T05:30:00Z",
+        "hs_al_publicar_al_sync": 3,
+    }
+    status, _ = _request("PATCH", f"/youtube_shorts_log?{query}", payload=forged)
+    assert status >= 400, f"direct_capture_patch_must_be_denied_http_{status}"
+
+    status, _ = _request("POST", "/youtube_shorts_log", payload={
+        "youtube_video_id": "e12-http-forged-insert",
+        **forged,
+    })
+    assert status >= 400, f"direct_capture_insert_must_be_denied_http_{status}"
+
+    # Unrelated metadata updates are intentionally unaffected by the guard.
+    status, _ = _request(
+        "PATCH", f"/youtube_shorts_log?{query}",
+        payload={"status": "published"},
+    )
+    assert status in {200, 204}, f"unrelated_metadata_update_should_work_http_{status}"
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute("""
+            SELECT views_primeras_3h, published_at, sync_captured_at,
+                   hs_al_publicar_al_sync, status
+            FROM public.youtube_shorts_log WHERE id = %s
+        """, (row_id,)).fetchone()
+    assert stored == (None, None, None, None, "published")
+
+
+def test_e12_capture_rpc_over_http_is_cas_and_preserves_uint64_and_elapsed():
     video_id = "e12-http-uint64"
     row_id = _insert_e12_video(video_id)
     payload = {
@@ -214,12 +256,65 @@ def test_e12_capture_rpc_over_http_is_cas_and_preserves_uint64():
     assert first_status == second_status == 200
     assert first is True
     assert second is False
+
     with psycopg.connect(DATABASE_URL) as conn:
-        stored = conn.execute(
-            "SELECT views_primeras_3h FROM public.youtube_shorts_log WHERE id = %s",
-            (row_id,),
-        ).fetchone()[0]
-    assert stored == 18446744073709551615
+        stored = conn.execute("""
+            SELECT views_primeras_3h, published_at, sync_captured_at,
+                   hs_al_publicar_al_sync
+            FROM public.youtube_shorts_log WHERE id = %s
+        """, (row_id,)).fetchone()
+    assert stored[0] == 18446744073709551615
+    assert stored[1].isoformat() == "2026-10-30T02:30:00+00:00"
+    assert stored[2].isoformat() == "2026-10-30T05:30:00+00:00"
+    assert stored[3] == Decimal("3")
+
+
+def test_e12_captured_video_cannot_be_reassigned_or_deleted_over_http():
+    video_id = "e12-http-immutable-identity"
+    row_id = _insert_e12_video(video_id)
+    payload = {
+        "p_row_id": row_id,
+        "p_youtube_video_id": video_id,
+        "p_views": "123",
+        "p_published_at": "2026-10-30T02:30:00Z",
+        "p_sync_captured_at": "2026-10-30T05:30:00Z",
+    }
+    status, result = _request("POST", "/rpc/pr_d_capture_views_once", payload=payload)
+    assert status == 200 and result is True
+
+    query = urlencode({"id": f"eq.{row_id}"})
+    status, _ = _request(
+        "PATCH", f"/youtube_shorts_log?{query}",
+        payload={"youtube_video_id": "e12-http-reassigned"},
+    )
+    assert status >= 400, f"captured_video_identity_change_must_be_denied_http_{status}"
+
+    status, _ = _request("DELETE", f"/youtube_shorts_log?{query}")
+    assert status >= 400, f"captured_outcome_delete_must_be_denied_http_{status}"
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute("""
+            SELECT youtube_video_id, views_primeras_3h
+            FROM public.youtube_shorts_log WHERE id = %s
+        """, (row_id,)).fetchone()
+    assert stored == (video_id, 123)
+
+
+def test_e12_private_helper_schema_is_not_exposed_to_postgrest():
+    payload = {
+        "p_row_id": 1,
+        "p_youtube_video_id": "not-reachable",
+        "p_views": "1",
+        "p_published_at": "2026-10-30T02:30:00Z",
+        "p_sync_captured_at": "2026-10-30T05:30:00Z",
+    }
+    status, _ = _request(
+        "POST",
+        "/rpc/pr_d_capture_views_once",
+        payload=payload,
+        extra_headers={"Content-Profile": "pr_d_internal"},
+    )
+    assert status == 406, f"private_schema_must_not_be_exposed_http_{status}"
 
 
 def test_e12_capture_rpc_rejects_wrong_id_outside_window_and_anon():
@@ -277,7 +372,7 @@ def test_e12_capture_rpc_concurrent_http_claim_has_one_winner():
     assert sorted(value for _, value in results) == [False, True]
     with psycopg.connect(DATABASE_URL) as conn:
         stored = conn.execute(
-            "SELECT views_primeras_3h FROM public.youtube_shorts_log WHERE id = %s",
+            "SELECT views_primeras_3h, hs_al_publicar_al_sync FROM public.youtube_shorts_log WHERE id = %s",
             (row_id,),
-        ).fetchone()[0]
-    assert stored == 2147483648
+        ).fetchone()
+    assert stored == (2147483648, Decimal("3"))
