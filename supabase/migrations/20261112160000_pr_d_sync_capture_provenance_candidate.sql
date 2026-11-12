@@ -86,7 +86,7 @@ BEGIN
             WHERE roleid = v_role_oid OR member = v_role_oid
         ) THEN
             RAISE EXCEPTION
-                'prd_capture_writer_role_misconfigured: dedicated role must be NOLOGIN, NOINHERIT, BYPASSRLS, and have no memberships';
+                'prd_capture_writer_role_misconfigured: dedicated role must be NOLOGIN, NOINHERIT, without BYPASSRLS, and have no memberships';
         END IF;
     END IF;
 END;
