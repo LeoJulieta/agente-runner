@@ -1,8 +1,7 @@
 """Disposable PostgreSQL compatibility tests for the audited production shape.
 
-Requires DATABASE_URL pointing ONLY to a disposable PostgreSQL database.
-The GitHub Actions workflow provisions its own throwaway PostgreSQL service.
-Never point this test at Supabase or another live database.
+This test is destructive only inside an explicitly opted-in, local, disposable
+database. It fails closed for every other connection configuration.
 """
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -12,19 +11,46 @@ import os
 import pytest
 
 psycopg = pytest.importorskip("psycopg")
+from psycopg.conninfo import conninfo_to_dict
 
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA = ROOT / "tests/fixtures/pr_d_youtube_shorts_log_schema.sql"
 MIGRATION = ROOT / "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
 DATABASE_URL = os.getenv("DATABASE_URL")
+DISPOSABLE_OPT_IN = os.getenv("PR_D_DISPOSABLE_DATABASE") == "1"
+ALLOWED_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _assert_disposable_database(dsn: str) -> None:
+    """Reject arbitrary DSNs before opening a connection or executing DDL."""
+    try:
+        params = conninfo_to_dict(dsn)
+    except (TypeError, ValueError):
+        pytest.fail("unsafe_database_url: DATABASE_URL is not valid libpq conninfo")
+
+    host = params.get("host", "")
+    hosts = host.split(",") if host else []
+    database = params.get("dbname", "")
+    user = params.get("user", "")
+
+    if not DISPOSABLE_OPT_IN:
+        pytest.fail("unsafe_database_url: PR_D_DISPOSABLE_DATABASE=1 is required")
+    if not hosts or any(item.strip().lower() not in ALLOWED_LOCAL_HOSTS for item in hosts):
+        pytest.fail("unsafe_database_url: only loopback PostgreSQL hosts are allowed")
+    if database != "prd_test" or user != "prd_test":
+        pytest.fail("unsafe_database_url: database/user must both be prd_test")
 
 
 @pytest.fixture(scope="module")
 def disposable_database():
     if not DATABASE_URL:
         pytest.skip("DATABASE_URL absent; integration test requires disposable PostgreSQL")
-    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        conn.execute("DROP TABLE IF EXISTS public.youtube_shorts_log CASCADE")
+    _assert_disposable_database(DATABASE_URL)
+
+    # Deliberately no CASCADE: unexpected dependencies must stop the test,
+    # never be removed as a side effect.
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("DROP TABLE IF EXISTS public.youtube_shorts_log")
         conn.execute(SCHEMA.read_text(encoding="utf-8"))
         conn.execute(MIGRATION.read_text(encoding="utf-8"))
     yield DATABASE_URL
