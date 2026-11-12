@@ -25,6 +25,28 @@ export function parseRfc3339EpochMicros(value: string): bigint {
   const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
   if (!match) throw new Error("published_at_invalid_rfc3339");
 
+  const year = Number(match[1].slice(0, 4));
+  const month = Number(match[1].slice(5, 7));
+  const day = Number(match[1].slice(8, 10));
+  const hour = Number(match[1].slice(11, 13));
+  const minute = Number(match[1].slice(14, 16));
+  const second = Number(match[1].slice(17, 19));
+  if (
+    year < 2005 ||
+    month < 1 || month > 12 ||
+    day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate() ||
+    hour > 23 || minute > 59 || second > 59
+  ) {
+    throw new Error("published_at_invalid_calendar_value");
+  }
+  if (match[3] !== "Z") {
+    const offsetHour = Number(match[3].slice(1, 3));
+    const offsetMinute = Number(match[3].slice(4, 6));
+    if (offsetHour > 23 || offsetMinute > 59) {
+      throw new Error("published_at_invalid_timezone_offset");
+    }
+  }
+
   const baseMilliseconds = Date.parse(match[1] + match[3]);
   if (!Number.isFinite(baseMilliseconds) || baseMilliseconds % 1_000 !== 0) {
     throw new Error("published_at_invalid_timestamp");
