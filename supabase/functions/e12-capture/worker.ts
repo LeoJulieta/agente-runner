@@ -68,6 +68,29 @@ export async function verifyCronSignature(
   return constantTimeEqual(toHex(new Uint8Array(signed)), suppliedSignature.toLowerCase());
 }
 
+async function claimWorkerSlot(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  minuteBucket: string,
+  fetchImpl: typeof fetch,
+): Promise<boolean> {
+  const baseUrl = supabaseUrl.replace(/\\/+$/, "");
+  const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/pr_d_claim_e12_worker_slot`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_minute_bucket: minuteBucket }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) throw new Error(`supabase_worker_slot_http_${response.status}`);
+  const result: unknown = await response.json();
+  if (typeof result !== "boolean") throw new Error("supabase_worker_slot_response_invalid");
+  return result;
+}
+
 async function fetchPendingCandidates(
   supabaseUrl: string,
   serviceRoleKey: string,
@@ -198,8 +221,23 @@ export async function handleE12Capture(
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const clockMicros = dependencies.clockMicros ?? nowEpochMicros;
   const nowSeconds = (dependencies.nowEpochSeconds ?? (() => Math.floor(Date.now() / 1_000)))();
+  const minuteBucketSeconds = Math.floor(Number(timestamp) / 60) * 60;
+  const minuteBucket = new Date(minuteBucketSeconds * 1_000).toISOString();
 
   try {
+    const slotClaimed = await claimWorkerSlot(
+      supabaseUrl,
+      serviceRoleKey,
+      minuteBucket,
+      fetchImpl,
+    );
+    if (!slotClaimed) {
+      return jsonResponse(200, {
+        skippedDuplicateInvocation: true,
+        minuteBucket,
+      });
+    }
+
     const candidates = await fetchPendingCandidates(
       supabaseUrl,
       serviceRoleKey,
@@ -258,6 +296,7 @@ export async function handleE12Capture(
       candidates: candidates.length,
       uniqueCandidates: videoIds.length,
       duplicateRows,
+      slotClaimed: true,
       eligible,
       captured,
       casLost,
