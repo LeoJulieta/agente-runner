@@ -202,6 +202,16 @@ Deno.test("collector captures timestamp after complete HTTP body read", async ()
 
   assert(clockCalledAfterBody, "capture clock must run only after body completion");
   assert(result[0].syncCapturedAt === "2026-10-30T05:30:00.123456Z", "capture timestamp must preserve microseconds");
+  const expectedResponseDigest = new Uint8Array(await crypto.subtle.digest("SHA-256", bodyBytes));
+  const expectedResponseHex = Array.from(expectedResponseDigest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  assert(result[0].responseBodySha256 === expectedResponseHex, "digest must cover the exact raw response bytes");
+  const requestDigest = new Uint8Array(await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(JSON.stringify(["video-1"])),
+  ));
+  const expectedRequestHex = Array.from(requestDigest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  assert(result[0].requestedVideoIdsSha256 === expectedRequestHex, "digest must bind the canonical requested ID set");
+  assert(result[0].collectorBuild === "e12-collector/0.1.0", "collector build identity must be recorded");
 });
 
 Deno.test("collector enforces the one-megabyte response limit", async () => {
