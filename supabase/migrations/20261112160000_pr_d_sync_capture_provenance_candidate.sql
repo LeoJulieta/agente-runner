@@ -187,6 +187,12 @@ GRANT EXECUTE ON FUNCTION public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz
 ) TO service_role;
 
+-- TRUNCATE bypasses row-level triggers and would erase captured evidence in bulk.
+-- API roles do not need DDL/foreign-key privileges on this table.
+REVOKE TRUNCATE, TRIGGER, REFERENCES
+    ON TABLE public.youtube_shorts_log
+    FROM PUBLIC, anon, authenticated, service_role;
+
 CREATE INDEX IF NOT EXISTS youtube_shorts_log_sync_capture_pending_idx
     ON public.youtube_shorts_log (id)
     WHERE views_primeras_3h IS NULL;
