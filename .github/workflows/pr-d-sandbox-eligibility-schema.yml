@@ -30,7 +30,6 @@ on:
       - "tests/e2e/bootstrap_pr_d_postgrest.py"
       - "tests/e2e/test_pr_d_postgrest_isolated_http.py"
       - "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql"
-      - "tests/fixtures/pr_d_atomic_rpc_http_bootstrap.sql"
       - "supabase/migrations/004_pr_d_v2_atomic_persistence.sql"
       - "supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql"
       - ".github/workflows/pr-d-sandbox-eligibility-schema.yml"
