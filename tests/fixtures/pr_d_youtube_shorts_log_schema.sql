@@ -24,6 +24,10 @@ CREATE TABLE pr_d_test.youtube_shorts_log (
     updated_at timestamptz DEFAULT now()
 );
 
+-- Seed a legacy row before applying the candidate migration and its write guard.
+INSERT INTO pr_d_test.youtube_shorts_log (youtube_video_id, views_primeras_3h)
+VALUES ('legacy-fixture', 123);
+
 GRANT USAGE ON SCHEMA pr_d_test TO anon, authenticated, service_role;
 ALTER TABLE pr_d_test.youtube_shorts_log ENABLE ROW LEVEL SECURITY;
 GRANT ALL PRIVILEGES ON TABLE pr_d_test.youtube_shorts_log TO anon, authenticated, service_role;
