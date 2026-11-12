@@ -1,4 +1,10 @@
-import { type ClockMicros, collectYouTubeBatch, nowEpochMicros } from "./collector.ts";
+import { type ClockMicros, type E12Observation, collectYouTubeBatch, nowEpochMicros } from "./collector.ts";
+import {
+  createObservationAttestation,
+  verifyObservationAttestation,
+  type ObservationAttestation,
+  type ObservationAttestationPayload,
+} from "./provenance.ts";
 import { claimWorkerLease, releaseWorkerLease, renewWorkerLease, type WorkerLease } from "./lease.ts";
 
 export type WorkerDependencies = {
@@ -8,6 +14,12 @@ export type WorkerDependencies = {
   nowEpochSeconds?: () => number;
   randomUUID?: () => string;
   leaseTtlSeconds?: number;
+  attestObservation?: (payload: ObservationAttestationPayload) => Promise<ObservationAttestation>;
+  verifyAttestation?: (
+    payload: ObservationAttestationPayload,
+    attestation: ObservationAttestation,
+    publicKeySpkiBase64: string,
+  ) => Promise<boolean>;
 };
 
 type CandidateRow = {
@@ -179,14 +191,12 @@ async function persistObservation(
   supabaseUrl: string,
   serviceRoleKey: string,
   row: CandidateRow,
-  observation: {
-    videoId: string;
-    viewCount: string;
-    publishedAt: string;
-    syncCapturedAt: string;
-  },
+  observation: E12Observation,
   fetchImpl: typeof fetch,
   lease: WorkerLease,
+  payload: ObservationAttestationPayload,
+  attestation: ObservationAttestation,
+  publicKeySpkiBase64: string,
 ): Promise<boolean> {
   const baseUrl = supabaseUrl.replace(/\/+$/, "");
   const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/pr_d_capture_views_once`, {
@@ -204,6 +214,15 @@ async function persistObservation(
       p_sync_captured_at: observation.syncCapturedAt,
       p_run_id: lease.runId,
       p_fencing_token: lease.fencingToken,
+      p_attestation_version: attestation.version,
+      p_attestation_algorithm: attestation.algorithm,
+      p_collector_key_id: attestation.keyId,
+      p_collector_public_key_spki_base64: publicKeySpkiBase64,
+      p_collector_payload_sha256: attestation.payloadSha256,
+      p_collector_signature: attestation.signatureBase64,
+      p_collector_response_sha256: payload.responseBodySha256,
+      p_collector_requested_ids_sha256: payload.requestedVideoIdsSha256,
+      p_collector_build: payload.collectorBuild,
     }),
     signal: AbortSignal.timeout(15_000),
   });
@@ -279,8 +298,15 @@ export async function handleE12Capture(
   const supabaseUrl = dependencies.env("SUPABASE_URL");
   const serviceRoleKey = dependencies.env("SUPABASE_SERVICE_ROLE_KEY");
   const youtubeApiKey = dependencies.env("YOUTUBE_API_KEY");
+  const provenanceKeyId = dependencies.env("E12_PROVENANCE_KEY_ID");
+  const provenancePublicKey = dependencies.env("E12_PROVENANCE_PUBLIC_KEY_SPKI_B64");
+  const provenancePrivateKey = dependencies.env("E12_PROVENANCE_PRIVATE_KEY_PKCS8_B64");
+  const injectedAttestor = Boolean(dependencies.attestObservation && dependencies.verifyAttestation);
   if (!supabaseUrl || !serviceRoleKey || !youtubeApiKey) {
     return jsonResponse(500, { error: "required_worker_secret_missing" });
+  }
+  if (!provenanceKeyId || !provenancePublicKey || (!injectedAttestor && !provenancePrivateKey)) {
+    return jsonResponse(500, { error: "required_provenance_key_missing" });
   }
 
   const fetchImpl = dependencies.fetchImpl ?? fetch;
@@ -373,6 +399,25 @@ export async function handleE12Capture(
             throw new Error("e12_worker_lease_lost");
           }
           eligible++;
+          const payload: ObservationAttestationPayload = {
+            keyId: provenanceKeyId,
+            runId: lease.runId,
+                rowId: String(row.id),
+            videoId: observation.videoId,
+            publishedAt: observation.publishedAt,
+            viewCount: observation.viewCount,
+            syncCapturedAt: observation.syncCapturedAt,
+            responseBodySha256: observation.responseBodySha256 ?? "",
+            requestedVideoIdsSha256: observation.requestedVideoIdsSha256 ?? "",
+            collectorBuild: observation.collectorBuild ?? "",
+          };
+          const attestation = dependencies.attestObservation
+            ? await dependencies.attestObservation(payload)
+            : await createObservationAttestation(payload, provenancePrivateKey!);
+          const signatureValid = dependencies.verifyAttestation
+            ? await dependencies.verifyAttestation(payload, attestation, provenancePublicKey)
+            : await verifyObservationAttestation(payload, attestation, provenancePublicKey);
+          if (!signatureValid) throw new Error("e12_observation_attestation_invalid");
           const didCapture = await persistObservation(
             supabaseUrl,
             serviceRoleKey,
@@ -380,6 +425,9 @@ export async function handleE12Capture(
             observation,
             fetchImpl,
             lease,
+            payload,
+            attestation,
+            provenancePublicKey,
           );
           if (didCapture) captured++;
           else casLost++;
