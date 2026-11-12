@@ -106,21 +106,27 @@ Deno.test("worker obtains source observation itself and persists only through th
     calls.push({ url, method, headers, body });
 
     if (url.includes("/rest/v1/youtube_shorts_log")) {
-      return new Response(JSON.stringify([{
-        id: 42,
-        youtube_video_id: "video-1",
-        created_at: "2026-10-30T02:00:00Z",
-      }]), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(
+        JSON.stringify([{
+          id: 42,
+          youtube_video_id: "video-1",
+          created_at: "2026-10-30T02:00:00Z",
+        }]),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
     }
     if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
-      return new Response(JSON.stringify({
-        items: [{
-          id: "video-1",
-          snippet: { publishedAt: "2026-10-30T02:30:00Z" },
-          statistics: { viewCount: YOUTUBE_UINT64_MAX.toString() },
-          status: { privacyStatus: "public" },
-        }],
-      }), { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          items: [{
+            id: "video-1",
+            snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+            statistics: { viewCount: YOUTUBE_UINT64_MAX.toString() },
+            status: { privacyStatus: "public" },
+          }],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
     }
     if (url.includes("/rest/v1/rpc/pr_d_capture_views_once")) {
       return new Response("true", { status: 200, headers: { "content-type": "application/json" } });
@@ -135,20 +141,35 @@ Deno.test("worker obtains source observation itself and persists only through th
   const result = await response.json();
 
   assert(response.status === 200, "worker cycle should succeed");
-  assert(result.candidates === 1 && result.eligible === 1 && result.captured === 1, "one eligible row should be captured");
+  assert(
+    result.candidates === 1 && result.eligible === 1 && result.captured === 1,
+    "one eligible row should be captured",
+  );
   assert(calls.length === 3, "worker should query candidates, YouTube, then CAS");
 
   const candidateCall = calls[0];
   assert(candidateCall.url.includes("created_at=gte."), "created_at may be used only as a coarse candidate filter");
   assert(candidateCall.url.includes("status=eq.published"), "only published rows are candidates");
-  assert(candidateCall.headers.get("apikey") === "sb_secret_test_only_not_real", "Supabase secret key must use apikey header");
-  assert(candidateCall.headers.get("authorization") === null, "service key must not be copied into Authorization header");
+  assert(
+    candidateCall.headers.get("apikey") === "sb_secret_test_only_not_real",
+    "Supabase secret key must use apikey header",
+  );
+  assert(
+    candidateCall.headers.get("authorization") === null,
+    "service key must not be copied into Authorization header",
+  );
 
   const youtubeCall = calls[1];
   const youtubeUrl = new URL(youtubeCall.url);
-  assert(youtubeUrl.searchParams.get("part") === "snippet,statistics,status", "collector must request source publication time, count and privacy");
+  assert(
+    youtubeUrl.searchParams.get("part") === "snippet,statistics,status",
+    "collector must request source publication time, count and privacy",
+  );
   assert(youtubeUrl.searchParams.get("id") === "video-1", "collector must request the exact candidate ID");
-  assert(youtubeUrl.searchParams.get("key") === "youtube-test-key", "YouTube key must be used only for the source request");
+  assert(
+    youtubeUrl.searchParams.get("key") === "youtube-test-key",
+    "YouTube key must be used only for the source request",
+  );
 
   const rpcCall = calls[2];
   const rpcBody = JSON.parse(rpcCall.body);
@@ -157,7 +178,10 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(rpcBody.p_youtube_video_id === "video-1", "video id must be exact");
   assert(rpcBody.p_views === YOUTUBE_UINT64_MAX.toString(), "uint64 must remain an exact decimal string");
   assert(rpcBody.p_published_at === "2026-10-30T02:30:00Z", "publishedAt must come from YouTube");
-  assert(rpcBody.p_sync_captured_at === "2026-10-30T05:30:00.123456Z", "capture time must be taken after response read");
+  assert(
+    rpcBody.p_sync_captured_at === "2026-10-30T05:30:00.123456Z",
+    "capture time must be taken after response read",
+  );
   assert(!("hs_al_publicar_al_sync" in rpcBody), "legacy elapsed column must never be written by E12");
 });
 
@@ -165,21 +189,27 @@ Deno.test("worker reports CAS first-write conflicts without overwriting outcomes
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);
     if (url.includes("/rest/v1/youtube_shorts_log")) {
-      return new Response(JSON.stringify([{
-        id: 7,
-        youtube_video_id: "video-1",
-        created_at: "2026-10-30T02:00:00Z",
-      }]), { status: 200 });
+      return new Response(
+        JSON.stringify([{
+          id: 7,
+          youtube_video_id: "video-1",
+          created_at: "2026-10-30T02:00:00Z",
+        }]),
+        { status: 200 },
+      );
     }
     if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
-      return new Response(JSON.stringify({
-        items: [{
-          id: "video-1",
-          snippet: { publishedAt: "2026-10-30T02:30:00Z" },
-          statistics: { viewCount: "50" },
-          status: { privacyStatus: "public" },
-        }],
-      }), { status: 200 });
+      return new Response(
+        JSON.stringify({
+          items: [{
+            id: "video-1",
+            snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+            statistics: { viewCount: "50" },
+            status: { privacyStatus: "public" },
+          }],
+        }),
+        { status: 200 },
+      );
     }
     if (url.includes("/rpc/pr_d_capture_views_once")) return new Response("false", { status: 200 });
     throw new Error("unexpected_test_fetch_url");
@@ -187,5 +217,8 @@ Deno.test("worker reports CAS first-write conflicts without overwriting outcomes
 
   const response = await handleE12Capture(await signedRequest(), dependencies(fetchImpl));
   const result = await response.json();
-  assert(response.status === 200 && result.casLost === 1 && result.captured === 0, "CAS conflict must be reported without retrying a write");
+  assert(
+    response.status === 200 && result.casLost === 1 && result.captured === 0,
+    "CAS conflict must be reported without retrying a write",
+  );
 });
