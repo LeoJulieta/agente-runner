@@ -219,3 +219,18 @@ Deno.test("collector enforces the one-megabyte response limit", async () => {
   }
   assert(threw, "oversized YouTube response must be rejected");
 });
+
+Deno.test("collector fails closed when a successful response has no readable body", async () => {
+  let threw = false;
+  try {
+    await collectYouTubeBatch(
+      ["video-1"],
+      "test-key",
+      () => Promise.resolve(new Response(null, { status: 200 })),
+      () => 1_800_000_000_000_000n,
+    );
+  } catch (error) {
+    threw = error instanceof Error && error.message === "youtube_response_body_missing";
+  }
+  assert(threw, "missing response body must fail closed without unbounded buffering");
+});
