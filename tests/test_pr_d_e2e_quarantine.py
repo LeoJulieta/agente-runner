@@ -143,7 +143,7 @@ def test_new_postgrest_http_e2e_is_separate_and_fail_closed():
     assert "20261112160000_pr_d_sync_capture_provenance_candidate.sql" in bootstrap
     assert "20261112170000_pr_d_lab_results_rpc_write_boundary_candidate.sql" in bootstrap
     atomic_boundary_migration = (ROOT / "supabase/migrations/20261112170000_pr_d_lab_results_rpc_write_boundary_candidate.sql").read_text(encoding="utf-8")
-    assert "pr_d_lab_results_insert_requires_atomic_rpc" in atomic_boundary_migration
+    assert "prd_lab_results_insert_requires_atomic_rpc" in atomic_boundary_migration
     assert "SECURITY DEFINER" in atomic_boundary_migration
     assert "REVOKE TRUNCATE" in atomic_boundary_migration
     assert "to_jsonb(OLD) - ARRAY['status', 'last_test']" in atomic_boundary_migration
