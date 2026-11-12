@@ -194,6 +194,8 @@ def test_internal_capture_role_is_least_privilege_and_rpc_is_service_only(dispos
                 has_column_privilege('pr_d_capture_owner',
                     'pr_d_test.youtube_shorts_log', 'elapsed_seconds_e12', 'UPDATE'),
                 has_column_privilege('pr_d_capture_owner',
+                    'pr_d_test.youtube_shorts_log', 'hs_al_publicar_al_sync', 'SELECT'),
+                has_column_privilege('pr_d_capture_owner',
                     'pr_d_test.youtube_shorts_log', 'hs_al_publicar_al_sync', 'UPDATE'),
                 has_table_privilege('pr_d_capture_owner',
                     'pr_d_test.youtube_shorts_log', 'UPDATE'),
@@ -213,7 +215,7 @@ def test_internal_capture_role_is_least_privilege_and_rpc_is_service_only(dispos
     assert internal_privileges == (True, False, False)
     assert role == (False, False, False, False, False, False, False)
     assert membership_count == 0
-    assert helper_privileges == (True, True, False, False, False, False)
+    assert helper_privileges == (True, True, True, False, False, False, False)
     assert rls_and_ownership == (True, True)
 
 
