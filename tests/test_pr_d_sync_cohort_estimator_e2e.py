@@ -49,7 +49,7 @@ def _build(n_rows, *, include_out_of_window=False):
         )
         publication = extract_published_at(api, expected_video_id=video_id)
         captured = parse_sync_captured_at(
-            (publication + timedelta(hours=4 if not (include_out_of_window and i == n_rows - 1) else 2)).isoformat()
+            (publication + timedelta(hours=3 if not (include_out_of_window and i == n_rows - 1) else 2)).isoformat()
         )
         decision = evaluate_sync_window(publication, captured)
         row = {
@@ -123,13 +123,13 @@ def test_adapter_rejects_non_null_analytic_values_on_excluded_rows():
 @pytest.mark.parametrize(
     ("elapsed", "expected_eligible"),
     [
-        (timedelta(hours=3), True),
-        (timedelta(hours=6), True),
-        (timedelta(hours=3) - timedelta(microseconds=1), False),
-        (timedelta(hours=6) + timedelta(microseconds=1), False),
+        (timedelta(hours=3) - timedelta(minutes=5), True),
+        (timedelta(hours=3) + timedelta(minutes=5), True),
+        (timedelta(hours=3) - timedelta(minutes=5, microseconds=1), False),
+        (timedelta(hours=3) + timedelta(minutes=5, microseconds=1), False),
     ],
 )
-def test_sync_window_closed_boundaries_and_immediate_outside_values(elapsed, expected_eligible):
+def test_three_hour_target_with_closed_five_minute_tolerance(elapsed, expected_eligible):
     published = datetime.fromisoformat(PUBLISHED.replace("Z", "+00:00"))
     captured = published + elapsed
     decision = evaluate_sync_window(published, captured.isoformat())
@@ -140,10 +140,10 @@ def test_sync_window_closed_boundaries_and_immediate_outside_values(elapsed, exp
 
 def test_sync_window_normalizes_equivalent_timezone_offsets():
     published_utc = "2026-10-30T02:30:00Z"
-    captured_with_offset = "2026-10-30T09:30:00+03:00"
+    captured_with_offset = "2026-10-30T08:30:00+03:00"
     decision = evaluate_sync_window(published_utc, captured_with_offset)
     assert decision.eligible is True
-    assert decision.elapsed_seconds == 4 * 60 * 60
+    assert decision.elapsed_seconds == 3 * 60 * 60
 
 
 @pytest.mark.parametrize(
