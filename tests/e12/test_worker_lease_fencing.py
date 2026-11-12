@@ -49,6 +49,25 @@ def bootstrap():
                 elapsed_seconds_e12 numeric(20,6)
             )
         """)
+        conn.execute("""
+            ALTER TABLE public.youtube_shorts_log
+            ADD CONSTRAINT youtube_shorts_log_sync_capture_window_ck
+            CHECK (
+                (published_at IS NULL AND sync_captured_at IS NULL AND elapsed_seconds_e12 IS NULL)
+                OR (
+                    published_at IS NOT NULL AND sync_captured_at IS NOT NULL
+                    AND views_primeras_3h IS NOT NULL AND views_primeras_3h >= 0
+                    AND elapsed_seconds_e12 = EXTRACT(EPOCH FROM (sync_captured_at - published_at))
+                    AND sync_captured_at >= published_at + interval '2 hours 55 minutes'
+                    AND sync_captured_at <= published_at + interval '3 hours 5 minutes'
+                )
+            )
+        """)
+        conn.execute("""
+            INSERT INTO public.youtube_shorts_log(
+                id, youtube_video_id, views_primeras_3h, published_at, sync_captured_at, elapsed_seconds_e12
+            ) VALUES (3, 'video-legacy', 50, %s, %s, 10800.123456)
+        """, (PUBLISHED, CAPTURED))
         conn.execute("ALTER TABLE public.youtube_shorts_log ENABLE ROW LEVEL SECURITY")
         conn.execute("""
             CREATE ROLE pr_d_capture_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
@@ -166,6 +185,18 @@ def capture(run_id, token, row_id=1, video_id="video-1", hmac_override=None):
                 hmac_signature, RESPONSE_SHA, REQUESTED_IDS_SHA, COLLECTOR_BUILD,
             ),
         ).fetchone()[0]
+
+
+def test_legacy_capture_row_survives_attestation_upgrade():
+    with connect() as conn:
+        row = conn.execute("""
+            SELECT views_primeras_3h, published_at, sync_captured_at,
+                   collector_signature, collector_hmac_signature
+            FROM public.youtube_shorts_log WHERE id=3
+        """).fetchone()
+        assert row[0] == 50
+        assert row[1] is not None and row[2] is not None
+        assert row[3] is None and row[4] is None
 
 
 def test_exclusive_claim_renew_takeover_and_stale_owner_rejection():
