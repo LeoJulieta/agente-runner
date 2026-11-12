@@ -281,3 +281,42 @@ def test_e12_capture_rpc_concurrent_http_claim_has_one_winner():
             (row_id,),
         ).fetchone()[0]
     assert stored == 2147483648
+
+
+def test_e12_direct_http_insert_and_patch_cannot_bypass_cas():
+    video_id = "e12-http-direct-write-denied"
+    row_id = _insert_e12_video(video_id)
+
+    patch_status, _ = _request(
+        "PATCH",
+        f"/youtube_shorts_log?id=eq.{row_id}",
+        payload={
+            "views_primeras_3h": 888,
+            "published_at": "2026-10-30T02:30:00Z",
+            "sync_captured_at": "2026-10-30T05:30:00Z",
+        },
+    )
+    assert patch_status >= 400, f"direct_patch_must_be_rejected_http_{patch_status}"
+
+    insert_status, _ = _request(
+        "POST",
+        "/youtube_shorts_log",
+        payload={
+            "youtube_video_id": "e12-http-direct-insert-denied",
+            "views_primeras_3h": 888,
+        },
+    )
+    assert insert_status >= 400, f"direct_insert_must_be_rejected_http_{insert_status}"
+
+    with psycopg.connect(DATABASE_URL) as conn:
+        stored = conn.execute(
+            "SELECT views_primeras_3h, published_at, sync_captured_at "
+            "FROM public.youtube_shorts_log WHERE id = %s",
+            (row_id,),
+        ).fetchone()
+        direct_insert_count = conn.execute(
+            "SELECT count(*) FROM public.youtube_shorts_log "
+            "WHERE youtube_video_id = 'e12-http-direct-insert-denied'"
+        ).fetchone()[0]
+    assert stored == (None, None, None)
+    assert direct_insert_count == 0
