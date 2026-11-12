@@ -182,8 +182,13 @@ Deno.test("worker obtains source observation itself and persists only through th
         ),
       );
     }
-    if (url.includes("/rest/v1/rpc/pr_d_capture_views_once")) {
-      return Promise.resolve(new Response("true", { status: 200, headers: { "content-type": "application/json" } }));
+    if (url.includes("/rest/v1/rpc/pr_d_capture_views_batch")) {
+      const batchBody = JSON.parse(body) as { p_observations: Record<string, unknown>[] };
+      assert(batchBody.p_observations.length === 1, "single-candidate test should send one CAS batch item");
+      return Promise.resolve(new Response(
+        JSON.stringify({ attempted: 1, captured: 1, not_captured: 0 }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ));
     }
     if (url.includes("/rpc/pr_d_release_e12_worker_lease")) {
       return Promise.resolve(new Response("true", { status: 200 }));
@@ -202,7 +207,7 @@ Deno.test("worker obtains source observation itself and persists only through th
     result.candidates === 1 && result.eligible === 1 && result.captured === 1,
     "one eligible row should be captured",
   );
-  assert(calls.length === 9, "worker should claim slot and lease, renew, query YouTube, renew before CAS, then release");
+  assert(calls.length === 8, "worker should claim slot and lease, query, renew once, batch CAS, then release");
 
   const slotCall = calls[0];
   const slotBody = JSON.parse(slotCall.body);
@@ -225,8 +230,7 @@ Deno.test("worker obtains source observation itself and persists only through th
 
   const renewalCall = calls[3];
   assert(renewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew before source collection");
-  assert(calls[4].url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew before each YouTube batch");
-  const youtubeCall = calls[5];
+  const youtubeCall = calls[4];
   const youtubeUrl = new URL(youtubeCall.url);
   assert(
     youtubeUrl.searchParams.get("part") === "snippet,statistics,status",
@@ -238,11 +242,13 @@ Deno.test("worker obtains source observation itself and persists only through th
     "YouTube key must be used only for the source request",
   );
 
-  const casRenewalCall = calls[6];
-  assert(casRenewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew immediately before CAS");
-  const rpcCall = calls[7];
-  const rpcBody = JSON.parse(rpcCall.body);
-  assert(rpcCall.url.endsWith("/rpc/pr_d_capture_views_once"), "persistence must use the CAS RPC");
+  const casRenewalCall = calls[5];
+  assert(casRenewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew immediately before batch CAS");
+  const rpcCall = calls[6];
+  const batchBody = JSON.parse(rpcCall.body) as { p_observations: Record<string, unknown>[] };
+  assert(rpcCall.url.endsWith("/rpc/pr_d_capture_views_batch"), "persistence must use the batch CAS RPC");
+  assert(batchBody.p_observations.length === 1, "batch RPC must contain one observation");
+  const rpcBody = batchBody.p_observations[0];
   assert(rpcBody.p_row_id === "42", "row id must be exact");
   assert(rpcBody.p_youtube_video_id === "video-1", "video id must be exact");
   assert(rpcBody.p_views === YOUTUBE_UINT64_MAX.toString(), "uint64 must remain an exact decimal string");
