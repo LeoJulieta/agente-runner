@@ -320,3 +320,75 @@ def test_e12_direct_http_insert_and_patch_cannot_bypass_cas():
         ).fetchone()[0]
     assert stored == (None, None, None)
     assert direct_insert_count == 0
+
+
+def test_lab_results_direct_insert_is_denied_to_service_role():
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute("SET ROLE service_role")
+        with pytest.raises(
+            psycopg.errors.InsufficientPrivilege,
+            match="prd_lab_results_insert_requires_atomic_rpc",
+        ):
+            conn.execute(
+                """
+                INSERT INTO public.lab_results
+                    (lab_id, gen, params, metrics, status, evidence_count, reproducible, last_test)
+                VALUES
+                    ('DIRECT_INSERT_BYPASS_ATTEMPT', 1, '{}'::jsonb, '{}'::jsonb,
+                     'VERIFICADO', 1, false, now())
+                """
+            )
+
+    status, _ = _request(
+        "POST",
+        "/lab_results",
+        payload={
+            "lab_id": "DIRECT_HTTP_INSERT_BYPASS_ATTEMPT",
+            "gen": 1,
+            "params": {},
+            "metrics": {},
+            "status": "VERIFICADO",
+            "evidence_count": 1,
+            "reproducible": False,
+        },
+    )
+    assert status >= 400, f"direct_lab_results_post_must_be_rejected_http_{status}"
+
+
+def test_atomic_lab_results_rpc_is_the_only_service_role_insert_capability():
+    with psycopg.connect(DATABASE_URL) as conn:
+        wrapper_signature = (
+            "public.rpc_insert_baseline_and_evidence("
+            "text,integer,jsonb,text,jsonb,jsonb,text,boolean,text)"
+        )
+        implementation_signature = (
+            "public.pr_d_rpc_insert_baseline_and_evidence_impl("
+            "text,integer,jsonb,text,jsonb,jsonb,text,boolean,text)"
+        )
+        wrapper_execute, implementation_execute = conn.execute(
+            """
+            SELECT
+                has_function_privilege('service_role', %s, 'EXECUTE'),
+                has_function_privilege('service_role', %s, 'EXECUTE')
+            """,
+            (wrapper_signature, implementation_signature),
+        ).fetchone()
+        wrapper_owner = conn.execute(
+            """
+            SELECT pg_get_userbyid(proowner)
+            FROM pg_proc
+            WHERE oid = %s::regprocedure
+            """,
+            (wrapper_signature,),
+        ).fetchone()[0]
+        writer_memberships = conn.execute(
+            """
+            SELECT count(*) FROM pg_auth_members
+            WHERE roleid = (SELECT oid FROM pg_roles WHERE rolname='pr_d_lab_results_writer')
+               OR member = (SELECT oid FROM pg_roles WHERE rolname='pr_d_lab_results_writer')
+            """
+        ).fetchone()[0]
+    assert wrapper_execute is True
+    assert implementation_execute is False
+    assert wrapper_owner == "pr_d_lab_results_writer"
+    assert writer_memberships == 0
