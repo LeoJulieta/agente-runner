@@ -7,7 +7,7 @@ This directory contains an **unapplied operational candidate**. Nothing here cre
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY` (the current `sb_secret_` key may be stored as this Edge Function secret)
 - `YOUTUBE_API_KEY`
-- `E12_CRON_HMAC_SECRET` (at least 32 random characters)
+- `E12_CRON_HMAC_SECRET` (at least 32 random bytes)
 
 Store the HMAC secret and the function URL in Supabase Vault under exactly:
 
