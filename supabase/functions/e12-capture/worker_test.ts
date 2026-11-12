@@ -522,7 +522,7 @@ Deno.test(
       youtube_video_id: `video-${String(index + 1).padStart(4, "0")}`,
       created_at: "2026-10-30T05:00:00Z",
     }));
-    const fetchImpl: typeof fetch = async (input) => {
+    const fetchImpl: typeof fetch = async (input, init) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith("/rpc/pr_d_claim_e12_worker_slot")) {
         counts.slotClaim++;
@@ -565,8 +565,9 @@ Deno.test(
       }
       if (url.pathname.endsWith("/rpc/pr_d_capture_views_batch")) {
         counts.casWrite++;
-        const body = await new Response(await (async () => "")()).text();
-        return new Response(JSON.stringify({ attempted: 50, captured: 50, not_captured: 0 }), { status: 200 });
+        const body = JSON.parse(String(init?.body)) as { p_observations: unknown[] };
+        const attempted = body.p_observations.length;
+        return new Response(JSON.stringify({ attempted, captured: attempted, not_captured: 0 }), { status: 200 });
       }
       throw new Error(`unexpected_500_candidate_request:${url.pathname}`);
     };
@@ -575,7 +576,7 @@ Deno.test(
       await signedRequest(),
       dependencies(fetchImpl),
     );
-    assert(response.status === 200, "500 eligible candidates should complete in the baseline");
+    assert(response.status === 200, "500 eligible candidates should complete through ten batches");
     const result = await response.json() as { captured: number; eligible: number };
     assert(result.eligible === 500 && result.captured === 500, "all 500 candidates should be captured");
     assert(counts.youtubeFetch === 10, "500 videos should use ten YouTube batches of 50");
