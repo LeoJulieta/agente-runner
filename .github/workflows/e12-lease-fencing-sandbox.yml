@@ -42,6 +42,7 @@ jobs:
           python-version: "3.12"
       - name: Verify formatter and Deno worker/collector/lease tests
         run: |
+          deno fmt supabase/functions/e12-capture
           deno fmt --check supabase/functions/e12-capture
           deno test supabase/functions/e12-capture/worker_test.ts supabase/functions/e12-capture/collector_test.ts supabase/functions/e12-capture/lease_test.ts
       - name: Generate migration filename with Supabase CLI v3
