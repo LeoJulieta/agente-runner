@@ -1,5 +1,9 @@
 name: E12 lease and fencing sandbox tests
 
+concurrency:
+  group: e12-lease-fencing-sandbox-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
