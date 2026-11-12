@@ -4,6 +4,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import psycopg
+import pytest
 
 DATABASE_URL = os.environ["TEST_DATABASE_URL"]
 MIGRATION = os.environ["E12_LEASE_SQL_PATH"]
@@ -86,6 +87,12 @@ def apply_migration():
         conn.execute(sql)
 
 
+@pytest.fixture(scope="module", autouse=True)
+def prepared_database():
+    bootstrap()
+    apply_migration()
+
+
 def claim(run_id):
     with connect() as conn:
         return conn.execute("SELECT * FROM public.pr_d_claim_e12_worker_lease(%s, 90)", (run_id,)).fetchone()
@@ -102,8 +109,9 @@ def release(run_id, token):
 
 
 def test_exclusive_claim_renew_takeover_and_stale_owner_rejection():
-    bootstrap()
-    apply_migration()
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+        conn.execute("UPDATE public.youtube_shorts_log SET views_primeras_3h=NULL,published_at=NULL,sync_captured_at=NULL,elapsed_seconds_e12=NULL")
     first = claim(RUN_A)
     assert first[0] is True and int(first[1]) == 1
     token_a = int(first[1])
@@ -149,5 +157,12 @@ def test_two_simultaneous_claims_have_exactly_one_winner():
 
 def test_lease_cannot_be_renewed_after_expiry():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        current = conn.execute(
+            "SELECT owner_run_id, fencing_token FROM pr_d_internal.e12_worker_lease WHERE singleton"
+        ).fetchone()
+        assert current is not None
         conn.execute("UPDATE pr_d_internal.e12_worker_lease SET lease_expires_at = clock_timestamp() - interval '1 second'")
-    assert renew(RUN_B, 2) is False
+    assert renew(current[0], current[1]) is False
+    takeover = claim(RUN_A if current[0] != RUN_A else RUN_B)
+    assert takeover[0] is True
+    assert int(takeover[1]) == int(current[1]) + 1
