@@ -78,7 +78,6 @@ async function fetchPendingCandidates(
 ): Promise<CandidateRow[]> {
   const baseUrl = supabaseUrl.replace(/\/+$/, "");
   const url = new URL(`${baseUrl}/rest/v1/youtube_shorts_log`);
-  const nowIso = new Date(nowEpochSeconds * 1_000).toISOString();
   const cutoffIso = new Date(
     nowEpochSeconds * 1_000 - CANDIDATE_LOOKBACK_HOURS * 60 * 60 * 1_000,
   ).toISOString();
@@ -225,7 +224,7 @@ export async function handleE12Capture(
     let captured = 0;
     let casLost = 0;
     let nonEligible = 0;
-    let duplicateRows = duplicateVideoIds.size;
+    const duplicateRows = duplicateVideoIds.size;
 
     const videoIds = [...byVideoId.keys()];
     for (let offset = 0; offset < videoIds.length; offset += YOUTUBE_BATCH_SIZE) {
