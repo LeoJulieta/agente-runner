@@ -1,0 +1,62 @@
+name: E12 worker slot — disposable PostgreSQL and PostgREST
+
+on:
+  push:
+    branches:
+      - sandbox/e12-edge-worker-2026-11-12
+    paths:
+      - supabase/migrations/20261112160000_pr_d_sync_capture_provenance_candidate.sql
+      - supabase/migrations/20261112180000_pr_d_e12_worker_run_slot.sql
+      - tests/e2e/bootstrap_pr_d_postgrest.py
+      - tests/e2e/test_pr_d_postgrest_isolated_http.py
+      - .github/workflows/e12-worker-slot-postgres.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-postgres-postgrest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.11@sha256:653186fe15006c099d2fb3bc1d8461c1dee9d036c43f2e5fdaf4f22e5e601876
+        env:
+          POSTGRES_USER: prd_test
+          POSTGRES_PASSWORD: prd_test
+          POSTGRES_DB: prd_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U prd_test -d prd_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://prd_test:prd_test@localhost:5432/prd_test
+      SUPABASE_URL: http://127.0.0.1:3000
+      PR_D_TEST_JWT_SECRET: pr-d-http-e2e-only-secret-32-bytes-minimum
+      PR_D_DISPOSABLE_DATABASE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install pinned test dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements/pr-d-statistical-fixtures-py312.txt
+      - name: Bootstrap identity-verified disposable database and apply candidate migrations
+        run: python tests/e2e/bootstrap_pr_d_postgrest.py
+      - name: Start pinned PostgREST
+        run: >-
+          docker run -d --name prd-postgrest --network host
+          -e PGRST_DB_URI=postgres://authenticator:prd_test_auth@127.0.0.1:5432/prd_test
+          -e PGRST_DB_SCHEMAS=public
+          -e PGRST_DB_ANON_ROLE=anon
+          -e PGRST_JWT_SECRET=pr-d-http-e2e-only-secret-32-bytes-minimum
+          postgrest/postgrest:v12.2.12@sha256:5f4ce744539bbba786b4e24dbbd95bdb2a956dcf568c5374995a0ff4a68f5bd2
+      - name: Test CAS and single-use worker slot over actual HTTP
+        run: python -m pytest -q tests/e2e/test_pr_d_postgrest_isolated_http.py
+      - name: Stop disposable PostgREST
+        if: always()
+        run: docker rm -f prd-postgrest || true
