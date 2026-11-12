@@ -283,8 +283,8 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(canonicalPayload[2] === "11111111-2222-4333-8444-555555555555", "canonical payload must bind run ID");
   assert(canonicalPayload[3] === "9007199254740993", "canonical payload must bind exact fencing token");
   assert(canonicalPayload[5] === "video-1" && canonicalPayload[7] === YOUTUBE_UINT64_MAX.toString(), "canonical payload must bind video and exact uint64 count");
-  assert(rpcBody.p_collector_signature === "A".repeat(86) + "==", "CAS must persist the Ed25519 signature");
-  assert(rpcBody.p_collector_hmac_signature === "d".repeat(64), "CAS must persist the database-verifiable HMAC");
+  assert(rpcBody.p_collector_signature === attestation.signatureBase64, "CAS must persist the Ed25519 signature");
+  assert(rpcBody.p_collector_hmac_signature === attestation.hmacSignatureHex, "CAS must persist the database-verifiable HMAC");
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_response_sha256)), "CAS must persist the raw response digest");
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_requested_ids_sha256)), "CAS must persist the requested IDs digest");
   assert(rpcBody.p_collector_build === "e12-collector/0.1.0", "CAS must persist collector build identity");
