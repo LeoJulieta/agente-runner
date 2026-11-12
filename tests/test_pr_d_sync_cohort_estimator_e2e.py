@@ -98,6 +98,7 @@ def test_e12_api_to_eligibility_first_cohort_to_hc3_estimator():
 def test_excluded_none_placeholders_are_compacted_before_numpy_and_counts_preserved():
     cohort = _build(40, include_out_of_window=True)
     assert cohort["eligible_mask"] == [True] * 39 + [False]
+    assert cohort["sync_elapsed_seconds"] == [10_800.0] * 39 + [7_200.0]
     assert cohort["outcomes"][-1] is None
     assert cohort["design_matrix"][-1] is None
     result = fit_eligible_cohort_hc3(cohort, coefficient_index=1, min_n_eff=30)
