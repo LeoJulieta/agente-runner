@@ -112,6 +112,16 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog
 AS $guard$
 BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.views_primeras_3h IS NOT NULL
+           OR OLD.published_at IS NOT NULL
+           OR OLD.sync_captured_at IS NOT NULL THEN
+            RAISE EXCEPTION 'prd_capture_evidence_delete_prohibited'
+                USING ERRCODE = '42501';
+        END IF;
+        RETURN OLD;
+    END IF;
+
     IF TG_OP = 'INSERT' THEN
         IF (
             NEW.views_primeras_3h IS NOT NULL
@@ -145,7 +155,7 @@ $guard$;
 DROP TRIGGER IF EXISTS youtube_shorts_log_capture_write_guard
     ON public.youtube_shorts_log;
 CREATE TRIGGER youtube_shorts_log_capture_write_guard
-    BEFORE INSERT OR UPDATE OF youtube_video_id, views_primeras_3h, published_at, sync_captured_at
+    BEFORE INSERT OR UPDATE OF youtube_video_id, views_primeras_3h, published_at, sync_captured_at OR DELETE
     ON public.youtube_shorts_log
     FOR EACH ROW EXECUTE FUNCTION public.pr_d_guard_capture_write();
 REVOKE ALL ON FUNCTION public.pr_d_guard_capture_write() FROM PUBLIC, anon, authenticated, service_role;
