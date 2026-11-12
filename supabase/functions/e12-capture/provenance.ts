@@ -1,4 +1,4 @@
-import { YOUTUBE_UINT64_MAX } from "./collector.ts";
+import { parseRfc3339EpochMicros, YOUTUBE_UINT64_MAX } from "./collector.ts";
 
 export const E12_ATTESTATION_VERSION = "e12-observation-attestation/v1";
 export const E12_ATTESTATION_ALGORITHM = "Ed25519";
@@ -31,14 +31,16 @@ function assertPayload(payload: ObservationAttestationPayload): void {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.runId)) {
     throw new Error("e12_attestation_run_id_invalid");
   }
-  if (!/^\d+$/.test(payload.rowId) || !payload.videoId.trim()) {
+  if (!/^[1-9]\d*$/.test(payload.rowId) || !payload.videoId.trim() || payload.videoId !== payload.videoId.trim()) {
     throw new Error("e12_attestation_identity_invalid");
   }
-  if (!/^\d+$/.test(payload.viewCount) || BigInt(payload.viewCount) > YOUTUBE_UINT64_MAX) {
+  if (!/^(0|[1-9]\d*)$/.test(payload.viewCount) || BigInt(payload.viewCount) > YOUTUBE_UINT64_MAX) {
     throw new Error("e12_attestation_view_count_invalid");
   }
-  if (!Number.isFinite(Date.parse(payload.publishedAt)) ||
-      !Number.isFinite(Date.parse(payload.syncCapturedAt))) {
+  try {
+    parseRfc3339EpochMicros(payload.publishedAt);
+    parseRfc3339EpochMicros(payload.syncCapturedAt);
+  } catch {
     throw new Error("e12_attestation_timestamp_invalid");
   }
   if (!/^[a-f0-9]{64}$/.test(payload.responseBodySha256) ||
