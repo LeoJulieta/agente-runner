@@ -31,8 +31,6 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.lab_results TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.lab_results_id_seq TO service_role;
 
--- The caller runs this bootstrap, then applies migration 004 and reloads PostgREST.
-
 -- PostgREST connects as a non-superuser authenticator and can switch only to
 -- the explicitly granted API roles.
 DO $authenticator$
@@ -44,14 +42,21 @@ END
 $authenticator$;
 GRANT anon, authenticated, service_role TO authenticator;
 
-
--- Candidate E12 capture RPC is exercised over HTTP on this disposable table.
+-- Start from the actual legacy type. The candidate migration must widen it.
 CREATE TABLE public.youtube_shorts_log (
     id bigserial PRIMARY KEY,
     youtube_video_id text NOT NULL,
-    views_primeras_3h numeric(20,0),
-    published_at timestamptz,
-    sync_captured_at timestamptz
+    views_primeras_3h integer,
+    hs_al_publicar_al_sync numeric,
+    status text NOT NULL DEFAULT 'pending'
 );
-GRANT SELECT, UPDATE ON TABLE public.youtube_shorts_log TO service_role;
-GRANT USAGE, SELECT ON SEQUENCE public.youtube_shorts_log_id_seq TO service_role;
+ALTER TABLE public.youtube_shorts_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY service_all
+    ON public.youtube_shorts_log
+    FOR ALL TO service_role
+    USING (true)
+    WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE, DELETE
+    ON TABLE public.youtube_shorts_log TO service_role;
+GRANT USAGE, SELECT
+    ON SEQUENCE public.youtube_shorts_log_id_seq TO service_role;
