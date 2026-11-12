@@ -140,15 +140,15 @@ GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_release_e12_worker_lease(uuid, bigi
 
 CREATE OR REPLACE FUNCTION public.pr_d_claim_e12_worker_lease(p_run_id uuid, p_ttl_seconds integer)
 RETURNS TABLE(acquired boolean, fencing_token text, lease_expires_at timestamptz)
-LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog, public
+LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog
 AS $wrapper$ SELECT * FROM pr_d_internal.pr_d_claim_e12_worker_lease(p_run_id, p_ttl_seconds); $wrapper$;
 
 CREATE OR REPLACE FUNCTION public.pr_d_renew_e12_worker_lease(p_run_id uuid, p_fencing_token bigint, p_ttl_seconds integer)
-RETURNS boolean LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog, public
+RETURNS boolean LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog
 AS $wrapper$ SELECT pr_d_internal.pr_d_renew_e12_worker_lease(p_run_id, p_fencing_token, p_ttl_seconds); $wrapper$;
 
 CREATE OR REPLACE FUNCTION public.pr_d_release_e12_worker_lease(p_run_id uuid, p_fencing_token bigint)
-RETURNS boolean LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog, public
+RETURNS boolean LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog
 AS $wrapper$ SELECT pr_d_internal.pr_d_release_e12_worker_lease(p_run_id, p_fencing_token); $wrapper$;
 
 REVOKE ALL ON FUNCTION public.pr_d_claim_e12_worker_lease(uuid, integer) FROM PUBLIC, anon, authenticated;
@@ -168,7 +168,7 @@ CREATE FUNCTION pr_d_internal.pr_d_capture_views_once(
     p_run_id uuid, p_fencing_token bigint
 )
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = pg_catalog, public, pr_d_internal
+SET search_path = pg_catalog, pr_d_internal
 SET statement_timeout = '10s'
 SET lock_timeout = '5s'
 AS $capture$
@@ -226,7 +226,7 @@ CREATE FUNCTION public.pr_d_capture_views_once(
     p_published_at timestamptz, p_sync_captured_at timestamptz,
     p_run_id uuid, p_fencing_token bigint
 )
-RETURNS boolean LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog, public
+RETURNS boolean LANGUAGE sql SECURITY INVOKER SET search_path = pg_catalog
 AS $wrapper$
     SELECT pr_d_internal.pr_d_capture_views_once(
         p_row_id, p_youtube_video_id, p_views, p_published_at,
