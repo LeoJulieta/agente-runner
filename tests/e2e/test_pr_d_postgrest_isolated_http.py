@@ -238,6 +238,11 @@ def test_e12_capture_rpc_rejects_wrong_id_outside_window_and_anon():
     status, result = _request("POST", "/rpc/pr_d_capture_views_once", payload=outside)
     assert status == 200 and result is False
 
+    for invalid_views in ("-1", "1.5", "18446744073709551616"):
+        invalid = dict(base, p_youtube_video_id="e12-http-correct", p_views=invalid_views)
+        status, result = _request("POST", "/rpc/pr_d_capture_views_once", payload=invalid)
+        assert status == 200 and result is False
+
     status, _ = _request(
         "POST", "/rpc/pr_d_capture_views_once", role="anon",
         payload=dict(base, p_youtube_video_id="e12-http-correct"),
