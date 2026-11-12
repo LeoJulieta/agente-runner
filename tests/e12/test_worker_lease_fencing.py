@@ -205,6 +205,40 @@ def test_legacy_capture_row_survives_attestation_upgrade():
         conn.rollback()
 
 
+
+def capture_record(run_id, token, row_id, video_id, hmac_override=None):
+    canonical = canonical_payload(run_id, token, row_id, video_id)
+    payload_sha = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    hmac_signature = hmac_override or hmac.new(HMAC_SECRET, canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+    return {
+        "p_row_id": row_id,
+        "p_youtube_video_id": video_id,
+        "p_views": "123",
+        "p_published_at": PUBLISHED,
+        "p_sync_captured_at": CAPTURED,
+        "p_run_id": str(run_id),
+        "p_fencing_token": token,
+        "p_attestation_version": "e12-observation-attestation/v1",
+        "p_attestation_algorithm": "Ed25519",
+        "p_collector_key_id": KEY_ID,
+        "p_collector_public_key_spki_base64": PUBLIC_KEY,
+        "p_collector_payload_canonical": canonical,
+        "p_collector_payload_sha256": payload_sha,
+        "p_collector_signature": SIGNATURE,
+        "p_collector_hmac_signature": hmac_signature,
+        "p_collector_response_sha256": RESPONSE_SHA,
+        "p_collector_requested_ids_sha256": REQUESTED_IDS_SHA,
+        "p_collector_build": COLLECTOR_BUILD,
+    }
+
+
+def capture_batch(records):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT public.pr_d_capture_views_batch(%s::jsonb)",
+            (json.dumps(records),),
+        ).fetchone()[0]
+
 def test_exclusive_claim_renew_takeover_and_stale_owner_rejection():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
@@ -301,3 +335,34 @@ def test_old_unfenced_and_unattested_cas_signatures_are_removed():
         """).fetchone()[0]
         assert old_five is None
         assert old_seven is None
+
+
+def test_batch_cas_checks_each_hmac_and_bounds_batch_size():
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("INSERT INTO public.youtube_shorts_log(id,youtube_video_id) VALUES (4,'video-4'),(5,'video-5')")
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+    lease = claim(RUN_A)
+    token = int(lease[1])
+    first = capture_record(RUN_A, token, 4, "video-4")
+    second_invalid = capture_record(RUN_A, token, 5, "video-5", hmac_override="0" * 64)
+
+    duplicate = pytest.raises(psycopg.errors.RaiseException)
+    with duplicate:
+        capture_batch([first, first])
+
+    result = capture_batch([first, second_invalid])
+    assert result == {"attempted": 2, "captured": 1, "not_captured": 1}
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT id, views_primeras_3h FROM public.youtube_shorts_log WHERE id IN (4,5) ORDER BY id
+        """).fetchall()
+    assert rows[0] == (4, 123)
+    assert rows[1] == (5, None)
+
+    second_valid = capture_record(RUN_A, token, 5, "video-5")
+    retry = capture_batch([second_valid])
+    assert retry == {"attempted": 1, "captured": 1, "not_captured": 0}
+
+    too_large = [capture_record(RUN_A, token, 100 + index, f"video-{100 + index}") for index in range(51)]
+    with pytest.raises(psycopg.errors.RaiseException):
+        capture_batch(too_large)
