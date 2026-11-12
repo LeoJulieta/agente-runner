@@ -1,10 +1,10 @@
 # PR-D-DESIGN.md
 
-**Versión contractual:** PR D v2.1 (enmienda candidata de sincronización; sandbox, pendiente de promoción)
+**Versión contractual:** PR D v2 (contrato documental aprobado; incorpora E1–E5)
 
 **Fecha de congelamiento:** 2026-10-09
 
-**Estado:** PR D v2 sigue siendo la referencia aprobada en `main` mediante PR #75. Esta rama propone la enmienda v2.1; no está fusionada ni autoriza implementación de producción.
+**Estado:** contrato documental aprobado y fusionado en `main` mediante PR #75; implementación del motor aún no autorizada
 **Alcance:** diseño estadístico y operativo previo a implementación\
 **Principio rector:** evidencia primero. Ninguna regla estadística podrá
 modificarse después de observar los resultados para favorecer una
@@ -83,17 +83,8 @@ Cada corrida validará como mínimo:
 `n_total` contará los registros candidatos recuperados antes de aplicar
 filtros analíticos. `n_eff` contará las observaciones efectivamente
 elegibles para el análisis después de aplicar todos los filtros
-preregistrados, incluido el filtro de sincronización alrededor de las 3 horas
-cuando corresponda: intervalo cerrado de 2 h 55 min a 3 h 05 min (3 h ± 5 min).
-
-En esta enmienda, `views_primeras_3h` representa el `statistics.viewCount`
-acumulado observado en un único instante entre 2 h 55 min y 3 h 05 min
-después de `publishedAt`. No representa una suma de vistas ocurridas
-exclusivamente dentro de un intervalo exacto de tres horas ni un valor
-extrapolado. Se conservarán `published_at` y `sync_captured_at` para
-auditar el instante y el tiempo transcurrido exactos. Las capturas fuera
-de la ventana se excluirán antes del análisis; no se corregirán ni
-extrapolarán para hacerlas parecer mediciones de tres horas.
+preregistrados, incluido el filtro de sincronización de 3--6 horas
+cuando corresponda.
 
 Para Familia II se registrará `n_events`, cantidad de observaciones
 elegibles con `Y > 0`. `n_eff` y `n_events` no son intercambiables: una
