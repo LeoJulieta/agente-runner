@@ -33,7 +33,7 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install --disable-pip-version-check pytest numpy statsmodels tzdata
       - name: Run eligibility-first cohort and estimator integration tests
-        run: python -m pytest -q tests/test_pr_d_cohort_builder_eligibility.py tests/test_pr_d_sync_cohort_estimator_e2e.py tests/test_pr_d_family_ii_validation.py tests/test_pr_d_drift_reproducibility.py
+        run: python -m pytest -q tests/test_pr_d_cohort_builder_eligibility.py tests/test_pr_d_e12_provenance_guard.py tests/test_pr_d_sync_cohort_estimator_e2e.py tests/test_pr_d_family_ii_validation.py tests/test_pr_d_drift_reproducibility.py
 
   disposable-postgres-schema:
     runs-on: ubuntu-latest
