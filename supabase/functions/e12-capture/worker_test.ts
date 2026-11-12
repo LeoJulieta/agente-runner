@@ -502,3 +502,85 @@ Deno.test("worker never calls CAS when independent attestation verification fail
   assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_once")), "CAS must not run for an invalid attestation");
   assert(calls.some((url) => url.includes("/rpc/pr_d_release_e12_worker_lease")), "lease must still be released");
 });
+
+
+Deno.test(
+  "500-candidate baseline quantifies per-observation Supabase RPC amplification",
+  { timeout: 30_000 },
+  async () => {
+    const counts = {
+      slotClaim: 0,
+      leaseClaim: 0,
+      leaseRenew: 0,
+      leaseRelease: 0,
+      candidateFetch: 0,
+      youtubeFetch: 0,
+      casWrite: 0,
+    };
+    const candidates = Array.from({ length: 500 }, (_, index) => ({
+      id: index + 1,
+      youtube_video_id: \`video-\${String(index + 1).padStart(4, "0")}\`,
+      created_at: "2026-10-30T05:00:00Z",
+    }));
+    const fetchImpl: typeof fetch = async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/rpc/pr_d_claim_e12_worker_slot")) {
+        counts.slotClaim++;
+        return new Response("true", { status: 200 });
+      }
+      if (url.pathname.endsWith("/rpc/pr_d_claim_e12_worker_lease")) {
+        counts.leaseClaim++;
+        return new Response(JSON.stringify([{
+          acquired: true,
+          fencing_token: "9007199254740993",
+          lease_expires_at: "2026-10-30T05:31:30Z",
+        }]), { status: 200 });
+      }
+      if (url.pathname.endsWith("/rpc/pr_d_renew_e12_worker_lease")) {
+        counts.leaseRenew++;
+        return new Response("true", { status: 200 });
+      }
+      if (url.pathname.endsWith("/rpc/pr_d_release_e12_worker_lease")) {
+        counts.leaseRelease++;
+        return new Response("true", { status: 200 });
+      }
+      if (url.pathname.endsWith("/rest/v1/youtube_shorts_log")) {
+        counts.candidateFetch++;
+        return new Response(JSON.stringify(candidates), {
+          status: 200,
+          headers: { "content-range": "0-499/500" },
+        });
+      }
+      if (url.hostname === "youtube.googleapis.com") {
+        counts.youtubeFetch++;
+        const ids = (url.searchParams.get("id") ?? "").split(",").filter(Boolean);
+        return new Response(JSON.stringify({
+          items: ids.map((id) => ({
+            id,
+            status: { privacyStatus: "public" },
+            snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+            statistics: { viewCount: "100" },
+          })),
+        }), { status: 200 });
+      }
+      if (url.pathname.endsWith("/rpc/pr_d_capture_views_once")) {
+        counts.casWrite++;
+        return new Response("true", { status: 200 });
+      }
+      throw new Error(\`unexpected_500_candidate_request:\${url.pathname}\`);
+    };
+
+    const response = await handleE12Capture(
+      await signedRequest(),
+      dependencies(fetchImpl),
+    );
+    assert(response.status === 200, "500 eligible candidates should complete in the baseline");
+    const result = await response.json() as { captured: number; eligible: number };
+    assert(result.eligible === 500 && result.captured === 500, "all 500 candidates should be captured");
+    assert(counts.youtubeFetch === 10, "500 videos should use ten YouTube batches of 50");
+    assert(counts.leaseRenew === 511, "baseline performs one post-query, ten per-batch and 500 per-row renewals");
+    assert(counts.casWrite === 500, "baseline performs one CAS HTTP request per observation");
+    const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+    assert(total === 1025, "baseline request count should be reproducible");
+  },
+);
