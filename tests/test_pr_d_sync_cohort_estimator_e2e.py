@@ -1,0 +1,114 @@
+from datetime import datetime, timedelta, timezone
+
+import math
+import pytest
+
+from labs.pr_d_cohort_builder import MISSING_EXCLUDE, SyncWindow, build_preregistered_cohort
+from labs.pr_d_cohort_estimator import fit_eligible_cohort_hc3
+from labs.pr_d_sync_contract import (
+    LOWER_SYNC_SECONDS, UPPER_SYNC_SECONDS,
+    evaluate_sync_window, extract_published_at, parse_sync_captured_at,
+)
+
+VIDEO_ID = "fixture-video-001"
+PUBLISHED = "2026-10-30T02:30:00Z"
+
+
+def _api_resource(video_id, views, published=PUBLISHED):
+    return {
+        "items": [
+            {"id": "decoy", "snippet": {"publishedAt": "2026-10-30T01:00:00Z"},
+             "status": {"privacyStatus": "public"}, "statistics": {"viewCount": "999999"}},
+            {"id": video_id, "snippet": {"publishedAt": published},
+             "status": {"privacyStatus": "public"}, "statistics": {"viewCount": str(views)}},
+        ]
+    }
+
+
+def _view_count(response, expected_video_id):
+    matches = [item for item in response["items"] if item.get("id") == expected_video_id]
+    if len(matches) != 1:
+        raise ValueError("fixture_video_id_missing_or_ambiguous")
+    raw = matches[0]["statistics"]["viewCount"]
+    if not isinstance(raw, str) or not raw.isdecimal():
+        raise ValueError("fixture_view_count_invalid")
+    return int(raw)
+
+
+def _build(n_rows, *, include_out_of_window=False):
+    rows = []
+    published = datetime.fromisoformat(PUBLISHED.replace("Z", "+00:00"))
+    for i in range(n_rows):
+        video_id = f"fixture-{i:03d}"
+        api = _api_resource(video_id, 20 + (i % 7) + (2 if i >= n_rows // 2 else 0))
+        publication = extract_published_at(api, expected_video_id=video_id)
+        captured = parse_sync_captured_at(
+            (published + timedelta(hours=4 if not (include_out_of_window and i == n_rows - 1) else 2)).isoformat()
+        )
+        decision = evaluate_sync_window(publication, captured)
+        row = {
+            "candidate_id": video_id,
+            "sync_elapsed_seconds": decision.elapsed_seconds,
+            "outcome": _view_count(api, video_id),
+            "intercept": 1,
+            "condition": 1 if i >= n_rows // 2 else 0,
+        }
+        if include_out_of_window and i == n_rows - 1:
+            # The excluded candidate deliberately has no usable analytic fields.
+            row.pop("outcome")
+            row.pop("intercept")
+            row.pop("condition")
+        rows.append(row)
+    return build_preregistered_cohort(
+        rows,
+        candidate_id_field="candidate_id",
+        outcome_field="outcome",
+        predictor_fields=("intercept", "condition"),
+        sync_elapsed_seconds_field="sync_elapsed_seconds",
+        sync_window=SyncWindow(
+            lower_seconds=LOWER_SYNC_SECONDS, upper_seconds=UPPER_SYNC_SECONDS,
+            lower_inclusive=True, upper_inclusive=True, missing_policy=MISSING_EXCLUDE,
+        ),
+        preregistered_masks={},
+    )
+
+
+def test_e12_api_to_eligibility_first_cohort_to_hc3_estimator():
+    cohort = _build(40)
+    assert cohort["n_total"] == 40
+    assert cohort["n_eff"] == 40
+    assert cohort["n_events"] == 40
+    result = fit_eligible_cohort_hc3(cohort, coefficient_index=1, min_n_eff=30)
+    assert result["status"] == "ESTIMABLE"
+    assert result["metrics"]["covariance_type"] == "HC3"
+    assert (result["metrics"]["n_total"], result["metrics"]["n_eff"], result["metrics"]["n_events"]) == (40, 40, 40)
+    assert math.isfinite(result["metrics"]["effect_size"])
+
+
+def test_excluded_none_placeholders_are_compacted_before_numpy_and_counts_preserved():
+    cohort = _build(40, include_out_of_window=True)
+    assert cohort["eligible_mask"] == [True] * 39 + [False]
+    assert cohort["outcomes"][-1] is None
+    assert cohort["design_matrix"][-1] is None
+    result = fit_eligible_cohort_hc3(cohort, coefficient_index=1, min_n_eff=30)
+    assert result["status"] == "ESTIMABLE"
+    assert (result["metrics"]["n_total"], result["metrics"]["n_eff"], result["metrics"]["n_events"]) == (40, 39, 39)
+
+
+def test_insufficient_valid_cohort_never_becomes_favorable():
+    cohort = _build(20)
+    result = fit_eligible_cohort_hc3(cohort, coefficient_index=1, min_n_eff=30)
+    assert result["status"] == "INSUFFICIENT_POWER"
+    assert result["metrics"]["insufficient_power_reason"] == "n_eff_below_minimum"
+    assert result["bh_input_p"] == 1.0
+
+
+def test_adapter_rejects_non_null_analytic_values_on_excluded_rows():
+    cohort = _build(40)
+    cohort["outcomes"][-1] = 0.0
+    cohort["design_matrix"][-1] = [1.0, 0.0]
+    cohort["eligible_mask"][-1] = False
+    cohort["n_eff"] = 39
+    cohort["n_events"] = 39
+    with pytest.raises(ValueError, match="excluded_analytic_placeholder_must_be_null"):
+        fit_eligible_cohort_hc3(cohort, coefficient_index=1)
