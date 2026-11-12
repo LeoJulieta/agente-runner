@@ -1,6 +1,8 @@
 -- MANUAL ONLY: do not execute until the Edge Function is deployed,
 -- the HMAC secret and function URL are provisioned in Vault, and deployment
 -- has explicit approval. This file is deliberately outside supabase/migrations.
+-- The Edge Function claims a private single-use slot for the signed UTC minute
+-- before any YouTube request, so replay cannot repeat the worker cycle.
 --
 -- IMPORTANT: pg_net request queues are readable under the current project ACL.
 -- This job sends only a short-lived HMAC signature, never sb_secret/service_role.
