@@ -143,8 +143,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - name: Install disposable integration test dependencies
-        run: python -m pip install "psycopg[binary]>=3.2,<4" "pytest>=8,<9"
+        run: python -m pip install "psycopg[binary]>=3.2,<4" "pytest>=8,<9" "cryptography>=44,<46"
       - name: Bootstrap isolated roles, fixtures and E12 migrations
         run: python tests/e12/prepare_postgrest.py
       - name: Start disposable PostgREST against the local PostgreSQL service
@@ -166,6 +169,8 @@ jobs:
           done
           docker logs e12-postgrest
           exit 1
+      - name: Run the complete Deno worker against real PostgREST HTTP and simulated YouTube
+        run: deno test --allow-env --allow-net supabase/functions/e12-capture/worker_postgrest_e2e_test.ts
       - name: Exercise RPC binding, fencing and role boundary over HTTP
         run: python -m pytest -q tests/e12/test_postgrest_integration.py
       - name: Stop disposable PostgREST
