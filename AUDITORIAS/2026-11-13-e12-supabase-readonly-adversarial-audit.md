@@ -25,7 +25,7 @@ Por lo tanto:
 - Los tests unitarios Deno del worker sí generan una key pair y verifican la attestation, pero todavía no conectan ese worker completo al PostgREST real.
 - No se debe describir el contrato HTTP actual como verificación criptográfica Ed25519 end-to-end.
 
-Acción pendiente: un test de integración Deno que genere una key pair real de test, registre la public key/HMAC únicamente en el PostgreSQL descartable, llame al worker real, traduzca la autenticación al JWT local de PostgREST y verifique la fila persistida.
+Avance posterior de esta auditoría: se añadió `supabase/functions/e12-capture/worker_postgrest_e2e_test.ts`, se actualizó `tests/e12/prepare_postgrest.py` para generar y registrar una key pair Ed25519/HMAC efímera únicamente en PostgreSQL descartable, y se añadió al workflow el paso Deno que llama al worker real con YouTube simulado y JWT local de PostgREST. La fixture de idempotency slot es un stub SQL local de test. Estos cambios están en commits `c34deb71fbf80735d9c9b3aaa1f435839b17245f`, `a13aceccaedb379f5c492376360d002cd455f92a`, `ccba4194107ea0837987bf9c590e89cd1b3d4c07`, `fe3a7cb03d03ff0309d6524da5e7dba8f316007b` y `4cb000c04ecd411d20413c486b52d493784bc877`. **Estado: IMPLEMENTADO EN RAMA, NO VERIFICADO**; el commit del workflow no devolvió checks/status visibles en la consulta realizada. No afirmar E2E aprobado hasta obtener CI verde y logs.
 
 ## 3. Baseline Supabase productivo — solo lectura
 
@@ -70,7 +70,7 @@ El advisory de salud no devolvió hallazgos en la consulta realizada.
 
 ## 4. Matriz de siguientes pruebas
 
-1. Worker Deno real → PostgREST real → PostgreSQL 17 descartable, con YouTube completamente simulado.
+1. Ejecutar y corregir hasta verde el nuevo test Worker Deno real → PostgREST real → PostgreSQL 17 descartable, con YouTube completamente simulado.
 2. Claves Ed25519/HMAC efímeras generadas en CI y registro solo en DB descartable.
 3. Pérdida de respuesta después del commit y retry: confirmar first-write-wins y ausencia de doble mutación.
 4. HTTP 500, timeout, conexión cortada antes del commit y conexión cortada después del commit.
