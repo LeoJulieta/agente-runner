@@ -182,8 +182,8 @@ Deno.test("worker obtains source observation itself and persists only through th
         ),
       );
     }
-    if (url.includes("/rest/v1/rpc/pr_d_capture_views_once")) {
-      return Promise.resolve(new Response("true", { status: 200, headers: { "content-type": "application/json" } }));
+    if (url.includes("/rest/v1/rpc/pr_d_capture_views_batch")) {
+      return Promise.resolve(new Response(JSON.stringify([{ row_id: "42", captured: true }]), { status: 200, headers: { "content-type": "application/json" } }));
     }
     if (url.includes("/rpc/pr_d_release_e12_worker_lease")) {
       return Promise.resolve(new Response("true", { status: 200 }));
@@ -202,7 +202,7 @@ Deno.test("worker obtains source observation itself and persists only through th
     result.candidates === 1 && result.eligible === 1 && result.captured === 1,
     "one eligible row should be captured",
   );
-  assert(calls.length === 9, "worker should claim slot and lease, renew, query YouTube, renew before CAS, then release");
+  assert(calls.length === 7, "one candidate batch should use one lease renewal, one YouTube request, one batch CAS and one release");
 
   const slotCall = calls[0];
   const slotBody = JSON.parse(slotCall.body);
@@ -224,9 +224,8 @@ Deno.test("worker obtains source observation itself and persists only through th
   );
 
   const renewalCall = calls[3];
-  assert(renewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew before source collection");
-  assert(calls[4].url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew before each YouTube batch");
-  const youtubeCall = calls[5];
+  assert(renewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew once before source collection");
+  const youtubeCall = calls[4];
   const youtubeUrl = new URL(youtubeCall.url);
   assert(
     youtubeUrl.searchParams.get("part") === "snippet,statistics,status",
@@ -238,11 +237,11 @@ Deno.test("worker obtains source observation itself and persists only through th
     "YouTube key must be used only for the source request",
   );
 
-  const casRenewalCall = calls[6];
-  assert(casRenewalCall.url.endsWith("/rpc/pr_d_renew_e12_worker_lease"), "worker must renew immediately before CAS");
-  const rpcCall = calls[7];
-  const rpcBody = JSON.parse(rpcCall.body);
-  assert(rpcCall.url.endsWith("/rpc/pr_d_capture_views_once"), "persistence must use the CAS RPC");
+  const rpcCall = calls[5];
+  const batchBody = JSON.parse(rpcCall.body);
+  assert(rpcCall.url.endsWith("/rpc/pr_d_capture_views_batch"), "persistence must use the bounded batch CAS RPC");
+  assert(Array.isArray(batchBody.p_items) && batchBody.p_items.length === 1, "batch CAS must contain exactly the eligible row");
+  const rpcBody = batchBody.p_items[0];
   assert(rpcBody.p_row_id === "42", "row id must be exact");
   assert(rpcBody.p_youtube_video_id === "video-1", "video id must be exact");
   assert(rpcBody.p_views === YOUTUBE_UINT64_MAX.toString(), "uint64 must remain an exact decimal string");
@@ -288,7 +287,7 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_response_sha256)), "CAS must persist the raw response digest");
   assert(/^[a-f0-9]{64}$/.test(String(rpcBody.p_collector_requested_ids_sha256)), "CAS must persist the requested IDs digest");
   assert(rpcBody.p_collector_build === "e12-collector/0.1.0", "CAS must persist collector build identity");
-  assert(calls[8].url.endsWith("/rpc/pr_d_release_e12_worker_lease"), "worker must release its lease after completion");
+  assert(calls[6].url.endsWith("/rpc/pr_d_release_e12_worker_lease"), "worker must release its lease after completion");
   assert(rpcBody.p_published_at === "2026-10-30T02:30:00Z", "publishedAt must come from YouTube");
   assert(
     rpcBody.p_sync_captured_at === "2026-10-30T05:30:00.123456Z",
@@ -525,8 +524,8 @@ Deno.test("worker reports CAS first-write conflicts without overwriting outcomes
         ),
       );
     }
-    if (url.includes("/rpc/pr_d_capture_views_once")) {
-      return Promise.resolve(new Response("false", { status: 200 }));
+    if (url.includes("/rpc/pr_d_capture_views_batch")) {
+      return Promise.resolve(new Response(JSON.stringify([{ row_id: "7", captured: false }]), { status: 200 }));
     }
     throw new Error("unexpected_test_fetch_url");
   };
@@ -629,6 +628,6 @@ Deno.test("worker never calls CAS when independent attestation verification fail
   const deps = dependencies(fetchImpl, { E12_PROVENANCE_PUBLIC_KEY_SPKI_B64: mismatchedPublicKey });
   const response = await handleE12Capture(await signedRequest(), deps);
   assert(response.status === 502, "invalid attestation must fail the worker cycle");
-  assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_once")), "CAS must not run for an invalid attestation");
+  assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_batch")), "batch CAS must not run for an invalid attestation");
   assert(calls.some((url) => url.includes("/rpc/pr_d_release_e12_worker_lease")), "lease must still be released");
 });
