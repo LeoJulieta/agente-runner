@@ -71,6 +71,7 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
   const publishedAt = new Date(now - 3 * 60 * 60 * 1000).toISOString().replace(".000Z", "Z");
   const syncMicros = BigInt(now) * 1000n;
   let youtubeCalls = 0;
+  const postgrestTrace: string[] = [];
   const realFetch = fetch;
 
   const fetchImpl: typeof fetch = async (input, init) => {
@@ -96,7 +97,12 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
       const headers = new Headers(init?.headers);
       headers.set("Authorization", "Bearer " + jwt);
       headers.set("apikey", "e12-disposable-test-key");
-      return realFetch(target, { ...init, headers });
+      const upstream = await realFetch(target, { ...init, headers });
+      const responseBody = await upstream.clone().text();
+      postgrestTrace.push(
+        `${init?.method ?? "GET"} ${target.pathname}${target.search} -> ${upstream.status}: ${responseBody.slice(0, 800)}`,
+      );
+      return upstream;
     }
     throw new Error("unexpected E2E network destination: " + url);
   };
@@ -129,7 +135,11 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
   }), dependencies);
   const result = await response.json();
 
-  assert(response.status === 200, "full worker must complete successfully; got " + JSON.stringify(result));
+  assert(
+    response.status === 200,
+    "full worker must complete successfully; got " + JSON.stringify(result) +
+      "; PostgREST trace: " + JSON.stringify(postgrestTrace),
+  );
   assert(result.candidates === 1 && result.eligible === 1 && result.captured === 1, "one real database candidate must be captured");
   assert(youtubeCalls === 1, "YouTube must be called once through the deterministic fake");
 
