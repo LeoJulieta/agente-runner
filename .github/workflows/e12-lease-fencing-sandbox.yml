@@ -123,7 +123,7 @@ jobs:
       E12_ATTESTATION_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261112232558_e12_collector_attestation.sql
       E12_BATCH_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261113090000_e12_capture_batch_cas.sql
       PGRST_JWT_SECRET: e12-postgrest-ci-jwt-secret-not-real-32-bytes-long!
-      POSTGREST_URL: http://127.0.0.1:3000/rest/v1
+      POSTGREST_URL: http://127.0.0.1:3000
     services:
       postgres:
         image: postgres:17
