@@ -156,6 +156,39 @@ def prepared_database():
         """, (KEY_ID, PUBLIC_KEY, HMAC_SECRET))
 
 
+@pytest.fixture(autouse=True)
+def reset_batch_test_state(prepared_database):
+    # Each test gets fresh capture rows and an active test key. The setup role
+    # temporarily disables the guard trigger only while resetting fixtures;
+    # no test operation runs with the trigger disabled.
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("ALTER TABLE public.youtube_shorts_log DISABLE TRIGGER youtube_shorts_log_pr_d_capture_guard")
+        conn.execute("""
+            UPDATE public.youtube_shorts_log
+               SET views_primeras_3h = NULL,
+                   published_at = NULL,
+                   sync_captured_at = NULL,
+                   elapsed_seconds_e12 = NULL,
+                   e12_capture_run_id = NULL,
+                   e12_fencing_token = NULL,
+                   collector_attestation_version = NULL,
+                   collector_attestation_algorithm = NULL,
+                   collector_key_id = NULL,
+                   collector_public_key_spki_base64 = NULL,
+                   collector_payload_canonical = NULL,
+                   collector_payload_sha256 = NULL,
+                   collector_signature = NULL,
+                   collector_hmac_signature = NULL,
+                   collector_response_sha256 = NULL,
+                   collector_requested_ids_sha256 = NULL,
+                   collector_build = NULL
+             WHERE id IN (1, 2)
+        """)
+        conn.execute("ALTER TABLE public.youtube_shorts_log ENABLE TRIGGER youtube_shorts_log_pr_d_capture_guard")
+        conn.execute("UPDATE pr_d_internal.e12_collector_key_registry SET status='active', revoked_at=NULL")
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+
+
 def claim(run_id):
     with connect() as conn:
         return conn.execute("SELECT * FROM public.pr_d_claim_e12_worker_lease(%s, 90)", (run_id,)).fetchone()
