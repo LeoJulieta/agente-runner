@@ -91,6 +91,8 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
 
     if (url.startsWith(postgrestUrl)) {
       const target = new URL(url);
+      // Supabase uses /rest/v1; bare PostgREST exposes the same API at /.
+      target.pathname = target.pathname.replace(/^\/rest\/v1(?=\/)/, "");
       const headers = new Headers(init?.headers);
       headers.set("Authorization", "Bearer " + jwt);
       headers.set("apikey", "e12-disposable-test-key");
