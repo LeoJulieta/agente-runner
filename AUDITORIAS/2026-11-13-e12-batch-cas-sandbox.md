@@ -3,7 +3,11 @@
 Fecha: 2026-11-13  
 Rama: `sandbox/e12-batch-cas-2026-11-13`  
 Base: `a9558516c7f39de0532672dd95e2a2170f58d8dc`  
-Estado inicial de este documento: **IMPLEMENTACIÓN CANDIDATA; CI PENDIENTE**. No desplegado ni integrado a producción.
+Estado: **IMPLEMENTADO_SANDBOX y VERIFICADO por GitHub Actions + PostgreSQL 17 descartable**. No desplegado ni integrado a producción.
+
+Commit final de esta rama: `6f21b8195784c0fce2c6282b1b78dd8b0cf7f816`.
+
+CI final: [run #78 — SUCCESS](https://github.com/LeoJulieta/agente-runner/actions/runs/43452302068). Deno: **31 passed, 0 failed**. PostgreSQL 17: **13 passed**.
 
 ## Objetivo
 
@@ -54,7 +58,7 @@ Con 500 candidatos únicos, 10 lotes de YouTube de hasta 50, todos elegibles, si
 | Release del lease | 1 |
 | **Total estimado** | **34** |
 
-Este valor es un **modelo de solicitudes**. Se añadió una prueba Deno con 500 candidatos sintéticos y fetch interceptado que cuenta 34 solicitudes, pero no es una medición de red real ni una prueba de latencia.
+En CI, una prueba Deno con 500 candidatos sintéticos contó **34 solicitudes HTTP simuladas** (10 renovaciones, 10 consultas a YouTube simuladas y 10 CAS batch), en 105 ms de ejecución de esa prueba. Esto verifica el conteo y el flujo con fetch interceptado; no es una medición de red real ni de latencia externa.
 
 ## Pruebas añadidas
 
@@ -72,6 +76,17 @@ Este valor es un **modelo de solicitudes**. Se añadió una prueba Deno con 500 
 - No crea PR, no modifica `main` y no integra esta rama a la rama E12 anterior.
 - La firma Ed25519 sigue verificándose en el worker; PostgreSQL verifica HMAC y la vinculación del payload, sin afirmar verificar Ed25519.
 
+## Resultado y revisión adversarial ejecutada
+
+- CI final #78: SUCCESS; Deno 31/31 y PostgreSQL 17 13/13.
+- La primera ejecución detectó expectativas Deno antiguas; se corrigieron los tests para el nuevo endpoint.
+- La segunda ejecución detectó contaminación de estado entre tests PostgreSQL; se agregó aislamiento explícito por test y se hizo autocontenido el test de expiración de lease.
+- La ejecución final pasó con fixtures aislados, migraciones `ops`/versionadas comparadas byte a byte y PostgreSQL 17 descartable.
+- Se verificaron concurrencia de dos RPC batch sobre la misma fila (un solo ganador), duplicados, HMAC inválido, fencing obsoleto, error de conversión con rollback, campos obligatorios y límites de 1–50 elementos.
+- El worker valida cantidad, orden e identidad de cada respuesta del batch antes de contabilizar resultados.
+
+La revisión realizada hasta aquí es una revisión técnica adversarial de código y pruebas dentro de esta sesión; no se presenta como auditoría independiente de un segundo revisor.
+
 ## Criterio de aceptación
 
-No declarar optimización verificada hasta que el CI de esta rama apruebe Deno y PostgreSQL 17 descartable. Si CI falla, corregir en esta misma rama y repetir pruebas. Después de CI, ejecutar revisión adversarial independiente de SQL, permisos efectivos, semántica transaccional, expiración del lease y métricas de solicitudes. No promover sin autorización adicional.
+La optimización queda **verificada en sandbox** para los escenarios cubiertos por CI. Sigue pendiente una instancia Supabase/PostgREST completamente descartable, una medición HTTP end-to-end y una auditoría independiente externa. No promover sin autorización adicional.
