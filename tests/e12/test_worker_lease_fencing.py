@@ -438,6 +438,8 @@ def test_two_simultaneous_claims_have_exactly_one_winner():
 
 
 def test_lease_cannot_be_renewed_after_expiry():
+    claimed = claim(RUN_A)
+    assert claimed[0] is True
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         current = conn.execute(
             "SELECT owner_run_id, fencing_token FROM pr_d_internal.e12_worker_lease WHERE singleton"
@@ -445,7 +447,7 @@ def test_lease_cannot_be_renewed_after_expiry():
         assert current is not None
         conn.execute("UPDATE pr_d_internal.e12_worker_lease SET lease_expires_at = clock_timestamp() - interval '1 second'")
     assert renew(current[0], current[1]) is False
-    takeover = claim(RUN_A if current[0] != RUN_A else RUN_B)
+    takeover = claim(RUN_B)
     assert takeover[0] is True
     assert int(takeover[1]) == int(current[1]) + 1
 
