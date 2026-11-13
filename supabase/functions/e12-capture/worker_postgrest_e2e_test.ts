@@ -90,11 +90,10 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
 
     if (url.startsWith(postgrestUrl)) {
       const target = new URL(url);
-      const request = new Request(target, init);
-      const headers = new Headers(request.headers);
+      const headers = new Headers(init?.headers);
       headers.set("Authorization", "Bearer " + jwt);
       headers.set("apikey", "e12-disposable-test-key");
-      return realFetch(new Request(target, { method: request.method, headers, body: request.body }));
+      return realFetch(target, { ...init, headers });
     }
     throw new Error("unexpected E2E network destination: " + url);
   };
