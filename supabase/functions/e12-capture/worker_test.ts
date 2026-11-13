@@ -297,6 +297,136 @@ Deno.test("worker obtains source observation itself and persists only through th
   assert(!("hs_al_publicar_al_sync" in rpcBody), "legacy elapsed column must never be written by E12");
 });
 
+Deno.test("worker signs each eligible observation but sends one ordered batch CAS", async () => {
+  const calls: Array<{ url: string; body: string }> = [];
+  const candidates = [101, 102].map((id) => ({
+    id,
+    youtube_video_id: `video-${id}`,
+    created_at: "2026-10-30T02:00:00Z",
+  }));
+  const fetchImpl: typeof fetch = (input, init) => {
+    const url = String(input);
+    const body = typeof init?.body === "string" ? init.body : "";
+    calls.push({ url, body });
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_claim_e12_worker_lease")) {
+      return Promise.resolve(new Response(JSON.stringify([{
+        acquired: true, fencing_token: "8", lease_expires_at: "2026-10-30T05:31:30Z",
+      }]), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_renew_e12_worker_lease")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rest/v1/youtube_shorts_log")) {
+      return Promise.resolve(new Response(JSON.stringify(candidates), { status: 200 }));
+    }
+    if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
+      return Promise.resolve(new Response(JSON.stringify({
+        items: candidates.map((row, index) => ({
+          id: row.youtube_video_id,
+          snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+          statistics: { viewCount: String(100 + index) },
+          status: { privacyStatus: "public" },
+        })),
+      }), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_capture_views_batch")) {
+      const items = JSON.parse(body).p_items as Array<Record<string, unknown>>;
+      return Promise.resolve(new Response(JSON.stringify(items.map((item) => ({
+        row_id: item.p_row_id, captured: true,
+      }))), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_release_e12_worker_lease")) {
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    throw new Error("unexpected_test_fetch_url");
+  };
+
+  const response = await handleE12Capture(await signedRequest(), dependencies(fetchImpl));
+  const result = await response.json();
+  const renewals = calls.filter((call) => call.url.includes("/rpc/pr_d_renew_e12_worker_lease"));
+  const youtubeCalls = calls.filter((call) => call.url.startsWith("https://www.googleapis.com/youtube/v3/videos"));
+  const batchCalls = calls.filter((call) => call.url.includes("/rpc/pr_d_capture_views_batch"));
+  assert(response.status === 200 && result.captured === 2, "both eligible observations should be captured");
+  assert(renewals.length === 1, "a normal bounded batch must not renew once per observation");
+  assert(youtubeCalls.length === 1, "two videos must share one YouTube batch request");
+  assert(batchCalls.length === 1, "two observations must share one batch CAS request");
+  const items = JSON.parse(batchCalls[0].body).p_items as Array<Record<string, unknown>>;
+  assert(items.length === 2, "batch CAS must include both eligible observations");
+  assert(items[0].p_row_id === "101" && items[1].p_row_id === "102", "batch order must match candidate order");
+  assert(items.every((item) => item.p_run_id === "11111111-2222-4333-8444-555555555555" && item.p_fencing_token === "8"), "every item must bind the same live lease and fencing token");
+  assert(calls.length === 7, "two observations should require one batch transport rather than per-row CAS/renewal");
+});
+
+Deno.test("500-candidate worker cycle uses 10 source batches and 10 batch CAS calls", async () => {
+  const candidates = Array.from({ length: 500 }, (_, index) => ({
+    id: index + 1,
+    youtube_video_id: `video-${index + 1}`,
+    created_at: "2026-10-30T02:00:00Z",
+  }));
+  const counts = { slot: 0, lease: 0, renew: 0, candidates: 0, youtube: 0, batch: 0, release: 0 };
+  const fetchImpl: typeof fetch = (input, init) => {
+    const url = String(input);
+    const body = typeof init?.body === "string" ? init.body : "";
+    if (url.includes("/rpc/pr_d_claim_e12_worker_slot")) {
+      counts.slot++;
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_claim_e12_worker_lease")) {
+      counts.lease++;
+      return Promise.resolve(new Response(JSON.stringify([{
+        acquired: true, fencing_token: "9", lease_expires_at: "2026-10-30T05:31:30Z",
+      }]), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_renew_e12_worker_lease")) {
+      counts.renew++;
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    if (url.includes("/rest/v1/youtube_shorts_log")) {
+      counts.candidates++;
+      return Promise.resolve(new Response(JSON.stringify(candidates), {
+        status: 200, headers: { "content-range": "0-499/500" },
+      }));
+    }
+    if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
+      counts.youtube++;
+      const ids = new URL(url).searchParams.get("id")!.split(",");
+      return Promise.resolve(new Response(JSON.stringify({
+        items: ids.map((id, index) => ({
+          id,
+          snippet: { publishedAt: "2026-10-30T02:30:00Z" },
+          statistics: { viewCount: String(1000 + counts.youtube * 50 + index) },
+          status: { privacyStatus: "public" },
+        })),
+      }), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_capture_views_batch")) {
+      counts.batch++;
+      const items = JSON.parse(body).p_items as Array<Record<string, unknown>>;
+      return Promise.resolve(new Response(JSON.stringify(items.map((item) => ({
+        row_id: item.p_row_id, captured: true,
+      }))), { status: 200 }));
+    }
+    if (url.includes("/rpc/pr_d_release_e12_worker_lease")) {
+      counts.release++;
+      return Promise.resolve(new Response("true", { status: 200 }));
+    }
+    throw new Error("unexpected_test_fetch_url");
+  };
+
+  const response = await handleE12Capture(await signedRequest(), dependencies(fetchImpl));
+  const result = await response.json();
+  assert(response.status === 200 && result.candidates === 500, "all 500 candidates should be processed");
+  assert(result.eligible === 500 && result.captured === 500 && result.casLost === 0, "all synthetic observations should capture");
+  assert(counts.slot === 1 && counts.lease === 1 && counts.candidates === 1 && counts.release === 1, "worker lifecycle calls must remain singular");
+  assert(counts.renew === 10, "one lease renewal is expected per 50-video batch");
+  assert(counts.youtube === 10 && counts.batch === 10, "500 observations should use 10 source requests and 10 CAS batch requests");
+  const totalHttpRequests = Object.values(counts).reduce((sum, value) => sum + value, 0);
+  assert(totalHttpRequests === 34, "500-candidate mocked cycle should issue 34 total HTTP requests");
+});
+
 Deno.test("worker skips replayed signed minute before any YouTube request", async () => {
   let calls = 0;
   const fetchImpl: typeof fetch = (input) => {

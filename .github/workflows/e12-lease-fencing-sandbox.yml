@@ -8,10 +8,13 @@ on:
   push:
     branches:
       - sandbox/e12-lease-provenance-2026-11-12
+      - sandbox/e12-batch-cas-2026-11-13
     paths:
       - "supabase/functions/e12-capture/**"
       - "supabase/ops/e12_worker_lease_fencing.sql"
       - "supabase/ops/e12_collector_attestation.sql"
+      - "supabase/ops/e12_capture_batch_cas.sql"
+      - "supabase/migrations/*_e12_capture_batch_cas.sql"
       - "supabase/migrations/*_e12_collector_attestation.sql"
       - "supabase/migrations/*_e12_worker_lease_fencing.sql"
       - "tests/e12/**"
@@ -84,6 +87,22 @@ jobs:
           test -s "$migration"
           echo "Generated disposable attestation migration path: $migration"
           sha256sum "$migration"
+      - name: Generate batch CAS migration filename with Supabase CLI v3
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/e12-batch-migration-generator"
+          mkdir -p "$workdir"
+          cd "$workdir"
+          supabase init
+          supabase migration new e12_capture_batch_cas
+          migration="$(find supabase/migrations -maxdepth 1 -name '*_e12_capture_batch_cas.sql' -print -quit)"
+          test -n "$migration"
+          cmp "$GITHUB_WORKSPACE/supabase/ops/e12_capture_batch_cas.sql" "$GITHUB_WORKSPACE/supabase/migrations/20261113090000_e12_capture_batch_cas.sql"
+          cp "$GITHUB_WORKSPACE/supabase/migrations/20261113090000_e12_capture_batch_cas.sql" "$migration"
+          test -s "$migration"
+          echo "Generated disposable batch CAS migration path: $migration"
+          sha256sum "$migration"
       - name: Install PostgreSQL test dependency
         run: python -m pip install "psycopg[binary]>=3.2,<4" "pytest>=8,<9"
       - name: Run real PostgreSQL lease/fencing adversarial tests
@@ -91,4 +110,5 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/e12_lease_test
           E12_LEASE_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261112231203_e12_worker_lease_fencing.sql
           E12_ATTESTATION_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261112232558_e12_collector_attestation.sql
+          E12_BATCH_SQL_PATH: ${{ github.workspace }}/supabase/migrations/20261113090000_e12_capture_batch_cas.sql
         run: python -m pytest -q tests/e12/test_worker_lease_fencing.py

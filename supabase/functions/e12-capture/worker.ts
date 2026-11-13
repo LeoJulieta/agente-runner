@@ -182,51 +182,73 @@ async function fetchPendingCandidates(
   return rows;
 }
 
-async function persistObservation(
+type PendingCapture = {
+  row: CandidateRow;
+  observation: E12Observation;
+  payload: ObservationAttestationPayload;
+  attestation: ObservationAttestation;
+};
+
+async function persistObservationsBatch(
   supabaseUrl: string,
   serviceRoleKey: string,
-  row: CandidateRow,
-  observation: E12Observation,
+  entries: PendingCapture[],
   fetchImpl: typeof fetch,
   lease: WorkerLease,
-  payload: ObservationAttestationPayload,
-  attestation: ObservationAttestation,
   publicKeySpkiBase64: string,
-): Promise<boolean> {
+): Promise<boolean[]> {
+  if (entries.length < 1 || entries.length > YOUTUBE_BATCH_SIZE) {
+    throw new Error("e12_capture_batch_size_invalid");
+  }
+  const items = entries.map(({ row, observation, payload, attestation }) => ({
+    p_row_id: String(row.id),
+    p_youtube_video_id: observation.videoId,
+    p_views: observation.viewCount,
+    p_published_at: observation.publishedAt,
+    p_sync_captured_at: observation.syncCapturedAt,
+    p_run_id: lease.runId,
+    p_fencing_token: lease.fencingToken,
+    p_attestation_version: attestation.version,
+    p_attestation_algorithm: attestation.algorithm,
+    p_collector_key_id: attestation.keyId,
+    p_collector_public_key_spki_base64: publicKeySpkiBase64,
+    p_collector_payload_canonical: new TextDecoder().decode(canonicalizeObservationPayload(payload)),
+    p_collector_payload_sha256: attestation.payloadSha256,
+    p_collector_signature: attestation.signatureBase64,
+    p_collector_hmac_signature: attestation.hmacSignatureHex,
+    p_collector_response_sha256: payload.responseBodySha256,
+    p_collector_requested_ids_sha256: payload.requestedVideoIdsSha256,
+    p_collector_build: payload.collectorBuild,
+  }));
+
   const baseUrl = supabaseUrl.replace(/\/+$/, "");
-  const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/pr_d_capture_views_once`, {
+  const response = await fetchImpl(`${baseUrl}/rest/v1/rpc/pr_d_capture_views_batch`, {
     method: "POST",
     headers: {
       apikey: serviceRoleKey,
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      p_row_id: String(row.id),
-      p_youtube_video_id: observation.videoId,
-      p_views: observation.viewCount,
-      p_published_at: observation.publishedAt,
-      p_sync_captured_at: observation.syncCapturedAt,
-      p_run_id: lease.runId,
-      p_fencing_token: lease.fencingToken,
-      p_attestation_version: attestation.version,
-      p_attestation_algorithm: attestation.algorithm,
-      p_collector_key_id: attestation.keyId,
-      p_collector_public_key_spki_base64: publicKeySpkiBase64,
-      p_collector_payload_canonical: new TextDecoder().decode(canonicalizeObservationPayload(payload)),
-      p_collector_payload_sha256: attestation.payloadSha256,
-      p_collector_signature: attestation.signatureBase64,
-      p_collector_hmac_signature: attestation.hmacSignatureHex,
-      p_collector_response_sha256: payload.responseBodySha256,
-      p_collector_requested_ids_sha256: payload.requestedVideoIdsSha256,
-      p_collector_build: payload.collectorBuild,
-    }),
+    body: JSON.stringify({ p_items: items }),
     signal: AbortSignal.timeout(15_000),
   });
-  if (!response.ok) throw new Error(`supabase_capture_rpc_http_${response.status}`);
+  if (!response.ok) throw new Error(`supabase_capture_batch_rpc_http_${response.status}`);
   const result: unknown = await response.json();
-  if (typeof result !== "boolean") throw new Error("supabase_capture_rpc_response_invalid");
-  return result;
+  if (!Array.isArray(result) || result.length !== entries.length) {
+    throw new Error("supabase_capture_batch_response_invalid");
+  }
+
+  return result.map((item, index) => {
+    if (
+      !item ||
+      typeof item !== "object" ||
+      (item as Record<string, unknown>).row_id !== String(entries[index].row.id) ||
+      typeof (item as Record<string, unknown>).captured !== "boolean"
+    ) {
+      throw new Error("supabase_capture_batch_item_response_invalid");
+    }
+    return (item as { captured: boolean }).captured;
+  });
 }
 
 export async function handleE12Capture(
@@ -308,7 +330,8 @@ export async function handleE12Capture(
 
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const clockMicros = dependencies.clockMicros ?? nowEpochMicros;
-  const nowSeconds = (dependencies.nowEpochSeconds ?? (() => Math.floor(Date.now() / 1_000)))();
+  const getNowSeconds = dependencies.nowEpochSeconds ?? (() => Math.floor(Date.now() / 1_000));
+  const nowSeconds = getNowSeconds();
   const minuteBucketSeconds = Math.floor(Number(timestamp) / 60) * 60;
   const minuteBucket = new Date(minuteBucketSeconds * 1_000).toISOString();
 
@@ -351,10 +374,7 @@ export async function handleE12Capture(
         nowSeconds,
       );
 
-      if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
-        throw new Error("e12_worker_lease_lost");
-      }
-
+      let lastLeaseRenewalEpochSeconds = getNowSeconds();
       const byVideoId = new Map<string, CandidateRow>();
       const duplicateVideoIds = new Set<string>();
       for (const row of candidates) {
@@ -377,6 +397,7 @@ export async function handleE12Capture(
         if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
           throw new Error("e12_worker_lease_lost");
         }
+        lastLeaseRenewalEpochSeconds = getNowSeconds();
         const batchIds = videoIds.slice(offset, offset + YOUTUBE_BATCH_SIZE);
         const observations = await collectYouTubeBatch(
           batchIds,
@@ -384,6 +405,7 @@ export async function handleE12Capture(
           fetchImpl,
           clockMicros,
         );
+        const pending: PendingCapture[] = [];
 
         for (const observation of observations) {
           if (!observation.eligible) {
@@ -392,9 +414,6 @@ export async function handleE12Capture(
           }
           const row = byVideoId.get(observation.videoId);
           if (!row) continue;
-          if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
-            throw new Error("e12_worker_lease_lost");
-          }
           eligible++;
           const payload: ObservationAttestationPayload = {
             keyId: provenanceKeyId,
@@ -421,19 +440,28 @@ export async function handleE12Capture(
             provenanceHmacSecret,
           );
           if (!signatureValid) throw new Error("e12_observation_attestation_invalid");
-          const didCapture = await persistObservation(
+          pending.push({ row, observation, payload, attestation });
+        }
+
+        if (pending.length > 0) {
+          if (getNowSeconds() >= lastLeaseRenewalEpochSeconds + leaseTtlSeconds - 30) {
+            if (!await renewWorkerLease(supabaseUrl, serviceRoleKey, lease, leaseTtlSeconds, fetchImpl)) {
+              throw new Error("e12_worker_lease_lost");
+            }
+            lastLeaseRenewalEpochSeconds = getNowSeconds();
+          }
+          const outcomes = await persistObservationsBatch(
             supabaseUrl,
             serviceRoleKey,
-            row,
-            observation,
+            pending,
             fetchImpl,
             lease,
-            payload,
-            attestation,
             provenancePublicKey,
           );
-          if (didCapture) captured++;
-          else casLost++;
+          for (const didCapture of outcomes) {
+            if (didCapture) captured++;
+            else casLost++;
+          }
         }
       }
 

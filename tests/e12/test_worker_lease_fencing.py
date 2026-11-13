@@ -12,6 +12,7 @@ import pytest
 DATABASE_URL = os.environ["TEST_DATABASE_URL"]
 LEASE_MIGRATION = os.environ["E12_LEASE_SQL_PATH"]
 ATTESTATION_MIGRATION = os.environ["E12_ATTESTATION_SQL_PATH"]
+BATCH_MIGRATION = os.environ["E12_BATCH_SQL_PATH"]
 RUN_A = uuid.UUID("11111111-2222-4333-8444-555555555555")
 RUN_B = uuid.UUID("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee")
 PUBLISHED = "2026-10-30T02:30:00Z"
@@ -146,6 +147,7 @@ def prepared_database():
     bootstrap()
     apply_sql_file(LEASE_MIGRATION)
     apply_sql_file(ATTESTATION_MIGRATION)
+    apply_sql_file(BATCH_MIGRATION)
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("""
             INSERT INTO pr_d_internal.e12_collector_key_registry(
@@ -185,6 +187,161 @@ def capture(run_id, token, row_id=1, video_id="video-1", hmac_override=None):
                 hmac_signature, RESPONSE_SHA, REQUESTED_IDS_SHA, COLLECTOR_BUILD,
             ),
         ).fetchone()[0]
+
+
+def batch_item(run_id, token, row_id, video_id, views="123", hmac_override=None):
+    canonical = canonical_payload(run_id, token, row_id, video_id, views)
+    payload_sha = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    hmac_signature = hmac_override or hmac.new(
+        HMAC_SECRET, canonical.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    return {
+        "p_row_id": str(row_id),
+        "p_youtube_video_id": video_id,
+        "p_views": views,
+        "p_published_at": PUBLISHED,
+        "p_sync_captured_at": CAPTURED,
+        "p_run_id": str(run_id),
+        "p_fencing_token": str(token),
+        "p_attestation_version": "e12-observation-attestation/v1",
+        "p_attestation_algorithm": "Ed25519",
+        "p_collector_key_id": KEY_ID,
+        "p_collector_public_key_spki_base64": PUBLIC_KEY,
+        "p_collector_payload_canonical": canonical,
+        "p_collector_payload_sha256": payload_sha,
+        "p_collector_signature": SIGNATURE,
+        "p_collector_hmac_signature": hmac_signature,
+        "p_collector_response_sha256": RESPONSE_SHA,
+        "p_collector_requested_ids_sha256": REQUESTED_IDS_SHA,
+        "p_collector_build": COLLECTOR_BUILD,
+    }
+
+
+def capture_batch(items):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT public.pr_d_capture_views_batch(%s::jsonb)",
+            (json.dumps(items),),
+        ).fetchone()[0]
+
+
+def test_batch_cas_preserves_per_row_attestation_and_first_write_wins():
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+    lease = claim(RUN_A)
+    token = int(lease[1])
+    items = [
+        batch_item(RUN_A, token, 1, "video-1", "123"),
+        batch_item(RUN_A, token, 2, "video-2", "456"),
+        batch_item(RUN_A, token, 1, "video-1", "789"),
+    ]
+    result = capture_batch(items)
+    assert result == [
+        {"row_id": "1", "captured": True},
+        {"row_id": "2", "captured": True},
+        {"row_id": "1", "captured": False},
+    ]
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, youtube_video_id, views_primeras_3h, collector_hmac_signature "
+            "FROM public.youtube_shorts_log WHERE id IN (1,2) ORDER BY id"
+        ).fetchall()
+        assert rows[0][:3] == (1, "video-1", 123)
+        assert rows[1][:3] == (2, "video-2", 456)
+        assert rows[0][3] == items[0]["p_collector_hmac_signature"]
+        assert rows[1][3] == items[1]["p_collector_hmac_signature"]
+
+
+def test_batch_sql_exception_rolls_back_all_prior_items():
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+    lease = claim(RUN_A)
+    token = int(lease[1])
+    items = [
+        batch_item(RUN_A, token, 1, "video-1"),
+        batch_item(RUN_A, token, 2, "video-2"),
+    ]
+    items[1]["p_row_id"] = "not-a-bigint"
+    with pytest.raises(psycopg.errors.InvalidTextRepresentation):
+        capture_batch(items)
+    with connect() as conn:
+        values = conn.execute(
+            "SELECT views_primeras_3h FROM public.youtube_shorts_log WHERE id IN (1,2) ORDER BY id"
+        ).fetchall()
+        assert values == [(None,), (None,)]
+
+
+def test_batch_bad_hmac_is_rejected_per_item_without_weakening_valid_item():
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+    lease = claim(RUN_A)
+    token = int(lease[1])
+    items = [
+        batch_item(RUN_A, token, 1, "video-1"),
+        batch_item(RUN_A, token, 2, "video-2", hmac_override="0" * 64),
+    ]
+    assert capture_batch(items) == [
+        {"row_id": "1", "captured": True},
+        {"row_id": "2", "captured": False},
+    ]
+
+
+def test_concurrent_batch_calls_have_exactly_one_first_write_winner():
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+    lease = claim(RUN_A)
+    token = int(lease[1])
+    item = batch_item(RUN_A, token, 1, "video-1")
+    barrier = threading.Barrier(2)
+
+    def contender():
+        barrier.wait(timeout=10)
+        return capture_batch([item])[0]["captured"]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda _: contender(), range(2)))
+    assert sorted(outcomes) == [False, True]
+
+
+def test_batch_missing_required_field_is_rejected():
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+    lease = claim(RUN_A)
+    item = batch_item(RUN_A, int(lease[1]), 1, "video-1")
+    del item["p_collector_hmac_signature"]
+    with pytest.raises(psycopg.errors.InvalidParameterValue):
+        capture_batch([item])
+    with connect() as conn:
+        assert conn.execute(
+            "SELECT views_primeras_3h FROM public.youtube_shorts_log WHERE id=1"
+        ).fetchone()[0] is None
+
+
+def test_batch_rejects_empty_oversized_and_non_array_payloads():
+    with pytest.raises(psycopg.errors.InvalidParameterValue):
+        capture_batch([])
+    with pytest.raises(psycopg.errors.InvalidParameterValue):
+        capture_batch([{}] * 51)
+    with pytest.raises(psycopg.errors.InvalidParameterValue):
+        with connect() as conn:
+            conn.execute("SELECT public.pr_d_capture_views_batch(%s::jsonb)", ('{"not":"array"}',))
+
+
+def test_batch_stale_fencing_token_cannot_write_after_takeover():
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
+    first = claim(RUN_A)
+    old_token = int(first[1])
+    assert release(RUN_A, old_token) is True
+    second = claim(RUN_B)
+    new_token = int(second[1])
+    assert new_token == old_token + 1
+    assert capture_batch([batch_item(RUN_A, old_token, 1, "video-1")]) == [
+        {"row_id": "1", "captured": False}
+    ]
+    assert capture_batch([batch_item(RUN_B, new_token, 1, "video-1")]) == [
+        {"row_id": "1", "captured": True}
+    ]
 
 
 def test_legacy_capture_row_survives_attestation_upgrade():
