@@ -1,4 +1,5 @@
 import { handleE12Capture } from "./worker.ts";
+import { verifyObservationAttestation, type ObservationAttestation, type ObservationAttestationPayload } from "./provenance.ts";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -132,7 +133,7 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
 
   const verifyUrl = new URL(postgrestUrl + "/youtube_shorts_log");
   verifyUrl.searchParams.set("id", "eq.4");
-  verifyUrl.searchParams.set("select", "id,youtube_video_id,views_primeras_3h,published_at,sync_captured_at,e12_capture_run_id,e12_fencing_token,collector_attestation_algorithm,collector_key_id,collector_payload_sha256,collector_signature,collector_hmac_signature");
+  verifyUrl.searchParams.set("select", "id,youtube_video_id,views_primeras_3h,published_at,sync_captured_at,e12_capture_run_id,e12_fencing_token,collector_attestation_algorithm,collector_key_id,collector_payload_canonical,collector_payload_sha256,collector_signature,collector_hmac_signature");
   const verifyResponse = await realFetch(verifyUrl, {
     headers: { Authorization: "Bearer " + jwt, apikey: "e12-disposable-test-key" },
   });
@@ -149,4 +150,31 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
   assert(/^[a-f0-9]{64}$/.test(row.collector_payload_sha256), "persisted canonical payload digest must be valid");
   assert(/^[A-Za-z0-9+/]{86}==$/.test(row.collector_signature), "persisted Ed25519 signature must have the expected encoding");
   assert(/^[a-f0-9]{64}$/.test(row.collector_hmac_signature), "persisted HMAC must be present");
+  const canonical = JSON.parse(row.collector_payload_canonical) as string[];
+  assert(canonical.length === 12, "persisted canonical payload must have all 12 fields");
+  const attestationPayload: ObservationAttestationPayload = {
+    keyId: canonical[1],
+    runId: canonical[2],
+    fencingToken: canonical[3],
+    rowId: canonical[4],
+    videoId: canonical[5],
+    publishedAt: canonical[6],
+    viewCount: canonical[7],
+    syncCapturedAt: canonical[8],
+    responseBodySha256: canonical[9],
+    requestedVideoIdsSha256: canonical[10],
+    collectorBuild: canonical[11],
+  };
+  const attestation: ObservationAttestation = {
+    version: canonical[0] as ObservationAttestation["version"],
+    algorithm: "Ed25519",
+    keyId: row.collector_key_id,
+    payloadSha256: row.collector_payload_sha256,
+    signatureBase64: row.collector_signature,
+    hmacSignatureHex: row.collector_hmac_signature,
+  };
+  assert(
+    await verifyObservationAttestation(attestationPayload, attestation, publicKey, hmacSecret),
+    "persisted canonical payload, Ed25519 signature and HMAC must verify independently after HTTP readback",
+  );
 });
