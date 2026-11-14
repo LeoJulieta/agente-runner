@@ -28,6 +28,7 @@ CREATE TABLE pr_d_internal.e12_worker_lease (
     updated_at timestamptz NOT NULL
 );
 ALTER TABLE pr_d_internal.e12_worker_lease OWNER TO pr_d_capture_owner;
+SET ROLE pr_d_capture_owner;
 REVOKE ALL ON TABLE pr_d_internal.e12_worker_lease FROM PUBLIC, anon, authenticated, service_role;
 COMMENT ON TABLE pr_d_internal.e12_worker_lease IS
     'Single active E12 execution lease. Fencing token increases on takeover and is checked in the capture transaction.';
@@ -137,6 +138,7 @@ REVOKE ALL ON FUNCTION pr_d_internal.pr_d_release_e12_worker_lease(uuid, bigint)
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_claim_e12_worker_lease(uuid, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_renew_e12_worker_lease(uuid, bigint, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_release_e12_worker_lease(uuid, bigint) TO service_role;
+RESET ROLE;
 
 CREATE OR REPLACE FUNCTION public.pr_d_claim_e12_worker_lease(p_run_id uuid, p_ttl_seconds integer)
 RETURNS TABLE(acquired boolean, fencing_token text, lease_expires_at timestamptz)
@@ -160,6 +162,7 @@ GRANT EXECUTE ON FUNCTION public.pr_d_release_e12_worker_lease(uuid, bigint) TO 
 
 -- Remove old CAS signatures so no caller can bypass fencing after upgrade.
 DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz);
+SET ROLE pr_d_capture_owner;
 DROP FUNCTION IF EXISTS pr_d_internal.pr_d_capture_views_once(bigint, text, numeric, timestamptz, timestamptz);
 
 CREATE FUNCTION pr_d_internal.pr_d_capture_views_once(
@@ -220,6 +223,7 @@ REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_once(
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint
 ) TO service_role;
+RESET ROLE;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
     p_row_id bigint, p_youtube_video_id text, p_views numeric,

@@ -16,6 +16,7 @@ BEGIN
 END;
 $preflight$;
 
+SET ROLE pr_d_capture_owner;
 CREATE FUNCTION pr_d_internal.pr_d_capture_views_batch(p_items jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -102,6 +103,7 @@ REVOKE ALL ON FUNCTION pr_d_internal.pr_d_capture_views_batch(jsonb)
     FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_batch(jsonb)
     TO service_role;
+RESET ROLE;
 
 CREATE FUNCTION public.pr_d_capture_views_batch(p_items jsonb)
 RETURNS jsonb
