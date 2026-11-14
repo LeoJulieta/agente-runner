@@ -207,3 +207,12 @@ Los tres jobs quedaron SUCCESS:
 - `full-migration-chain`
 
 El nuevo job de migraciones aplicó las cinco migraciones E12 en orden sobre un baseline sintético y comprobó preservación de fila legacy, RLS/owner, privilegios, replay del run-slot y claim del lease. Esto cierra la omisión anterior de no ejecutar las cinco migraciones E12 juntas sobre un baseline limpio sintético. No cierra la brecha entre ese baseline y el historial/esquema real de producción ni valida las 37 migraciones históricas de Supabase.
+
+
+## Addendum CI #99 — concurrencia de ocho contendientes — 2026-11-14
+
+Run #99 `43547415306`, SHA `4b86a23617a606a9fbf96daf36798a5856e929bc`: **SUCCESS**, los tres jobs verdes.
+
+El job `lease-fencing` ejecutó 31 tests Deno y 14 tests PostgreSQL; ambos pasaron. Se amplió la prueba de first-write-wins de 2 a 8 invocaciones simultáneas y se agregó una carrera de 8 reclamaciones de lease con exactamente un ganador. También se agregó takeover tras expiración forzada, con incremento del fencing token y rechazo de renovación, liberación y escritura del worker antiguo.
+
+Esto demuestra exclusión mutua ante ocho contendientes por un lease singleton en PostgreSQL 17 descartable. **No** demuestra throughput de ocho workers productivos en paralelo: el contrato E12 actual es deliberadamente singleton. La arquitectura multiagente futura deberá particionar leases por recurso/tarea y conservar límites globales, idempotencia y presupuesto; no debe eliminar la exclusión mutua de E12.
