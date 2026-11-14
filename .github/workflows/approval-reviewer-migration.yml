@@ -1,0 +1,43 @@
+name: Authenticated approval reviewer migration tests
+
+on:
+  push:
+    branches:
+      - security/authenticated-approval-reviewer-flow-2026-11-14
+    paths:
+      - "supabase/migrations/20261114190000_authenticated_approval_reviewer_flow.sql"
+      - "tests/security/**"
+      - ".github/workflows/approval-reviewer-migration.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-reviewer-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL driver
+        run: pip install "psycopg[binary]"
+      - name: Exercise reviewer RLS and atomic RPC
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: python -m unittest discover -s tests/security -v
