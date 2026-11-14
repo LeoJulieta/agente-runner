@@ -53,7 +53,7 @@ export function resolveSupabaseApiKey(env: (name: string) => string | undefined)
   // Transitional compatibility for projects that have not migrated off the
   // legacy service_role JWT key. Never put a new sb_secret_ value here.
   const legacyKey = env("SUPABASE_SERVICE_ROLE_KEY");
-  return legacyKey || undefined;
+  return legacyKey?.startsWith("eyJ") ? legacyKey : undefined;
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
