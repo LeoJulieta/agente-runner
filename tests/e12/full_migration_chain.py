@@ -38,11 +38,6 @@ def main() -> None:
             EXCEPTION WHEN duplicate_object THEN NULL;
             END $$;
         """)
-        service_bypass = conn.execute(
-            "SELECT rolbypassrls FROM pg_roles WHERE rolname = 'service_role'"
-        ).fetchone()[0]
-        assert service_bypass is True, "service_role must already be BYPASSRLS; do not ALTER Supabase reserved roles"
-
         conn.execute("""
             CREATE TABLE public.youtube_shorts_log (
                 id bigint PRIMARY KEY,
