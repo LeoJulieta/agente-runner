@@ -74,6 +74,30 @@ def main() -> None:
             },
             flush=True,
         )
+        # Test-only probe in this disposable local stack. It reveals the role
+        # PostgREST actually uses for an opaque sb_secret apikey request; it is
+        # not part of any product migration and is never installed in production.
+        conn.execute("""
+            CREATE OR REPLACE FUNCTION public.e12_gateway_context_probe()
+            RETURNS TABLE(
+                current_user_name text,
+                session_user_name text,
+                jwt_role text,
+                claims_present boolean,
+                internal_schema_usage boolean
+            )
+            LANGUAGE sql
+            SECURITY INVOKER
+            SET search_path = pg_catalog
+            AS $
+                SELECT current_user::text,
+                       session_user::text,
+                       NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+                       NULLIF(current_setting('request.jwt.claims', true), '') IS NOT NULL,
+                       has_schema_privilege(current_user, 'pr_d_internal', 'USAGE')
+            $
+        """)
+        conn.execute("GRANT EXECUTE ON FUNCTION public.e12_gateway_context_probe() TO anon, service_role")
         conn.execute("NOTIFY pgrst, 'reload schema'")
 
     cron_secret = "e12-local-gateway-cron-hmac-secret-at-least-32-bytes"
