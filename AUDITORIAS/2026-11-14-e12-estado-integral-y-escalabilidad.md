@@ -272,3 +272,18 @@ Corrección en el SHA que ejecuta CI #115:
 - comprobar que la conversión int4→numeric(20,0) conserva el valor legacy y que la policy anon_read sigue presente, para que el test no oculte el hallazgo.
 
 CI #115 está en curso. El test de API Gateway local todavía no se considera aprobado.
+
+
+## Addendum — compatibilidad de roles administrados Supabase — 2026-11-14
+
+CI #118 run 43548777446 terminó FAILURE: lease-fencing, PostgREST y full-migration-chain SUCCESS; el job local Supabase falló en el diagnóstico del rol pr_d_capture_owner. El diagnóstico demostró que Supabase local, al crear un rol nuevo, añade una membresía administrativa: pr_d_capture_owner es el rol concedido a postgres. No es un miembro de otro rol.
+
+La lectura de pg_auth_members en producción mostró el mismo patrón para los roles administrados existentes: postgres es miembro de anon, authenticated, authenticator, service_role y otros roles de plataforma. Por eso la regla original de "cero membresías" era demasiado estricta para Supabase.
+
+Corrección en commit 4e62f08adc04cbfd28f0a373eafe1db7a5f933f6:
+- permitir únicamente la membresía administrativa pr_d_capture_owner → postgres;
+- rechazar cualquier otro miembro o rol heredado;
+- mantener NOLOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE, NOINHERIT, NOREPLICATION y NOBYPASSRLS;
+- preparar el rol en el test local con la misma membresía administrada y verificar que no haya otros vínculos.
+
+CI #119 run 43549363896 está QUEUED. El cambio es sandbox; no se creó ni alteró ningún rol productivo.
