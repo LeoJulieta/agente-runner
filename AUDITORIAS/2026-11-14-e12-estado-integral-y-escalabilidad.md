@@ -216,3 +216,24 @@ Run #99 `43547415306`, SHA `4b86a23617a606a9fbf96daf36798a5856e929bc`: **SUCCESS
 El job `lease-fencing` ejecutó 31 tests Deno y 14 tests PostgreSQL; ambos pasaron. Se amplió la prueba de first-write-wins de 2 a 8 invocaciones simultáneas y se agregó una carrera de 8 reclamaciones de lease con exactamente un ganador. También se agregó takeover tras expiración forzada, con incremento del fencing token y rechazo de renovación, liberación y escritura del worker antiguo.
 
 Esto demuestra exclusión mutua ante ocho contendientes por un lease singleton en PostgreSQL 17 descartable. **No** demuestra throughput de ocho workers productivos en paralelo: el contrato E12 actual es deliberadamente singleton. La arquitectura multiagente futura deberá particionar leases por recurso/tarea y conservar límites globales, idempotencia y presupuesto; no debe eliminar la exclusión mutua de E12.
+
+
+## Addendum de claves modernas Supabase — 2026-11-14
+
+La documentación oficial vigente confirma:
+- `sb_secret_...` es una clave opaca, no un JWT; se envía en `apikey`, no como `Authorization: Bearer`.
+- El API Gateway hosted resuelve una secret key al rol PostgreSQL `service_role`, que tiene `BYPASSRLS` y acceso elevado completo.
+- En Edge Functions, Supabase inyecta `SUPABASE_SECRET_KEYS` como mapa JSON; puede existir una clave por componente. `SUPABASE_SERVICE_ROLE_KEY` sigue siendo la variable legacy JWT.
+- Las secret keys no son permisos finos: cada una sigue siendo de privilegio elevado. La separación por componente reduce el alcance de rotación, no los privilegios SQL.
+
+El worker ahora prefiere `SUPABASE_SECRET_KEYS["e12-capture"]`, luego `default`, y envía el valor solo en `apikey`. La variable legacy se admite solo como transición; el cambio que rechaza un `sb_secret_` mal ubicado en `SUPABASE_SERVICE_ROLE_KEY` está incluido en el SHA `84b1464d2e781241816215b29d289df3c8c6e164`, con CI #104 todavía en curso al escribir esta nota.
+
+CI #102 `43547600653` SUCCESS validó el helper moderno, 32 tests Deno, 14 tests PostgreSQL, el worker E2E y el contrato HTTP. El adaptador PostgREST del E2E verifica que el worker emita `apikey: sb_secret_...` y no Authorization; luego convierte la clave desechable a un JWT de prueba para el PostgREST independiente. **No es una prueba del API Gateway Supabase real.**
+
+Riesgo arquitectónico para 8+ agentes: no distribuir una secret key `service_role` a cada agente. El controlador/executor privilegiado debe ser el único custodio de la clave; los agentes secundarios reciben capacidades/tokens acotados y no credenciales globales. Una clave por componente no reduce el permiso SQL que otorga `service_role`.
+
+Referencias oficiales:
+- https://supabase.com/docs/guides/getting-started/api-keys
+- https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys
+- https://supabase.com/docs/guides/functions/auth-headers
+- https://supabase.com/docs/guides/functions/secrets
