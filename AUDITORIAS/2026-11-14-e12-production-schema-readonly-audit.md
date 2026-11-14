@@ -156,3 +156,10 @@ Remediaciones oficiales enlazadas por el Advisor:
 - Multiple permissive policies: https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies
 
 No se alteraron funciones, policies, índices, extensiones ni configuración Auth.
+
+
+## Addendum: membresías administrativas de roles Supabase
+
+La consulta de pg_auth_members en producción mostró que postgres es miembro administrativo (admin_option=true) de roles administrados como anon, authenticated, authenticator y service_role. En el stack local, crear pr_d_capture_owner también crea la membresía pr_d_capture_owner → postgres.
+
+La preflight E12 original exigía cero membresías y por eso fallaba en el stack Supabase local. Se corrigió en sandbox para permitir exclusivamente esa membresía administrativa hacia postgres y seguir rechazando cualquier otro miembro o rol heredado. No se creó ni alteró ningún rol en producción.
