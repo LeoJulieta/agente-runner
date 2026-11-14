@@ -89,13 +89,13 @@ def main() -> None:
             LANGUAGE sql
             SECURITY INVOKER
             SET search_path = pg_catalog
-            AS $
+            AS $$
                 SELECT current_user::text,
                        session_user::text,
                        NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
                        NULLIF(current_setting('request.jwt.claims', true), '') IS NOT NULL,
                        has_schema_privilege(current_user, 'pr_d_internal', 'USAGE')
-            $
+            $$
         """)
         conn.execute("GRANT EXECUTE ON FUNCTION public.e12_gateway_context_probe() TO anon, service_role")
         conn.execute("NOTIFY pgrst, 'reload schema'")
