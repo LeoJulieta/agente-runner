@@ -50,6 +50,8 @@ def main() -> None:
         privileges = conn.execute(
             """
             SELECT
+                current_user,
+                session_user,
                 has_schema_privilege('service_role', 'pr_d_internal', 'USAGE'),
                 has_function_privilege(
                     'service_role',
@@ -61,16 +63,24 @@ def main() -> None:
                     'public.pr_d_claim_e12_worker_slot(timestamptz)',
                     'EXECUTE'
                 ),
-                pg_has_role('authenticator', 'service_role', 'SET')
+                pg_has_role('authenticator', 'service_role', 'SET'),
+                (SELECT nspacl::text FROM pg_namespace WHERE nspname = 'pr_d_internal'),
+                (SELECT oid FROM pg_roles WHERE rolname = 'service_role'),
+                (SELECT rolinherit FROM pg_roles WHERE rolname = 'service_role')
             """
         ).fetchone()
         print(
             "E12_GATEWAY_EFFECTIVE_SQL_PRIVILEGES:",
             {
-                "service_role_schema_usage": privileges[0],
-                "service_role_internal_slot_execute": privileges[1],
-                "service_role_public_slot_execute": privileges[2],
-                "authenticator_can_set_service_role": privileges[3],
+                "migration_session_user": privileges[0],
+                "migration_session_role": privileges[1],
+                "service_role_schema_usage": privileges[2],
+                "service_role_internal_slot_execute": privileges[3],
+                "service_role_public_slot_execute": privileges[4],
+                "authenticator_can_set_service_role": privileges[5],
+                "internal_schema_acl": privileges[6],
+                "service_role_oid": privileges[7],
+                "service_role_inherit": privileges[8],
             },
             flush=True,
         )
