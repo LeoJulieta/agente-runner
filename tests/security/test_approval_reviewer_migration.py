@@ -85,6 +85,10 @@ class ApprovalReviewerMigrationTests(unittest.TestCase):
             )
 
             db.execute(migration_sql)
+            db.execute(
+                "INSERT INTO public.approval_reviewers(user_id, active) VALUES (%s, true)",
+                (REVIEWER,),
+            )
 
             privileges = db.execute("""
                 SELECT
