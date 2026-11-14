@@ -151,3 +151,12 @@ No se hicieron escrituras productivas, despliegues, cambios de secretos/permisos
 - CI #94: https://github.com/LeoJulieta/agente-runner/actions/runs/43546440805
 - Rama: https://github.com/LeoJulieta/agente-runner/tree/sandbox/e12-postgrest-contract-2026-11-13
 - Informe anterior: AUDITORIAS/2026-11-13-e12-postgrest-contract.md
+
+
+## Addendum de auditoría de migraciones — 2026-11-14
+
+Una inspección adicional de `tests/e12/test_worker_lease_fencing.py` y `tests/e12/prepare_postgrest.py` detectó una limitación importante del setup CI: `support.bootstrap()` crea directamente un esquema base sintético, incluye una función CAS placeholder y filas de prueba; después el job aplica solo las tres migraciones E12 de lease, atestación y batch. El directorio contiene además dos migraciones E12 anteriores:
+- `20261112160000_pr_d_sync_capture_provenance_candidate.sql`
+- `20261112180000_pr_d_e12_worker_run_slot.sql`
+
+Por tanto, el test actual **no demuestra una instalación limpia de las cinco migraciones E12 en secuencia** ni valida la migración del run-slot tal como está versionada. El worker E2E usa una función slot creada manualmente por `prepare_postgrest.py`, no la función desplegada desde la migración `20261112180000...`. La base descartable prueba contratos seleccionados y lógica posterior, no el grafo completo de instalación. Esto se agrega como gate prioritario: reconstruir un baseline realista desde migraciones versionadas y aplicar el conjunto E12 completo en orden, sin precrear objetos que las migraciones deben crear. Mantener una prueba aparte para upgrade desde un esquema preexistente. No promover hasta resolverlo.
