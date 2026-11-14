@@ -79,14 +79,16 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
     if (url.startsWith("https://www.googleapis.com/youtube/v3/videos")) {
       youtubeCalls++;
       const parsed = new URL(url);
-      assert(parsed.searchParams.get("id") === "e12-postgrest-e2e-video", "worker must request the seeded candidate");
+      const requestedIds = (parsed.searchParams.get("id") ?? "").split(",").filter(Boolean);
+      assert(requestedIds.includes("e12-postgrest-e2e-video"), "worker must request the seeded E2E candidate");
+      assert(requestedIds.length > 0, "worker must request at least one candidate");
       return new Response(JSON.stringify({
-        items: [{
-          id: "e12-postgrest-e2e-video",
+        items: requestedIds.map((id) => ({
+          id,
           snippet: { publishedAt },
           statistics: { viewCount: "987654321" },
           status: { privacyStatus: "public" },
-        }],
+        })),
       }), { status: 200, headers: { "content-type": "application/json" } });
     }
 
@@ -140,7 +142,7 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
     "full worker must complete successfully; got " + JSON.stringify(result) +
       "; PostgREST trace: " + JSON.stringify(postgrestTrace),
   );
-  assert(result.candidates === 1 && result.eligible === 1 && result.captured === 1, "one real database candidate must be captured");
+  assert(result.candidates === 3 && result.eligible === 3 && result.captured === 3, "all three disposable database candidates must be captured");
   assert(youtubeCalls === 1, "YouTube must be called once through the deterministic fake");
 
   const verifyUrl = new URL(postgrestUrl + "/youtube_shorts_log");
@@ -160,7 +162,7 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
   assert(row.collector_attestation_algorithm === "Ed25519", "persisted attestation algorithm must be Ed25519");
   assert(row.collector_key_id === "e12-postgrest-e2e-key", "persisted key ID must match the registered ephemeral key");
   assert(/^[a-f0-9]{64}$/.test(row.collector_payload_sha256), "persisted canonical payload digest must be valid");
-  assert(/^[A-Za-z0-9+/]{86}==$/.test(row.collector_signature), "persisted Ed25519 signature must have the expected encoding");
+  assert(/^[A-Za-z0-9+/]{86}=$/.test(row.collector_signature), "persisted Ed25519 signature must have the expected encoding");
   assert(/^[a-f0-9]{64}$/.test(row.collector_hmac_signature), "persisted HMAC must be present");
   const canonical = JSON.parse(row.collector_payload_canonical) as string[];
   assert(canonical.length === 12, "persisted canonical payload must have all 12 fields");
