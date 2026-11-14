@@ -23,6 +23,7 @@ USING (user_id = auth.uid() AND active);
 
 -- Remove all direct anonymous/authenticated access to approval rows.
 REVOKE ALL PRIVILEGES ON TABLE public.pending_approvals FROM anon, authenticated;
+REVOKE UPDATE (status, resolved_at) ON TABLE public.pending_approvals FROM anon;
 
 GRANT SELECT ON TABLE public.pending_approvals TO authenticated;
 
