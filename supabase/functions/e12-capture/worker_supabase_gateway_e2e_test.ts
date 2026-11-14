@@ -46,6 +46,20 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
   assert(publishableKey.startsWith("sb_publishable_"), "local API key must be the modern publishable key");
   const baseUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
 
+  // Inspect the role and claims actually selected by the local Gateway for
+  // an opaque sb_secret apikey-only request. This probe exists only in the
+  // disposable CI database and is not part of product migrations.
+  const contextProbe = await fetch(baseUrl + "/rest/v1/rpc/e12_gateway_context_probe", {
+    method: "POST",
+    headers: { apikey: secretKey, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  const contextBody = await contextProbe.clone().text();
+  assert(contextProbe.ok, "Gateway role probe must succeed: HTTP " + contextProbe.status + " " + contextBody.slice(0, 500));
+  const contextRows: unknown = JSON.parse(contextBody);
+  assert(Array.isArray(contextRows) && contextRows.length === 1, "Gateway role probe must return one row");
+  const context = contextRows[0] as Record<string, unknown>;
+  console.log("E12_GATEWAY_REQUEST_CONTEXT", JSON.stringify(context));
   // Supabase documents that /rest/v1/ OpenAPI requires an elevated key.
   // This read-only probe confirms the local Gateway accepts sb_secret without
   // an Authorization: Bearer header before testing the protected RPC path.
