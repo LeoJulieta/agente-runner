@@ -47,6 +47,33 @@ def main() -> None:
             )
             """
         )
+        privileges = conn.execute(
+            """
+            SELECT
+                has_schema_privilege('service_role', 'pr_d_internal', 'USAGE'),
+                has_function_privilege(
+                    'service_role',
+                    'pr_d_internal.pr_d_claim_e12_worker_slot(timestamptz)',
+                    'EXECUTE'
+                ),
+                has_function_privilege(
+                    'service_role',
+                    'public.pr_d_claim_e12_worker_slot(timestamptz)',
+                    'EXECUTE'
+                ),
+                pg_has_role('authenticator', 'service_role', 'SET')
+            """
+        ).fetchone()
+        print(
+            "E12_GATEWAY_EFFECTIVE_SQL_PRIVILEGES:",
+            {
+                "service_role_schema_usage": privileges[0],
+                "service_role_internal_slot_execute": privileges[1],
+                "service_role_public_slot_execute": privileges[2],
+                "authenticator_can_set_service_role": privileges[3],
+            },
+            flush=True,
+        )
         conn.execute("NOTIFY pgrst, 'reload schema'")
 
     cron_secret = "e12-local-gateway-cron-hmac-secret-at-least-32-bytes"

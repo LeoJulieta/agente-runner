@@ -46,6 +46,19 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
   assert(publishableKey.startsWith("sb_publishable_"), "local API key must be the modern publishable key");
   const baseUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
 
+  // Supabase documents that /rest/v1/ OpenAPI requires an elevated key.
+  // This read-only probe confirms the local Gateway accepts sb_secret without
+  // an Authorization: Bearer header before testing the protected RPC path.
+  const apiRootProbe = await fetch(baseUrl + "/rest/v1/", {
+    headers: { apikey: secretKey },
+  });
+  const apiRootBody = await apiRootProbe.clone().text();
+  assert(
+    apiRootProbe.ok,
+    "local Gateway must recognize sb_secret from apikey alone: HTTP " +
+      apiRootProbe.status + " " + apiRootBody.slice(0, 800),
+  );
+
   const now = Date.now();
   const nowSeconds = Math.floor(now / 1000);
   const timestamp = String(nowSeconds);
