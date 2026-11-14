@@ -39,9 +39,10 @@ def main() -> None:
         conn.execute(
             """
             INSERT INTO public.youtube_shorts_log(
-                id, youtube_video_id, status, created_at
+                id, topic, titulo, youtube_video_id, status, created_at
             ) VALUES (
-                4, 'e12-supabase-gateway-video', 'published',
+                4, 'e12-gateway-test', 'E12 Supabase Gateway fixture',
+                'e12-supabase-gateway-video', 'published',
                 clock_timestamp() - interval '4 hours'
             )
             """
