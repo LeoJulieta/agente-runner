@@ -327,3 +327,15 @@ Corrección en commit sandbox e366a558c195d3dd841dcabfcd9f07c9277de2ad:
 - RESET ROLE antes de crear el wrapper público.
 
 CI #122 run 43550277429 está IN_PROGRESS. Sin cambios productivos.
+
+
+## Addendum — ownership de lease y collector — 2026-11-14
+
+CI #122 run 43550277429 FAILURE global: lease-fencing, PostgREST y full-migration-chain SUCCESS; Gateway local aplicó las migraciones de provenance y run-slot, pero falló al llegar a e12_worker_lease con "must be owner of table".
+
+Corrección en commit sandbox 8be816368c2be373aa54737ff053a467d8f531b0:
+- ejecutar como pr_d_capture_owner las ACL/COMMENT y funciones internas después de transferir la tabla;
+- RESET ROLE antes de wrappers públicos;
+- aplicar el mismo patrón a lease, registry de claves del collector y batch CAS.
+
+CI #123 run 43550534269 está QUEUED. No hubo cambios productivos.
