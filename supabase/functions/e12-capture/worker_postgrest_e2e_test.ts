@@ -97,6 +97,17 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
       const target = new URL(url);
       // Supabase uses /rest/v1; bare PostgREST exposes the same API at /.
       target.pathname = target.pathname.replace(/^\/rest\/v1(?=\/)/, "");
+      const outboundHeaders = new Headers(init?.headers);
+      assert(
+        outboundHeaders.get("apikey") === "sb_secret_e12_test_only",
+        "worker must send the modern secret key only in the apikey header",
+      );
+      assert(
+        outboundHeaders.get("Authorization") === null,
+        "worker must not send the opaque secret key as a Bearer JWT",
+      );
+      // Test adapter models the hosted API gateway translation: sb_secret_ is
+      // resolved to the service_role JWT before bare PostgREST receives it.
       const headers = new Headers(init?.headers);
       headers.set("Authorization", "Bearer " + jwt);
       headers.set("apikey", "e12-disposable-test-key");
@@ -117,7 +128,7 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
     env: (name: string) => ({
       E12_CRON_HMAC_SECRET: cronSecret,
       SUPABASE_URL: postgrestUrl,
-      SUPABASE_SERVICE_ROLE_KEY: "e12-disposable-test-key",
+      SUPABASE_SECRET_KEYS: JSON.stringify({ "e12-capture": "sb_secret_e12_test_only" }),
       YOUTUBE_API_KEY: "e12-fake-youtube-key",
       E12_PROVENANCE_KEY_ID: "e12-postgrest-e2e-key",
       E12_PROVENANCE_PUBLIC_KEY_SPKI_B64: publicKey,
