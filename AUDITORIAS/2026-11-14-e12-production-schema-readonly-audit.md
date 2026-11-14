@@ -163,3 +163,10 @@ No se alteraron funciones, policies, índices, extensiones ni configuración Aut
 La consulta de pg_auth_members en producción mostró que postgres es miembro administrativo (admin_option=true) de roles administrados como anon, authenticated, authenticator y service_role. En el stack local, crear pr_d_capture_owner también crea la membresía pr_d_capture_owner → postgres.
 
 La preflight E12 original exigía cero membresías y por eso fallaba en el stack Supabase local. Se corrigió en sandbox para permitir exclusivamente esa membresía administrativa hacia postgres y seguir rechazando cualquier otro miembro o rol heredado. No se creó ni alteró ningún rol en producción.
+
+
+## Addendum: opciones de membresía de rol
+
+La consulta de producción a pg_auth_members mostró que las membresías administrativas existentes de postgres tienen set_option=true e inherit_option=true. En Supabase local, la membresía creada automáticamente para pr_d_capture_owner tenía admin_option=true pero set_option=false; por eso CREATE SCHEMA ... AUTHORIZATION fallaba con "must be able to SET ROLE".
+
+La migración sandbox ahora fija explícitamente la membresía del administrador con SET TRUE e INHERIT FALSE: puede asumir el rol de forma explícita para crear el schema, pero no hereda sus privilegios automáticamente. CI #120 debe verificarlo antes de cerrar este gate.
