@@ -177,7 +177,13 @@ END;
 $capture_role$;
 
 REVOKE ALL ON SCHEMA pr_d_internal FROM PUBLIC, anon, authenticated;
+
+-- Only the schema owner grants API access. The installer (postgres) has
+-- SET ROLE membership but deliberately does not inherit owner privileges.
+SET ROLE pr_d_capture_owner;
 GRANT USAGE ON SCHEMA pr_d_internal TO service_role;
+RESET ROLE;
+
 GRANT USAGE ON SCHEMA public TO pr_d_capture_owner;
 
 GRANT SELECT (
