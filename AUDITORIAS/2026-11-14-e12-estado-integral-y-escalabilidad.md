@@ -195,3 +195,15 @@ Comprobaciones pasadas:
 En la consulta de jobs, `postgrest-contract` también terminó SUCCESS y el paso de tests SQL/lease de `lease-fencing` terminó SUCCESS; ese job aún estaba en limpieza al momento de la lectura. No se declara el run completo SUCCESS hasta confirmar su conclusión final.
 
 **Límite:** el baseline de esta prueba es sintético y recrea las columnas/roles legacy mínimas necesarias; no es clon de producción ni reproduce el historial completo de 37 migraciones de Supabase. Tampoco prueba upgrade desde cada versión histórica ni rollback/restore. El hallazgo de brecha de migración queda reducido, pero no cerrado en sentido productivo.
+
+
+## Cierre de CI #98 — 2026-11-14
+
+La ejecución completa #98 terminó **SUCCESS** (no solo sus jobs individuales): https://github.com/LeoJulieta/agente-runner/actions/runs/43547245149
+
+Los tres jobs quedaron SUCCESS:
+- `lease-fencing`
+- `postgrest-contract`
+- `full-migration-chain`
+
+El nuevo job de migraciones aplicó las cinco migraciones E12 en orden sobre un baseline sintético y comprobó preservación de fila legacy, RLS/owner, privilegios, replay del run-slot y claim del lease. Esto cierra la omisión anterior de no ejecutar las cinco migraciones E12 juntas sobre un baseline limpio sintético. No cierra la brecha entre ese baseline y el historial/esquema real de producción ni valida las 37 migraciones históricas de Supabase.
