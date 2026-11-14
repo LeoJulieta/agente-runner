@@ -652,4 +652,14 @@ Deno.test("Supabase key resolver prefers the named modern secret and fails close
     SUPABASE_SERVICE_ROLE_KEY: "legacy-must-not-be-used",
   } as Record<string, string>)[name]);
   assert(malformed === undefined, "malformed modern key map must fail closed without legacy fallback");
+
+  const legacy = resolveSupabaseApiKey((name) => ({
+    SUPABASE_SERVICE_ROLE_KEY: "eyJ.legacy.service_role.jwt",
+  } as Record<string, string>)[name]);
+  assert(legacy === "eyJ.legacy.service_role.jwt", "legacy JWT remains a transitional fallback");
+
+  const misplacedModern = resolveSupabaseApiKey((name) => ({
+    SUPABASE_SERVICE_ROLE_KEY: "sb_secret_misplaced_test_only",
+  } as Record<string, string>)[name]);
+  assert(misplacedModern === undefined, "opaque modern keys must not be accepted through the legacy variable");
 });
