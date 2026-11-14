@@ -10,11 +10,14 @@ These migrations were applied to the connected Supabase project and verified thr
 - 20261114184123_revoke_client_dml_except_pending_approval_update.sql
   - Removes INSERT, UPDATE, DELETE, REFERENCES and TRIGGER from anon/authenticated on all existing public tables.
   - Re-grants only UPDATE on pending_approvals to anon, temporarily preserving the existing approval dashboard path.
+- 20261114184737_restrict_anon_pending_approval_update_columns_and_transition.sql
+  - Restricts anonymous UPDATE to status and resolved_at columns only.
+  - Replaces the open policy with a pending → approved/rejected transition and requires resolved_at.
 
 ## Verification after application
 
 - Public tables: 34.
-- anon: INSERT on 0 tables; UPDATE on 1 table (pending_approvals); DELETE on 0; TRUNCATE on 0.
+- anon: INSERT on 0 tables; table-level UPDATE on 0 tables but column-level UPDATE only on status and resolved_at in pending_approvals; DELETE on 0; TRUNCATE on 0.
 - authenticated: INSERT/UPDATE/DELETE/TRUNCATE on 0 tables.
 - service_role: DML privileges preserved on 34/34 tables and TRUNCATE on 34/34.
 - No rows, RLS policies, table definitions, functions, secrets, cron jobs or webhooks were changed.
