@@ -37,7 +37,6 @@ class ApprovalReviewerMigrationTests(unittest.TestCase):
             db.execute("DROP TABLE IF EXISTS public.approval_reviewers CASCADE")
             db.execute("DROP FUNCTION IF EXISTS public.review_pending_approval(text,text)")
             db.execute("DROP TABLE IF EXISTS public.pending_approvals CASCADE")
-            db.execute("DROP TABLE IF EXISTS auth.users CASCADE")
             db.execute("DROP FUNCTION IF EXISTS auth.uid()")
             db.execute("DROP SCHEMA IF EXISTS auth CASCADE")
             db.execute("CREATE SCHEMA auth")
@@ -111,7 +110,7 @@ class ApprovalReviewerMigrationTests(unittest.TestCase):
                 WHERE oid='public.review_pending_approval(text,text)'::regprocedure
             """).fetchone()
             self.assertTrue(function_security[0])
-            self.assertIn("search_path=pg_catalog, public, auth", function_security[1])
+            self.assertIn("search_path=pg_catalog,public,auth", str(function_security[1]).replace(" ", ""))
 
             db.execute("SET ROLE authenticated")
             db.execute("SELECT set_config('request.jwt.claim.sub', %s, false)", (str(NON_REVIEWER),))
