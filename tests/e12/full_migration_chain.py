@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -242,7 +242,7 @@ def main() -> None:
             assert service_exec is True, f"service_role lacks EXECUTE on {signature}"
 
         conn.execute("SET request.jwt.claims = '{\"role\":\"service_role\"}'")
-        minute = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+        minute = datetime.now(timezone.utc).replace(second=0, microsecond=0) - timedelta(minutes=1)
         first_slot = conn.execute(
             "SELECT public.pr_d_claim_e12_worker_slot(%s)", (minute,)
         ).fetchone()[0]
@@ -258,6 +258,11 @@ def main() -> None:
             )
         """).fetchone()
         assert lease is not None and lease[0] is True, lease
+        lease_released = conn.execute(
+            "SELECT public.pr_d_release_e12_worker_lease(%s, %s)",
+            ("11111111-2222-4333-8444-555555555555", int(lease[1])),
+        ).fetchone()[0]
+        assert lease_released is True, "synthetic lease must be released before the next E2E test"
 
         capture_owner_oid = conn.execute(
             "SELECT oid FROM pg_roles WHERE rolname = 'pr_d_capture_owner'"
