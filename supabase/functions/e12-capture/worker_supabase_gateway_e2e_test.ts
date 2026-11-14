@@ -54,6 +54,7 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
   const postgrestTrace: string[] = [];
   let youtubeCalls = 0;
   let committedBatchBody: string | null = null;
+  let inFlightReplayOutcomes: unknown[] | null = null;
 
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = String(input);
@@ -84,6 +85,15 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
     );
     if (url.includes("/rpc/pr_d_capture_views_batch") && init?.body) {
       committedBatchBody = String(init.body);
+      // Replay immediately after the commit response but before the worker
+      // releases its lease, isolating first-write-wins from stale-lease denial.
+      const replayWhileLeaseActive = await fetch(baseUrl + "/rest/v1/rpc/pr_d_capture_views_batch", {
+        method: "POST",
+        headers: { apikey: secretKey, "Content-Type": "application/json" },
+        body: committedBatchBody,
+      });
+      assert(replayWhileLeaseActive.ok, "active-lease replay must be accepted by the gateway");
+      inFlightReplayOutcomes = await replayWhileLeaseActive.json();
     }
     return response;
   };
@@ -122,6 +132,11 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
   assert(youtubeCalls === 1, "YouTube must be called exactly once through the fake");
 
   assert(committedBatchBody !== null, "worker must issue a batch CAS through the gateway");
+  assert(
+    Array.isArray(inFlightReplayOutcomes) && inFlightReplayOutcomes.length === 1 &&
+      inFlightReplayOutcomes.every((item) => item.captured === false),
+    "replay while the original lease is active must prove first-write-wins",
+  );
   const replay = await fetch(baseUrl + "/rest/v1/rpc/pr_d_capture_views_batch", {
     method: "POST",
     headers: { apikey: secretKey, "Content-Type": "application/json" },
