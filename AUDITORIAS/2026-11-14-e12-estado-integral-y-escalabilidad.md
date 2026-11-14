@@ -403,3 +403,23 @@ Corrección en commit sandbox 85fac44dbf13114a2d8dc578e1273a542dd61267:
 - el test sigue comprobando que el stack ofrece sb_secret_/sb_publishable_ modernos, sin mezclarlos con la variable legacy del worker.
 
 CI #128 run 43551635213 está IN_PROGRESS. Esto no implica que el Python SDK del agente autónomo acepte sb_secret_; esa compatibilidad se debe probar aparte.
+
+
+## Addendum — causa raíz HMAC y CI #129 — 2026-11-14
+
+Comprobación de CI #128 (run 43551635213, SHA 85fac44dbf13114a2d8dc578e1273a542dd61267):
+- postgrest-contract SUCCESS; lease-fencing SUCCESS; full-migration-chain SUCCESS.
+- supabase-gateway-contract FAILURE: las cinco migraciones y el seed de clave/candidato pasaron. El worker respondió 401 antes de emitir tráfico al Gateway (trace vacío).
+
+Causa raíz identificada por comparación literal de los bytes canónicos:
+- worker.ts construía el canonical HMAC con separadores backslash+n literales, mientras que el E2E Gateway firmaba con bytes LF reales.
+- worker_test.ts repetía el mismo error en su helper de firma, por lo que las pruebas unitarias aceptaban el protocolo defectuoso.
+- La corrección anterior además mezcló el JWT legacy dentro de SUPABASE_SECRET_KEYS, aunque resolveSupabaseApiKey exige sb_secret_ en ese mapa.
+
+Corrección en commit sandbox 4f87e4f590148e196731dcc4a5df75f64110d43c:
+- worker.ts ahora usa LF real en la canonicalización HMAC;
+- worker_test.ts firma el mismo formato canónico;
+- Gateway E2E vuelve a suministrar sb_secret_ moderno en SUPABASE_SECRET_KEYS;
+- exportador de fixture elimina dependencia innecesaria del JWT legacy.
+
+CI #129 run 43614211000 está QUEUED. No declarar corregido/verificado hasta que pasen los tests unitarios y el E2E HTTP contra el Gateway real local. Esta corrección modifica código del worker, pero aún solo en la rama sandbox; no se desplegó.
