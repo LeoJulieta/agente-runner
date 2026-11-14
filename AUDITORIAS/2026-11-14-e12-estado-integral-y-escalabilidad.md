@@ -302,3 +302,16 @@ Corrección en commit sandbox 0a57f83bdcdcb9810767dddaf2236e40203c7b3b:
 - el test verifica que la única membresía sea pr_d_capture_owner → postgres, set_option=true e inherit_option=false.
 
 CI #120 run 43549584991 está QUEUED. No hubo cambios productivos.
+
+
+## Addendum — permisos de instalación en schema privado — 2026-11-14
+
+CI #120 run 43549584991 FAILURE global: tres jobs SUCCESS; el gateway local aplicó el preflight y la membresía, pero falló al crear la función interna con permission denied for schema pr_d_internal. La razón: INHERIT FALSE evita que postgres herede CREATE del rol propietario; aunque puede SET ROLE, la migración no había asumido el rol al crear la función.
+
+Corrección en commit sandbox 8d421b02f1b29ef1403b7826f0db6d60cf1d0eb7:
+- la migración asume temporalmente pr_d_capture_owner;
+- concede USAGE, CREATE en pr_d_internal al administrador postgres desde el rol propietario;
+- vuelve a RESET ROLE antes de continuar;
+- service_role conserva solo USAGE; anon/authenticated siguen sin acceso al schema privado.
+
+CI #121 run 43549792254 QUEUED. No se modificó producción.
