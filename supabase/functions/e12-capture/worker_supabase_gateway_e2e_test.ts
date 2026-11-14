@@ -73,6 +73,29 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
       apiRootProbe.status + " " + apiRootBody.slice(0, 800),
   );
 
+  const candidateProbeUrl = new URL(baseUrl + "/rest/v1/youtube_shorts_log");
+  candidateProbeUrl.searchParams.set("select", "id,youtube_video_id,status,created_at,views_primeras_3h,hs_al_publicar_al_sync,published_at,sync_captured_at,elapsed_seconds_e12");
+  candidateProbeUrl.searchParams.set("status", "eq.published");
+  candidateProbeUrl.searchParams.set("youtube_video_id", "not.is.null");
+  candidateProbeUrl.searchParams.set("views_primeras_3h", "is.null");
+  candidateProbeUrl.searchParams.set("hs_al_publicar_al_sync", "is.null");
+  candidateProbeUrl.searchParams.set("published_at", "is.null");
+  candidateProbeUrl.searchParams.set("sync_captured_at", "is.null");
+  candidateProbeUrl.searchParams.set("elapsed_seconds_e12", "is.null");
+  candidateProbeUrl.searchParams.set("created_at", "gte." + new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString());
+  candidateProbeUrl.searchParams.set("order", "created_at.desc");
+  candidateProbeUrl.searchParams.set("limit", "500");
+  const candidateProbe = await fetch(candidateProbeUrl, {
+    headers: { apikey: secretKey, Prefer: "count=exact" },
+  });
+  const candidateProbeBody = await candidateProbe.clone().text();
+  console.log("E12_GATEWAY_CANDIDATE_PROBE", JSON.stringify({
+    status: candidateProbe.status,
+    contentRange: candidateProbe.headers.get("content-range"),
+    body: candidateProbeBody.slice(0, 2000),
+  }));
+  assert(candidateProbe.ok, "candidate selection probe must succeed: HTTP " + candidateProbe.status);
+
   const now = Date.now();
   const nowSeconds = Math.floor(now / 1000);
   const timestamp = String(nowSeconds);
@@ -156,6 +179,7 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
     leaseTtlSeconds: 90,
   });
   const result = await response.json();
+  console.log("E12_GATEWAY_WORKER_RESULT", JSON.stringify(result));
   assert(
     response.status === 200,
     "worker must succeed through local Supabase Gateway: " + JSON.stringify(result) +
