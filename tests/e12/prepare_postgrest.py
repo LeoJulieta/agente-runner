@@ -48,6 +48,16 @@ def main() -> None:
             """,
             (key_id, public_key_b64, hmac_secret),
         )
+        # The companion HTTP RPC contract test uses its own deterministic
+        # fixture identity/HMAC. Register it separately from the worker E2E key.
+        conn.execute(
+            """
+            INSERT INTO pr_d_internal.e12_collector_key_registry(
+                key_id, algorithm, public_key_spki_base64, hmac_secret, status
+            ) VALUES (%s, 'Ed25519', %s, %s, 'active')
+            """,
+            (support.KEY_ID, support.PUBLIC_KEY, support.HMAC_SECRET),
+        )
         conn.execute(
             """
             INSERT INTO public.youtube_shorts_log(id, youtube_video_id, status, created_at)
