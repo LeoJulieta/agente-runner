@@ -11,6 +11,7 @@ on:
       - sandbox/e12-batch-cas-2026-11-13
       - sandbox/e12-postgrest-contract-2026-11-13
     paths:
+      - ".github/workflows/e12-lease-fencing-sandbox.yml"
       - "supabase/functions/e12-capture/**"
       - "supabase/ops/e12_worker_lease_fencing.sql"
       - "supabase/ops/e12_collector_attestation.sql"
