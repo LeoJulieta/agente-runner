@@ -170,6 +170,14 @@ def main() -> None:
         """).fetchone()[0]
         assert schema_owner_ok is True
 
+        schema_privileges = conn.execute("""
+            SELECT
+                has_schema_privilege('service_role', 'pr_d_internal', 'USAGE'),
+                has_schema_privilege('anon', 'pr_d_internal', 'USAGE'),
+                has_schema_privilege('authenticated', 'pr_d_internal', 'USAGE')
+        """).fetchone()
+        assert schema_privileges == (True, False, False), schema_privileges
+
         views_type = conn.execute("""
             SELECT data_type, numeric_precision, numeric_scale
             FROM information_schema.columns
