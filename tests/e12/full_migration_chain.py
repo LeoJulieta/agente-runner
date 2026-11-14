@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 import psycopg
@@ -19,44 +20,100 @@ MIGRATIONS = [
 
 def main() -> None:
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        conn.execute("""
-            DO $$ BEGIN
-                CREATE ROLE anon NOLOGIN;
-            EXCEPTION WHEN duplicate_object THEN NULL;
-            END $$;
-        """)
-        conn.execute("""
-            DO $$ BEGIN
-                CREATE ROLE authenticated NOLOGIN;
-            EXCEPTION WHEN duplicate_object THEN NULL;
-            END $$;
-        """)
-        conn.execute("""
-            DO $$ BEGIN
-                CREATE ROLE service_role NOLOGIN BYPASSRLS;
-            EXCEPTION WHEN duplicate_object THEN NULL;
-            END $$;
-        """)
-        conn.execute("ALTER ROLE service_role BYPASSRLS")
+        for role_sql in (
+            "CREATE ROLE anon NOLOGIN",
+            "CREATE ROLE authenticated NOLOGIN",
+            "CREATE ROLE service_role NOLOGIN BYPASSRLS",
+        ):
+            role_name = role_sql.split()[2]
+            conn.execute(
+                """
+                DO $role$
+                BEGIN
+                    EXECUTE %s;
+                EXCEPTION WHEN duplicate_object THEN NULL;
+                END
+                $role$;
+                """,
+                (role_sql,),
+            )
+
+        service_bypass = conn.execute(
+            "SELECT rolbypassrls FROM pg_roles WHERE rolname = 'service_role'"
+        ).fetchone()[0]
+        assert service_bypass is True, "service_role must already be BYPASSRLS; do not ALTER Supabase reserved roles"
+
         conn.execute("""
             CREATE TABLE public.youtube_shorts_log (
                 id bigint PRIMARY KEY,
-                youtube_video_id text NOT NULL,
-                status text NOT NULL DEFAULT 'published',
-                created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-                views_primeras_3h numeric,
-                hs_al_publicar_al_sync numeric
+                topic text NOT NULL,
+                angulo text,
+                titulo text NOT NULL,
+                descripcion text,
+                tags text[],
+                script_texto text,
+                youtube_video_id text,
+                youtube_url text,
+                status text,
+                views integer,
+                likes integer,
+                created_at timestamptz,
+                updated_at timestamptz,
+                idioma text,
+                hook_patron_aplicado boolean,
+                hook_texto text,
+                hook_patron_tipo text,
+                privacy_status text,
+                upload_status text,
+                views_primeras_3h integer,
+                hs_al_publicar_al_sync numeric,
+                alerta_privacidad boolean
             )
+        """)
+        conn.execute("""
+            CREATE OR REPLACE FUNCTION public.update_updated_at()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS $$
+            BEGIN
+                NEW.updated_at = clock_timestamp();
+                RETURN NEW;
+            END;
+            $$
+        """)
+        conn.execute("""
+            CREATE TRIGGER shorts_updated_at
+            BEFORE UPDATE ON public.youtube_shorts_log
+            FOR EACH ROW EXECUTE FUNCTION public.update_updated_at()
+        """)
+        conn.execute("CREATE INDEX idx_shorts_log_created_at ON public.youtube_shorts_log(created_at DESC)")
+        conn.execute("CREATE INDEX idx_shorts_log_status ON public.youtube_shorts_log(status)")
+        conn.execute("""
+            CREATE INDEX idx_youtube_shorts_log_alerta_privacidad
+            ON public.youtube_shorts_log(alerta_privacidad, updated_at)
+            WHERE alerta_privacidad = true
         """)
         conn.execute("ALTER TABLE public.youtube_shorts_log ENABLE ROW LEVEL SECURITY")
         conn.execute("""
-            GRANT SELECT, INSERT, UPDATE, DELETE
-            ON public.youtube_shorts_log TO service_role
+            CREATE POLICY anon_read ON public.youtube_shorts_log
+            FOR SELECT TO anon USING (true)
+        """)
+        conn.execute("""
+            CREATE POLICY service_all ON public.youtube_shorts_log
+            FOR ALL TO service_role USING (true) WITH CHECK (true)
+        """)
+        conn.execute("""
+            GRANT ALL PRIVILEGES ON public.youtube_shorts_log
+            TO anon, authenticated, service_role
         """)
         conn.execute("""
             INSERT INTO public.youtube_shorts_log(
-                id, youtube_video_id, views_primeras_3h, hs_al_publicar_al_sync
-            ) VALUES (7, 'legacy-migration-chain-row', 12345, 3.25)
+                id, topic, titulo, youtube_video_id, status,
+                views_primeras_3h, hs_al_publicar_al_sync, privacy_status
+            ) VALUES (
+                7, 'legacy-topic', 'legacy-title', 'legacy-migration-chain-row',
+                'published', 12345, 3.25, 'public'
+            )
         """)
 
         for filename in MIGRATIONS:
@@ -77,24 +134,69 @@ def main() -> None:
             ).fetchone()[0]
             assert exists, f"missing function after migration chain: {signature}"
 
-        assert conn.execute("""
-            SELECT relrowsecurity
+        table_security = conn.execute("""
+            SELECT relrowsecurity, relforcerowsecurity
             FROM pg_class
             WHERE oid = 'public.youtube_shorts_log'::regclass
-        """).fetchone()[0] is True
-        assert conn.execute("""
+        """).fetchone()
+        assert table_security == (True, False), table_security
+
+        schema_owner_ok = conn.execute("""
             SELECT n.nspowner = r.oid
             FROM pg_namespace n
             JOIN pg_roles r ON r.rolname = 'pr_d_capture_owner'
             WHERE n.nspname = 'pr_d_internal'
-        """).fetchone()[0] is True
+        """).fetchone()[0]
+        assert schema_owner_ok is True
+
+        views_type = conn.execute("""
+            SELECT data_type, numeric_precision, numeric_scale
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'youtube_shorts_log'
+              AND column_name = 'views_primeras_3h'
+        """).fetchone()
+        assert views_type == ("numeric", 20, 0), views_type
 
         legacy = conn.execute("""
             SELECT youtube_video_id, views_primeras_3h, hs_al_publicar_al_sync,
                    published_at, sync_captured_at, elapsed_seconds_e12
             FROM public.youtube_shorts_log WHERE id = 7
         """).fetchone()
-        assert legacy == ("legacy-migration-chain-row", 12345, 3.25, None, None, None), legacy
+        assert legacy == (
+            "legacy-migration-chain-row", Decimal("12345"), Decimal("3.25"),
+            None, None, None,
+        ), legacy
+
+        policy_names = {
+            row[0] for row in conn.execute("""
+                SELECT policyname FROM pg_policies
+                WHERE schemaname = 'public' AND tablename = 'youtube_shorts_log'
+            """).fetchall()
+        }
+        assert {"anon_read", "service_all", "pr_d_capture_owner_select", "pr_d_capture_owner_update"} <= policy_names
+
+        trigger_names = {
+            row[0] for row in conn.execute("""
+                SELECT trigger_name FROM information_schema.triggers
+                WHERE event_object_schema = 'public' AND event_object_table = 'youtube_shorts_log'
+            """).fetchall()
+        }
+        assert "shorts_updated_at" in trigger_names
+        assert any("pr_d_guard_capture_fields" in name for name in trigger_names)
+
+        anon_can_select = conn.execute(
+            "SELECT has_table_privilege('anon', 'public.youtube_shorts_log', 'SELECT')"
+        ).fetchone()[0]
+        anon_can_truncate = conn.execute(
+            "SELECT has_table_privilege('anon', 'public.youtube_shorts_log', 'TRUNCATE')"
+        ).fetchone()[0]
+        assert anon_can_select is True and anon_can_truncate is True
+
+        conn.execute("SET ROLE anon")
+        anon_rows = conn.execute("SELECT count(*) FROM public.youtube_shorts_log").fetchone()[0]
+        conn.execute("RESET ROLE")
+        assert anon_rows == 1, "synthetic production-like anon_read policy should remain observable"
 
         for signature in (
             "public.pr_d_claim_e12_worker_slot(timestamptz)",
@@ -128,10 +230,11 @@ def main() -> None:
         """).fetchone()
         assert lease is not None and lease[0] is True, lease
 
-        print("PASS: five E12 migrations applied in order on a synthetic legacy baseline", flush=True)
-        print("PASS: legacy capture row preserved unchanged", flush=True)
-        print("PASS: internal schema ownership and RLS verified", flush=True)
-        print("PASS: anon denied and service_role granted on E12 RPCs", flush=True)
+        print("PASS: five E12 migrations applied in order on a production-shaped synthetic baseline", flush=True)
+        print("PASS: production int4 views column converted to numeric(20,0) without changing legacy value", flush=True)
+        print("PASS: legacy policies, grants, indexes and updated_at trigger preserved", flush=True)
+        print("PASS: anon_read policy and TRUNCATE grant reproduced for explicit security review", flush=True)
+        print("PASS: internal schema ownership, RLS and E12 RPC privileges verified", flush=True)
         print("PASS: versioned run-slot migration enforces same-minute replay rejection", flush=True)
         print("PASS: versioned lease migration creates an active lease", flush=True)
 
