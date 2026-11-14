@@ -111,6 +111,32 @@ def main() -> None:
             )
         """)
 
+        preexisting_owner = conn.execute("""
+            SELECT oid, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole,
+                   rolinherit, rolreplication, rolbypassrls
+            FROM pg_roles WHERE rolname = 'pr_d_capture_owner'
+        """).fetchone()
+        if preexisting_owner:
+            memberships = conn.execute("""
+                SELECT granted.rolname AS granted_role, member.rolname AS member_role
+                FROM pg_auth_members m
+                JOIN pg_roles granted ON granted.oid = m.roleid
+                JOIN pg_roles member ON member.oid = m.member
+                WHERE m.roleid = %s OR m.member = %s
+                ORDER BY granted.rolname, member.rolname
+            """, (preexisting_owner[0], preexisting_owner[0])).fetchall()
+            schema_owner = conn.execute("""
+                SELECT nspname FROM pg_namespace
+                WHERE nspowner = %s ORDER BY nspname
+            """, (preexisting_owner[0],)).fetchall()
+            print(
+                "PREEXISTING pr_d_capture_owner:",
+                {"attributes": preexisting_owner[1:], "memberships": memberships, "owned_schemas": schema_owner},
+                flush=True,
+            )
+        else:
+            print("PRE-MIGRATION: pr_d_capture_owner is absent", flush=True)
+
         for filename in MIGRATIONS:
             sql = (ROOT / "supabase" / "migrations" / filename).read_text(encoding="utf-8")
             conn.execute(sql)
