@@ -82,8 +82,10 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
     assert(outboundHeaders.get("apikey") === secretKey, "worker must send sb_secret in apikey");
     assert(outboundHeaders.get("Authorization") === null, "worker must not send opaque key as Bearer JWT");
     const response = await fetch(input, init);
+    const responseDetail = response.ok ? "" : " " + (await response.clone().text()).slice(0, 1200);
     postgrestTrace.push(
-      (init?.method ?? "GET") + " " + url.replace(baseUrl, "[SUPABASE_API]") + " -> " + response.status,
+      (init?.method ?? "GET") + " " + url.replace(baseUrl, "[SUPABASE_API]") +
+        " -> " + response.status + responseDetail,
     );
     if (url.includes("/rpc/pr_d_capture_views_batch") && init?.body) {
       committedBatchBody = String(init.body);
