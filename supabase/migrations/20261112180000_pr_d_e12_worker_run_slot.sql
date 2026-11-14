@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS pr_d_internal.e12_worker_run_slot (
     last_claimed_minute timestamptz NOT NULL
 );
 ALTER TABLE pr_d_internal.e12_worker_run_slot OWNER TO pr_d_capture_owner;
+SET ROLE pr_d_capture_owner;
 REVOKE ALL ON TABLE pr_d_internal.e12_worker_run_slot
     FROM PUBLIC, anon, authenticated, service_role;
 
@@ -80,6 +81,7 @@ REVOKE ALL ON FUNCTION pr_d_internal.pr_d_claim_e12_worker_slot(timestamptz)
     FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_claim_e12_worker_slot(timestamptz)
     TO service_role;
+RESET ROLE;
 
 DROP FUNCTION IF EXISTS public.pr_d_claim_e12_worker_slot(timestamptz);
 CREATE OR REPLACE FUNCTION public.pr_d_claim_e12_worker_slot(
