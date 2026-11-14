@@ -315,3 +315,15 @@ Corrección en commit sandbox 8d421b02f1b29ef1403b7826f0db6d60cf1d0eb7:
 - service_role conserva solo USAGE; anon/authenticated siguen sin acceso al schema privado.
 
 CI #121 run 43549792254 QUEUED. No se modificó producción.
+
+
+## Addendum — propiedad de tabla interna y ACL — 2026-11-14
+
+CI #121 run 43549792254 FAILURE global: los otros jobs pasaron y la primera migración E12 pasó en el Gateway local. La segunda migración avanzó hasta operaciones sobre e12_worker_run_slot y falló con "must be owner of table". Tras transferir la propiedad a pr_d_capture_owner, las operaciones de ACL/comentario/función deben ejecutarse bajo ese owner porque postgres tiene INHERIT FALSE.
+
+Corrección en commit sandbox e366a558c195d3dd841dcabfcd9f07c9277de2ad:
+- después de transferir la tabla al rol owner, SET ROLE pr_d_capture_owner;
+- ejecutar REVOKE/COMMENT y crear/configurar la función interna como owner;
+- RESET ROLE antes de crear el wrapper público.
+
+CI #122 run 43550277429 está IN_PROGRESS. Sin cambios productivos.
