@@ -287,3 +287,18 @@ Corrección en commit 4e62f08adc04cbfd28f0a373eafe1db7a5f933f6:
 - preparar el rol en el test local con la misma membresía administrada y verificar que no haya otros vínculos.
 
 CI #119 run 43549363896 está QUEUED. El cambio es sandbox; no se creó ni alteró ningún rol productivo.
+
+
+## Addendum — SET ROLE para el administrador confiable — 2026-11-14
+
+CI #119 run 43549363896 terminó FAILURE global: los otros tres jobs pasaron; el gateway local llegó a aplicar el diagnóstico de membresía, pero la migración falló al crear el schema con owner pr_d_capture_owner: postgres no podía ejecutar SET ROLE sobre ese rol.
+
+El diagnóstico muestra que el stack local crea la membresía pr_d_capture_owner → postgres con admin_option=true pero set_option=false. En producción, las membresías administrativas existentes de postgres tienen set_option=true e inherit_option=true.
+
+Corrección en commit sandbox 0a57f83bdcdcb9810767dddaf2236e40203c7b3b:
+- después del preflight, la migración ejecuta GRANT pr_d_capture_owner TO postgres WITH SET TRUE, INHERIT FALSE;
+- el administrador puede asumir explícitamente el rol para crear el schema;
+- no hereda automáticamente privilegios del rol;
+- el test verifica que la única membresía sea pr_d_capture_owner → postgres, set_option=true e inherit_option=false.
+
+CI #120 run 43549584991 está QUEUED. No hubo cambios productivos.
