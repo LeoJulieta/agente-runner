@@ -11,6 +11,9 @@ These migrations were applied to the connected Supabase project and verified thr
   - Removes INSERT, UPDATE, DELETE, REFERENCES and TRIGGER from anon/authenticated on all existing public tables.
   - Re-grants only UPDATE on pending_approvals to anon, temporarily preserving the existing approval dashboard path.
 - 20261114184737_restrict_anon_pending_approval_update_columns_and_transition.sql
+  - Revokes table-level UPDATE from anon and grants only column-level UPDATE on status and resolved_at.
+  - Replaces the permissive policy with a pending → approved/rejected transition requiring resolved_at.
+- 20261114184737_restrict_anon_pending_approval_update_columns_and_transition.sql
   - Restricts anonymous UPDATE to status and resolved_at columns only.
   - Replaces the open policy with a pending → approved/rejected transition and requires resolved_at.
 
