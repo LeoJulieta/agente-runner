@@ -160,6 +160,13 @@ BEGIN
         CREATE SCHEMA pr_d_internal AUTHORIZATION pr_d_capture_owner;
     END IF;
 
+    -- Installers run as postgres. Temporarily assume the non-login owner role
+    -- to grant the trusted admin only the schema rights needed to install the
+    -- SECURITY DEFINER helper; API roles remain excluded below.
+    SET ROLE pr_d_capture_owner;
+    GRANT USAGE, CREATE ON SCHEMA pr_d_internal TO postgres;
+    RESET ROLE;
+
     IF (
         SELECT nspowner FROM pg_namespace WHERE nspname = 'pr_d_internal'
     ) <> v_role_oid THEN
