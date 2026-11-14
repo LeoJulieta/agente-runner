@@ -319,21 +319,21 @@ def test_batch_bad_hmac_is_rejected_per_item_without_weakening_valid_item():
     ]
 
 
-def test_concurrent_batch_calls_have_exactly_one_first_write_winner():
+def test_eight_concurrent_batch_calls_have_exactly_one_first_write_winner():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
     lease = claim(RUN_A)
     token = int(lease[1])
     item = batch_item(RUN_A, token, 1, "video-1")
-    barrier = threading.Barrier(2)
+    barrier = threading.Barrier(8)
 
     def contender():
         barrier.wait(timeout=10)
         return capture_batch([item])[0]["captured"]
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        outcomes = list(pool.map(lambda _: contender(), range(2)))
-    assert sorted(outcomes) == [False, True]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        outcomes = list(pool.map(lambda _: contender(), range(8)))
+    assert sorted(outcomes) == [False] * 7 + [True]
 
 
 def test_batch_missing_required_field_is_rejected():
@@ -422,19 +422,51 @@ def test_exclusive_claim_renew_takeover_and_stale_owner_rejection():
         assert row == (123, RUN_B, token_b, KEY_ID, SIGNATURE, canonical_payload(RUN_B, token_b, 1, "video-1"), hashlib.sha256(canonical_payload(RUN_B, token_b, 1, "video-1").encode("utf-8")).hexdigest())
 
 
-def test_two_simultaneous_claims_have_exactly_one_winner():
+def test_eight_simultaneous_claims_have_exactly_one_winner():
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
         conn.execute("TRUNCATE pr_d_internal.e12_worker_lease")
-    barrier = threading.Barrier(2)
+    run_ids = [
+        uuid.UUID(f"00000000-0000-4000-8000-{index:012d}")
+        for index in range(1, 9)
+    ]
+    barrier = threading.Barrier(8)
 
     def contender(run_id):
         barrier.wait(timeout=10)
         return claim(run_id)
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(contender, (RUN_A, RUN_B)))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(contender, run_ids))
     assert sum(1 for result in results if result[0] is True) == 1
-    assert sum(1 for result in results if result[0] is False) == 1
+    assert sum(1 for result in results if result[0] is False) == 7
+    winners = [result for result in results if result[0] is True]
+    assert len({result[1] for result in winners}) == 1
+
+
+def test_expired_lease_takeover_fences_old_worker():
+    first = claim(RUN_A)
+    assert first[0] is True
+    old_token = int(first[1])
+
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute(
+            "UPDATE pr_d_internal.e12_worker_lease "
+            "SET lease_expires_at = clock_timestamp() - interval '1 second' "
+            "WHERE singleton"
+        )
+
+    takeover = claim(RUN_B)
+    assert takeover[0] is True
+    new_token = int(takeover[1])
+    assert new_token == old_token + 1
+    assert renew(RUN_A, old_token) is False
+    assert release(RUN_A, old_token) is False
+    assert capture_batch([batch_item(RUN_A, old_token, 1, "video-1")]) == [
+        {"row_id": "1", "captured": False}
+    ]
+    assert capture_batch([batch_item(RUN_B, new_token, 1, "video-1")]) == [
+        {"row_id": "1", "captured": True}
+    ]
 
 
 def test_lease_cannot_be_renewed_after_expiry():
