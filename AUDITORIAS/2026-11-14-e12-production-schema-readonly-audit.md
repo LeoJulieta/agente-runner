@@ -124,3 +124,35 @@ La UI puede filtrar status=published, pero el filtro del cliente no restringe co
 La documentación histórica de julio registra youtube_shorts_log como un registro de Shorts publicados y una tarjeta de dashboard que mostraba los últimos 10. También documenta que un consumidor usó la key anon para lectura y que los inserts fallaban hasta reemplazarla por service_role. Esto hace plausible que anon_read sea intencional para lectura pública, no necesariamente un error de configuración.
 
 El riesgo actual no es la existencia de lectura pública en sí, sino su alcance: la policy no limita filas a status=published ni privacy_status=public y no limita columnas. Los filtros del dashboard no son controles de autorización. El cambio correcto puede ser mantener lectura pública mediante una vista/RPC sanitizada y dejar la tabla base cerrada; primero hay que localizar el consumidor vigente y confirmar su contrato.
+
+
+## Addendum: Supabase Advisors — 2026-11-14 02:55 UTC
+
+Consulta de Security, Performance y Health Advisors, sin aplicar remediaciones.
+
+### Security
+- 5 tablas con RLS enabled y sin policies: public.fuentes_rss, public.lab_results, public.pain_points, public.paso1_candidatos_pendientes y public.workflow_logs. Sin policy normalmente significa denegación por RLS para roles API; no clasificar como exposición automática.
+- 4 funciones con search_path mutable: public.update_updated_at, public.buscar_tendencias_similares, public.recomputar_time_patterns y public.trg_lab_results_proteccion.
+- Extensión vector instalada en public.
+- Leaked Password Protection de Supabase Auth deshabilitado.
+
+### Performance
+- 1 FK sin índice de cobertura: public.affiliate_clicks.programa_id.
+- 4 avisos auth_rls_initplan: trends_manual_import, yt_fechas_especiales, yt_canales_competencia y yt_competencia_videos.
+- 12 índices marcados como no usados; entre ellos idx_youtube_shorts_log_alerta_privacidad. No borrar sin revisar consultas históricas y ventanas de observación.
+- 20 avisos de múltiples policies permisivas, principalmente en trends_manual_import, yt_canales_competencia, yt_competencia_videos y yt_fechas_especiales. Son avisos de rendimiento/duplicación, no prueba automática de bypass.
+
+### Health
+- Sin hallazgos.
+
+Remediaciones oficiales enlazadas por el Advisor:
+- RLS enabled no policy: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
+- Mutable search_path: https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable
+- Extension in public: https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public
+- Leaked password protection: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+- Unindexed FK: https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys
+- Auth RLS initplan: https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select
+- Unused index: https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index
+- Multiple permissive policies: https://supabase.com/docs/guides/database/database-linter?lint=0006_multiple_permissive_policies
+
+No se alteraron funciones, policies, índices, extensiones ni configuración Auth.
