@@ -237,3 +237,24 @@ Referencias oficiales:
 - https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys
 - https://supabase.com/docs/guides/functions/auth-headers
 - https://supabase.com/docs/guides/functions/secrets
+
+
+## Cierre CI #104 — límite de compatibilidad de claves — 2026-11-14
+
+Run #104 `43547736744`, SHA `84b1464d2e781241816215b29d289df3c8c6e164`: **SUCCESS**, los tres jobs verdes.
+
+- Deno: 32 passed, 0 failed.
+- PostgreSQL 17: 14 passed.
+- PostgREST worker E2E: 1 passed.
+- RPC HTTP contract: 1 passed.
+- Full E12 migration chain: SUCCESS.
+
+El resolver de credenciales ahora:
+- prefiere `SUPABASE_SECRET_KEYS["e12-capture"]`, con `default` como fallback;
+- falla cerrado si el mapa moderno existe pero está malformado o no contiene una clave `sb_secret_`;
+- solo acepta la variable legacy `SUPABASE_SERVICE_ROLE_KEY` si parece un JWT legacy `eyJ...`;
+- rechaza una clave opaca `sb_secret_` mal ubicada en la variable legacy.
+
+Run: https://github.com/LeoJulieta/agente-runner/actions/runs/43547736744
+
+El siguiente gate de integración es probar el contrato con el **API Gateway real de un stack Supabase local**, no solo PostgREST standalone y un adaptador de test. Esa prueba no tocará el proyecto hosted.
