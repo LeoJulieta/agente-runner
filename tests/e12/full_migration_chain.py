@@ -251,6 +251,23 @@ def main() -> None:
         """).fetchone()
         assert lease is not None and lease[0] is True, lease
 
+        capture_owner_oid = conn.execute(
+            "SELECT oid FROM pg_roles WHERE rolname = 'pr_d_capture_owner'"
+        ).fetchone()[0]
+        capture_owner_memberships = conn.execute("""
+            SELECT granted.rolname, member.rolname
+            FROM pg_auth_members m
+            JOIN pg_roles granted ON granted.oid = m.roleid
+            JOIN pg_roles member ON member.oid = m.member
+            WHERE m.roleid = %s OR m.member = %s
+            ORDER BY granted.rolname, member.rolname
+        """, (capture_owner_oid, capture_owner_oid)).fetchall()
+        unexpected_memberships = [
+            edge for edge in capture_owner_memberships
+            if not (edge[0] == "pr_d_capture_owner" and edge[1] == "postgres")
+        ]
+        assert not unexpected_memberships, unexpected_memberships
+
         print("PASS: five E12 migrations applied in order on a production-shaped synthetic baseline", flush=True)
         print("PASS: production int4 views column converted to numeric(20,0) without changing legacy value", flush=True)
         print("PASS: legacy policies, grants, indexes and updated_at trigger preserved", flush=True)

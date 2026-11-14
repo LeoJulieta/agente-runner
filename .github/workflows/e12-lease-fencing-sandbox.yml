@@ -243,7 +243,7 @@ jobs:
         env:
           SUPABASE_STATUS_ENV_FILE: ${{ runner.temp }}/e12-supabase-status.env
         run: python tests/e12/export_supabase_gateway_env.py
-      - name: Diagnose capture-owner role membership before migrations
+      - name: Prepare capture-owner role with trusted admin membership
         run: python tests/e12/diagnose_supabase_capture_role.py
       - name: Apply the five E12 migrations to the local Supabase database
         shell: bash

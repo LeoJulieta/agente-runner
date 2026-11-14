@@ -121,11 +121,16 @@ BEGIN
     END IF;
 
     IF EXISTS (
-        SELECT 1 FROM pg_auth_members
-        WHERE roleid = v_role_oid OR member = v_role_oid
+        SELECT 1
+        FROM pg_auth_members m
+        WHERE (m.roleid = v_role_oid OR m.member = v_role_oid)
+          AND NOT (
+              m.roleid = v_role_oid
+              AND m.member = (SELECT oid FROM pg_roles WHERE rolname = 'postgres')
+          )
     ) THEN
         RAISE EXCEPTION
-            'prd_capture_role_preflight_failed: pr_d_capture_owner must have no role memberships';
+            'prd_capture_role_preflight_failed: pr_d_capture_owner has an untrusted role membership; only the trusted postgres administrator membership is permitted';
     END IF;
 
     IF NOT (
