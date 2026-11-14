@@ -117,7 +117,7 @@ Una vez verificados backup/restore y coordinado el corte del dashboard, la conte
 BEGIN;
 DROP POLICY IF EXISTS "Permitir update anon" ON public.pending_approvals;
 DROP POLICY IF EXISTS "Permitir lectura anon" ON public.pending_approvals;
-REVOKE ALL PRIVILEGES ON TABLE public.pending_approvals FROM anon;
+REVOKE ALL PRIVILEGES ON TABLE public.pending_approvals FROM anon, authenticated;
 COMMIT;
 ```
 
