@@ -367,3 +367,15 @@ CI #124 run 43550834102:
 Corrección en commit sandbox 209f9a00c5ac11bac92b12fce00c9aef575947bf: the disposable test fixture now SET ROLE pr_d_capture_owner only around insertion of the ephemeral collector key, then RESET ROLE before seeding public candidate data. Production grants remain unchanged.
 
 CI #125 run 43550996747 is QUEUED. The actual HTTP/worker E2E has not run yet.
+
+
+## Addendum — forma real del candidato de prueba — 2026-11-14
+
+CI #125 run 43550996747:
+- Las cinco migraciones E12 aplicaron en el stack Supabase local.
+- El registro de clave efímera ya se insertó correctamente asumiendo pr_d_capture_owner.
+- El seed del candidato falló por NOT NULL en youtube_shorts_log.topic; el esquema productivo también exige topic y titulo NOT NULL.
+
+Consulta de solo lectura a information_schema confirmó que las únicas columnas NOT NULL sin default son topic y titulo. Corrección en commit sandbox 46fe73d5f76902c1822174c2f76e9a94c00dc02f: el fixture ahora proporciona ambas columnas.
+
+CI #126 run 43551195566 está QUEUED. El worker HTTP E2E todavía no se ejecutó.
