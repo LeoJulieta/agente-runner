@@ -88,3 +88,8 @@ Esta contención desactiva los botones de aprobación actuales hasta reemplazarl
 - Histórico: BITACORA.md documenta la creación de la policy anon UPDATE para habilitar el dashboard.
 
 No se ejecutó ninguna operación de aprobación, rechazo, modificación o lectura de payload.
+
+
+## 7. Barrido de policies de escritura
+
+Se consultaron todas las policies de public con cmd INSERT/UPDATE/DELETE/ALL y roles anon o public. El único caso con predicate no restringido para anon es pending_approvals UPDATE USING(true). Las policies service_role_full_access de trends_manual_import, yt_canales_competencia, yt_competencia_videos y yt_fechas_especiales están declaradas TO public, pero tanto USING como WITH CHECK exigen auth.role()='service_role'; no son escritura anónima efectiva. No se modificó ninguna policy.
