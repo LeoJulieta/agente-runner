@@ -210,3 +210,51 @@ jobs:
         run: python -m pip install "psycopg[binary]>=3.2,<4"
       - name: Apply all five E12 migrations in version order on a clean synthetic legacy baseline
         run: python tests/e12/full_migration_chain.py
+
+  supabase-gateway-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v3
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install disposable gateway test dependencies
+        run: python -m pip install "psycopg[binary]>=3.2,<4" "cryptography>=44,<46"
+      - name: Create isolated local Supabase project and start API Gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir="$RUNNER_TEMP/e12-supabase-gateway"
+          mkdir -p "$workdir"
+          cd "$workdir"
+          supabase init > "$RUNNER_TEMP/e12-supabase-init.log" 2>&1
+          if ! supabase start -x studio,mailpit,storage-api,imgproxy,realtime,postgres-meta,edge-runtime,logflare,vector,supavisor > "$RUNNER_TEMP/e12-supabase-start.log" 2>&1; then
+            grep -Ei "error|failed|unhealthy" "$RUNNER_TEMP/e12-supabase-start.log" | sed -E 's/sb_(secret|publishable)_[A-Za-z0-9_-]+/[REDACTED]/g' || true
+            exit 1
+          fi
+          supabase status -o env > "$RUNNER_TEMP/e12-supabase-status.env" 2>&1
+      - name: Export local Supabase endpoints and modern API keys
+        env:
+          SUPABASE_STATUS_ENV_FILE: ${{ runner.temp }}/e12-supabase-status.env
+        run: python tests/e12/export_supabase_gateway_env.py
+      - name: Apply the five E12 migrations to the local Supabase database
+        shell: bash
+        run: TEST_DATABASE_URL="$E12_GATEWAY_DB_URL" python tests/e12/full_migration_chain.py
+      - name: Register ephemeral attestation identity and candidate
+        run: python tests/e12/prepare_supabase_gateway.py
+      - name: Run full worker through the actual local Supabase API Gateway
+        run: deno test --allow-env --allow-net supabase/functions/e12-capture/worker_supabase_gateway_e2e_test.ts
+      - name: Stop local Supabase stack
+        if: always()
+        shell: bash
+        run: |
+          workdir="$RUNNER_TEMP/e12-supabase-gateway"
+          if [ -d "$workdir/supabase" ]; then
+            cd "$workdir"
+            supabase stop --no-backup > "$RUNNER_TEMP/e12-supabase-stop.log" 2>&1 || true
+          fi
