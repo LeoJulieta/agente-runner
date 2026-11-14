@@ -29,6 +29,33 @@ const CANDIDATE_LIMIT = 500;
 const YOUTUBE_BATCH_SIZE = 50;
 const CRON_CLOCK_SKEW_SECONDS = 120;
 
+/**
+ * Resolve the modern per-component Supabase secret key.
+ * Supabase injects SUPABASE_SECRET_KEYS as a JSON map; prefer the dedicated
+ * "e12-capture" key and fall back to "default". The legacy environment
+ * variable remains a transitional fallback only when the modern map is absent.
+ */
+export function resolveSupabaseApiKey(env: (name: string) => string | undefined): string | undefined {
+  const secretKeysJson = env("SUPABASE_SECRET_KEYS");
+  if (secretKeysJson) {
+    try {
+      const parsed: unknown = JSON.parse(secretKeysJson);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+      const keys = parsed as Record<string, unknown>;
+      const selected = keys["e12-capture"] ?? keys.default;
+      if (typeof selected !== "string" || !selected.startsWith("sb_secret_")) return undefined;
+      return selected;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Transitional compatibility for projects that have not migrated off the
+  // legacy service_role JWT key. Never put a new sb_secret_ value here.
+  const legacyKey = env("SUPABASE_SERVICE_ROLE_KEY");
+  return legacyKey || undefined;
+}
+
 function jsonResponse(status: number, body: Record<string, unknown>): Response {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
@@ -315,7 +342,7 @@ export async function handleE12Capture(
   }
 
   const supabaseUrl = dependencies.env("SUPABASE_URL");
-  const serviceRoleKey = dependencies.env("SUPABASE_SERVICE_ROLE_KEY");
+  const serviceRoleKey = resolveSupabaseApiKey(dependencies.env);
   const youtubeApiKey = dependencies.env("YOUTUBE_API_KEY");
   const provenanceKeyId = dependencies.env("E12_PROVENANCE_KEY_ID");
   const provenancePublicKey = dependencies.env("E12_PROVENANCE_PUBLIC_KEY_SPKI_B64");
