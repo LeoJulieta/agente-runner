@@ -27,23 +27,18 @@ def main() -> None:
     db_url = values.get("DB_URL") or values.get("SUPABASE_DB_URL")
     secret_key = values.get("SECRET_KEY") or values.get("SUPABASE_SECRET_KEY")
     publishable_key = values.get("PUBLISHABLE_KEY") or values.get("SUPABASE_PUBLISHABLE_KEY")
-    legacy_service_role_key = values.get("SERVICE_ROLE_KEY") or values.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not all((api_url, db_url, secret_key, publishable_key, legacy_service_role_key)):
-        raise RuntimeError("local Supabase status is missing API_URL, DB_URL, modern keys or legacy SERVICE_ROLE_KEY")
+    if not all((api_url, db_url, secret_key, publishable_key)):
+        raise RuntimeError("local Supabase status is missing API_URL, DB_URL, SECRET_KEY or PUBLISHABLE_KEY")
     if not secret_key.startswith("sb_secret_") or not publishable_key.startswith("sb_publishable_"):
         raise RuntimeError("local Supabase CLI did not provide modern sb_secret_/sb_publishable_ keys")
-    if not legacy_service_role_key.startswith("eyJ"):
-        raise RuntimeError("local Supabase CLI did not provide a legacy service_role JWT for the E12 worker contract")
 
     values_to_export = {
         "E12_GATEWAY_API_URL": api_url,
         "E12_GATEWAY_DB_URL": db_url,
         "E12_GATEWAY_SECRET_KEY": secret_key,
         "E12_GATEWAY_PUBLISHABLE_KEY": publishable_key,
-        "E12_GATEWAY_LEGACY_SERVICE_ROLE_KEY": legacy_service_role_key,
     }
     print(f"::add-mask::{secret_key}", flush=True)
-    print(f"::add-mask::{legacy_service_role_key}", flush=True)
     for name, value in values_to_export.items():
         with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
             output.write(f"{name}={value}\n")

@@ -20,7 +20,7 @@ async function sign(secret: string, timestamp: string, body = "{}"): Promise<str
   );
   const bodyHash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)));
   const bodyHashHex = Array.from(bodyHash, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  const canonical = `POST\\n/e12-capture\\n${timestamp}\\n${bodyHashHex}`;
+  const canonical = `POST\n/e12-capture\n${timestamp}\n${bodyHashHex}`;
   const bytes = new Uint8Array(
     await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(canonical)),
   );

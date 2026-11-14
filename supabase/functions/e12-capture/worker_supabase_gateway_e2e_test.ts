@@ -30,21 +30,19 @@ async function cronSignature(secret: string, timestamp: string, body: string): P
 
 type BatchOutcome = { captured: boolean };
 
-Deno.test("full E12 worker uses the legacy service_role JWT through the real local Supabase API Gateway", async () => {
+Deno.test("full E12 worker uses modern sb_secret through the real local Supabase API Gateway", async () => {
   const apiUrl = Deno.env.get("E12_GATEWAY_API_URL");
-  const modernSecretKey = Deno.env.get("E12_GATEWAY_SECRET_KEY");
-  const secretKey = Deno.env.get("E12_GATEWAY_LEGACY_SERVICE_ROLE_KEY");
+  const secretKey = Deno.env.get("E12_GATEWAY_SECRET_KEY");
   const publishableKey = Deno.env.get("E12_GATEWAY_PUBLISHABLE_KEY");
   const cronSecret = Deno.env.get("E12_GATEWAY_CRON_SECRET");
   const privateKey = Deno.env.get("E12_GATEWAY_PRIVATE_KEY_PKCS8_B64");
   const publicKey = Deno.env.get("E12_GATEWAY_PUBLIC_KEY_SPKI_B64");
   const hmacSecret = Deno.env.get("E12_GATEWAY_HMAC_SECRET_B64");
   assert(
-    apiUrl && modernSecretKey && secretKey && publishableKey && cronSecret && privateKey && publicKey && hmacSecret,
+    apiUrl && secretKey && publishableKey && cronSecret && privateKey && publicKey && hmacSecret,
     "local Supabase Gateway E2E environment is incomplete",
   );
-  assert(modernSecretKey.startsWith("sb_secret_"), "local modern secret key must be available");
-  assert(secretKey.startsWith("eyJ"), "E12 worker contract requires the legacy service_role JWT");
+  assert(secretKey.startsWith("sb_secret_"), "local API key must be the modern secret key");
   assert(publishableKey.startsWith("sb_publishable_"), "local API key must be the modern publishable key");
   const baseUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
 
@@ -81,7 +79,7 @@ Deno.test("full E12 worker uses the legacy service_role JWT through the real loc
     }
 
     const outboundHeaders = new Headers(init?.headers);
-    assert(outboundHeaders.get("apikey") === secretKey, "worker must send its configured legacy service_role JWT in apikey");
+    assert(outboundHeaders.get("apikey") === secretKey, "worker must send sb_secret in apikey");
     assert(outboundHeaders.get("Authorization") === null, "worker must not send opaque key as Bearer JWT");
     const response = await fetch(input, init);
     postgrestTrace.push(

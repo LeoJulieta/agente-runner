@@ -106,7 +106,7 @@ export async function verifyCronSignature(
   );
   const bodyHash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)));
   const bodyHashHex = toHex(bodyHash);
-  const canonical = `${method.toUpperCase()}\\n${pathname}\\n${timestamp}\\n${bodyHashHex}`;
+  const canonical = `${method.toUpperCase()}\n${pathname}\n${timestamp}\n${bodyHashHex}`;
   const signed = await crypto.subtle.sign(
     "HMAC",
     key,
