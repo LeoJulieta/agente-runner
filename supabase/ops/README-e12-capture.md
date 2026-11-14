@@ -23,7 +23,7 @@ The Cron SQL signs a canonical request with HMAC-SHA256: HTTP method, exact path
 
 ## Candidate discovery and evidence
 
-The worker uses `created_at` only as a coarse candidate filter (last six hours); it never derives the outcome elapsed time from that field. It fetches `snippet.publishedAt`, `statistics.viewCount`, and `status.privacyStatus` from YouTube, records response-receipt time after the full body is read, validates the public video and uint64 count, and persists only through `pr_d_capture_views_once`.
+The worker uses `created_at` only as a coarse candidate filter (last six hours); it never derives the outcome elapsed time from that field. It fetches `snippet.publishedAt`, `statistics.viewCount`, and `status.privacyStatus` from YouTube, records response-receipt time after the full body is read, validates the public video and uint64 count, and persists only through the fenced batch RPC `public.pr_d_capture_views_batch(jsonb)`, which delegates each row to the internal first-write-wins CAS routine.
 
 The SQL CAS remains the final first-write-wins authority. Legacy `hs_al_publicar_al_sync` is never updated.
 
@@ -34,15 +34,19 @@ The SQL CAS remains the final first-write-wins authority. Legacy `hs_al_publicar
 - No Cron job created.
 - No pg_net ACL changed.
 - No production DDL/DML or RPC write executed.
-- The worker integration branch in `agente-autonomo` must pass its own CI and remain unmerged until the complete pipeline is audited.
+- The implementation remains on the isolated `sandbox/e12-postgrest-contract-2026-11-13` branch in `LeoJulieta/agente-runner`; it has not been merged or deployed.
 
-## Replay control
+## Replay control, lease and fencing
 
-Before reading candidates or calling YouTube, the worker calls the service-role-only RPC `pr_d_claim_e12_worker_slot`. Its private singleton table allows one successful claim per signed UTC minute, rejects older replays, and is not exposed through PostgREST. This is minute-level replay idempotency, not a distributed execution lease: a worker lasting longer than one minute can overlap the next minute's worker. A lease with owner, expiry, renewal, and crash recovery remains required before scheduling. The CAS still protects each row independently.
+The worker first calls the service-role-only `pr_d_claim_e12_worker_slot` RPC. Its versioned singleton slot permits one successful invocation per signed UTC minute and rejects replays of the same minute. The slot is not the execution lease.
 
-The HMAC signature remains visible in the pg_net queue and is valid for at most 120 seconds. Replaying it cannot cause a second worker run for the same minute; a first valid invocation simply triggers the same bounded worker. This does not replace the need to audit pg_net ACLs and existing jobs before deployment.
+The worker then claims a singleton lease with owner/run ID, expiration and a monotonically increasing fencing token. It renews the lease before each YouTube batch and again if the remaining TTL margin is insufficient; it releases the lease on exit. A crashed worker becomes replaceable after expiry. Any stale worker that wakes after takeover is rejected by the fencing token. The batch CAS validates the active lease and token for every observation.
 
-The worker asks PostgREST for an exact candidate count and caps one cycle at 500 rows. If the result would be truncated, it fails closed before calling YouTube rather than silently skipping older candidates. A larger backlog requires an explicit pagination/quota design.
+CI #99 exercised eight simultaneous contenders for the same lease and eight simultaneous writes to the same observation: exactly one lease owner and exactly one first-write winner. It also tested takeover after forced expiry and rejection of stale renewal, release and write operations. This proves contention safety for the singleton resource, not eight workers doing useful work concurrently.
+
+The HMAC signature remains visible in the pg_net queue and is valid for at most 120 seconds. Replaying it cannot cause a second worker run for the same minute. This does not replace the need to audit pg_net ACLs and existing jobs before deployment.
+
+The worker caps one cycle at 500 candidates and sends CAS writes in batches of 1–50. If the result would be truncated, it fails closed before calling YouTube rather than silently skipping older candidates. A larger backlog requires an explicit pagination/quota design.
 
 ## Modern Supabase API key contract
 
@@ -54,3 +58,16 @@ References (checked 2026-11-14):
 - https://supabase.com/docs/guides/getting-started/api-keys
 - https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys
 - https://supabase.com/docs/guides/functions/auth-headers
+
+## Current evidence and limits
+
+- CI #78: batch CAS, Deno 31 and PostgreSQL 13 tests passed.
+- CI #79: PostgREST HTTP contract passed.
+- CI #98: all five E12 migrations applied in order on a synthetic legacy baseline.
+- CI #99: eight-way lease contention, eight-way CAS contention and expired-lease takeover passed.
+- CI #104: modern Supabase key resolver and legacy-key boundary passed.
+- CI #110: local Supabase API Gateway end-to-end test was added; check its final result before claiming the hosted-gateway contract verified.
+
+The current PostgREST standalone test uses a test adapter to translate the disposable modern key into a JWT for bare PostgREST. It does not represent the hosted gateway. The new local Supabase stack test is intended to close that gap.
+
+**Privilege warning:** a modern `sb_secret_...` key resolves to PostgreSQL `service_role` and has broad elevated access. A per-component key helps rotate/revoke independently but does not provide fine-grained SQL privileges. Do not distribute it to autonomous agents. Before production, design and verify a narrower execution identity or ensure a single tightly controlled executor is the only custodian.
