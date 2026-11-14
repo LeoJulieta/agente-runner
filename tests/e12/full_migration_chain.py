@@ -20,24 +20,24 @@ MIGRATIONS = [
 
 def main() -> None:
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        for role_sql in (
-            "CREATE ROLE anon NOLOGIN",
-            "CREATE ROLE authenticated NOLOGIN",
-            "CREATE ROLE service_role NOLOGIN BYPASSRLS",
-        ):
-            role_name = role_sql.split()[2]
-            conn.execute(
-                """
-                DO $role$
-                BEGIN
-                    EXECUTE %s;
-                EXCEPTION WHEN duplicate_object THEN NULL;
-                END
-                $role$;
-                """,
-                (role_sql,),
-            )
-
+        conn.execute("""
+            DO $$ BEGIN
+                CREATE ROLE anon NOLOGIN;
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$;
+        """)
+        conn.execute("""
+            DO $$ BEGIN
+                CREATE ROLE authenticated NOLOGIN;
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$;
+        """)
+        conn.execute("""
+            DO $$ BEGIN
+                CREATE ROLE service_role NOLOGIN BYPASSRLS;
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$;
+        """)
         service_bypass = conn.execute(
             "SELECT rolbypassrls FROM pg_roles WHERE rolname = 'service_role'"
         ).fetchone()[0]
