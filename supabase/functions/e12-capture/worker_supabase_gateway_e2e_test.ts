@@ -19,7 +19,7 @@ async function cronSignature(secret: string, timestamp: string, body: string): P
   );
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)));
   const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
-  const canonical = "POST\\n/e12-capture\\n" + timestamp + "\\n" + hex;
+  const canonical = ["POST", "/e12-capture", timestamp, hex].join(String.fromCharCode(10));
   const signature = new Uint8Array(await crypto.subtle.sign(
     "HMAC",
     key,
@@ -42,7 +42,7 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
   );
   assert(secretKey.startsWith("sb_secret_"), "local API key must be the modern secret key");
   assert(publishableKey.startsWith("sb_publishable_"), "local API key must be the modern publishable key");
-  const baseUrl = apiUrl.replace(/\\/+$/, "");
+  const baseUrl = apiUrl.endsWith("/") ? apiUrl.slice(0, -1) : apiUrl;
 
   const now = Date.now();
   const nowSeconds = Math.floor(now / 1000);
