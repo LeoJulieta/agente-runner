@@ -70,10 +70,12 @@ CREATE TABLE pr_d_internal.e12_collector_key_registry (
     )
 );
 ALTER TABLE pr_d_internal.e12_collector_key_registry OWNER TO pr_d_capture_owner;
+SET ROLE pr_d_capture_owner;
 REVOKE ALL ON TABLE pr_d_internal.e12_collector_key_registry
     FROM PUBLIC, anon, authenticated, service_role;
 COMMENT ON TABLE pr_d_internal.e12_collector_key_registry IS
     'Admin-controlled Ed25519 public keys and private HMAC verification material. No direct worker-role access.';
+RESET ROLE;
 
 GRANT UPDATE (
     e12_capture_run_id,
@@ -242,6 +244,7 @@ REVOKE ALL ON FUNCTION public.pr_d_guard_capture_fields()
 DROP FUNCTION IF EXISTS public.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint
 );
+SET ROLE pr_d_capture_owner;
 DROP FUNCTION IF EXISTS pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint
 );
@@ -427,6 +430,7 @@ GRANT EXECUTE ON FUNCTION pr_d_internal.pr_d_capture_views_once(
     bigint, text, numeric, timestamptz, timestamptz, uuid, bigint,
     text, text, text, text, text, text, text, text, text, text, text
 ) TO service_role;
+RESET ROLE;
 
 CREATE FUNCTION public.pr_d_capture_views_once(
     p_row_id bigint,

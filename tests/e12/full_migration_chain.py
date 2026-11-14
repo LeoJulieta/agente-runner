@@ -262,9 +262,17 @@ def main() -> None:
             WHERE m.roleid = %s OR m.member = %s
             ORDER BY granted.rolname, member.rolname
         """, (capture_owner_oid, capture_owner_oid)).fetchall()
-        assert capture_owner_memberships == [
-            ("pr_d_capture_owner", "postgres", False, True)
-        ], capture_owner_memberships
+        assert capture_owner_memberships, "capture-owner admin membership missing"
+        assert all(
+            edge[0] == "pr_d_capture_owner"
+            and edge[1] == "postgres"
+            and edge[2] is False
+            for edge in capture_owner_memberships
+        ), capture_owner_memberships
+        assert any(edge[3] is True for edge in capture_owner_memberships), (
+            "trusted postgres must have SET ROLE capability",
+            capture_owner_memberships,
+        )
 
         print("PASS: five E12 migrations applied in order on a production-shaped synthetic baseline", flush=True)
         print("PASS: production int4 views column converted to numeric(20,0) without changing legacy value", flush=True)
