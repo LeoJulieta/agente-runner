@@ -171,3 +171,27 @@ Por tanto, el test actual **no demuestra una instalación limpia de las cinco mi
 - Run: https://github.com/LeoJulieta/agente-runner/actions/runs/43547004395
 
 Este SUCCESS valida el alcance actual de los tests, pero no cierra el hallazgo del addendum de migraciones: el bootstrap aún crea un esquema base sintético y no aplica las cinco migraciones E12 completas en orden. Ese es ahora el siguiente gate técnico prioritario.
+
+
+## Addendum CI #98 — migraciones completas E12 — 2026-11-14
+
+Run #98: `43547245149`, SHA `2b8591d935e0d96f259ce6d544ec8c41541165fd`.
+
+El nuevo job `full-migration-chain` terminó **SUCCESS**. Logs confirman aplicación secuencial de las cinco migraciones:
+1. `20261112160000_pr_d_sync_capture_provenance_candidate.sql`
+2. `20261112180000_pr_d_e12_worker_run_slot.sql`
+3. `20261112231203_e12_worker_lease_fencing.sql`
+4. `20261112232558_e12_collector_attestation.sql`
+5. `20261113090000_e12_capture_batch_cas.sql`
+
+Comprobaciones pasadas:
+- fila legacy de captura conservada sin alterar sus valores;
+- schema privado `pr_d_internal` con owner esperado;
+- RLS habilitado;
+- `anon` sin EXECUTE y `service_role` con EXECUTE en RPC seleccionadas;
+- run-slot versionado acepta una reclamación y rechaza el replay del mismo minuto;
+- lease versionado permite reclamar una ejecución.
+
+En la consulta de jobs, `postgrest-contract` también terminó SUCCESS y el paso de tests SQL/lease de `lease-fencing` terminó SUCCESS; ese job aún estaba en limpieza al momento de la lectura. No se declara el run completo SUCCESS hasta confirmar su conclusión final.
+
+**Límite:** el baseline de esta prueba es sintético y recrea las columnas/roles legacy mínimas necesarias; no es clon de producción ni reproduce el historial completo de 37 migraciones de Supabase. Tampoco prueba upgrade desde cada versión histórica ni rollback/restore. El hallazgo de brecha de migración queda reducido, pero no cerrado en sentido productivo.
