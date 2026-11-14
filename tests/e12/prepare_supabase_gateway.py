@@ -24,14 +24,18 @@ def main() -> None:
     key_id = "e12-supabase-gateway-e2e-key"
 
     with psycopg.connect(os.environ["E12_GATEWAY_DB_URL"], autocommit=True) as conn:
-        conn.execute(
-            """
-            INSERT INTO pr_d_internal.e12_collector_key_registry(
-                key_id, algorithm, public_key_spki_base64, hmac_secret, status
-            ) VALUES (%s, 'Ed25519', %s, %s, 'active')
-            """,
-            (key_id, public_key_b64, hmac_secret),
-        )
+        conn.execute("SET ROLE pr_d_capture_owner")
+        try:
+            conn.execute(
+                """
+                INSERT INTO pr_d_internal.e12_collector_key_registry(
+                    key_id, algorithm, public_key_spki_base64, hmac_secret, status
+                ) VALUES (%s, 'Ed25519', %s, %s, 'active')
+                """,
+                (key_id, public_key_b64, hmac_secret),
+            )
+        finally:
+            conn.execute("RESET ROLE")
         conn.execute(
             """
             INSERT INTO public.youtube_shorts_log(
