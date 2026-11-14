@@ -258,3 +258,17 @@ El resolver de credenciales ahora:
 Run: https://github.com/LeoJulieta/agente-runner/actions/runs/43547736744
 
 El siguiente gate de integración es probar el contrato con el **API Gateway real de un stack Supabase local**, no solo PostgREST standalone y un adaptador de test. Esa prueba no tocará el proyecto hosted.
+
+
+## Addendum — test Supabase local y baseline fiel — 2026-11-14
+
+La primera prueba con el stack Supabase local (#110) se detuvo en el setup porque el test intentó ejecutar ALTER ROLE sobre el rol reservado service_role. La segunda iteración (#112) también se detuvo en una aserción que asumía BYPASSRLS=true en el stack local. No hubo acceso ni cambios en el proyecto hosted.
+
+Corrección en el SHA que ejecuta CI #115:
+- no alterar ni exigir atributos sobre el rol administrado service_role;
+- conservar la comprobación de grants y RPC;
+- cambiar el baseline de migraciones para que views_primeras_3h comience como integer/int4, igual que producción;
+- reproducir policies anon_read/service_all, grants, índices y el trigger shorts_updated_at;
+- comprobar que la conversión int4→numeric(20,0) conserva el valor legacy y que la policy anon_read sigue presente, para que el test no oculte el hallazgo.
+
+CI #115 está en curso. El test de API Gateway local todavía no se considera aprobado.
