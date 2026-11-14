@@ -423,3 +423,21 @@ Corrección en commit sandbox 4f87e4f590148e196731dcc4a5df75f64110d43c:
 - exportador de fixture elimina dependencia innecesaria del JWT legacy.
 
 CI #129 run 43614211000 está QUEUED. No declarar corregido/verificado hasta que pasen los tests unitarios y el E2E HTTP contra el Gateway real local. Esta corrección modifica código del worker, pero aún solo en la rama sandbox; no se desplegó.
+
+
+## Addendum — CI #129 y segundo signer desactualizado — 2026-11-14
+
+CI #129 run 43614211000 terminó FAILURE:
+- full-migration-chain SUCCESS; lease-fencing SUCCESS.
+- postgrest-contract FAILURE por 401 antes de cualquier HTTP.
+- supabase-gateway-contract avanzó más: canonical HMAC ya fue aceptado, el worker llegó al Gateway y la RPC pr_d_claim_e12_worker_slot respondió 403.
+
+La prueba PostgREST independiente tenía su propio helper HMAC y seguía generando backslash+n literal, de modo que quedó desincronizada al corregir el worker. Corregido en commit sandbox 4ca7efe4894a7bb18a0df7955ead9ee97cc0cbfb.
+
+CI #130 run 43614364122:
+- full-migration-chain SUCCESS;
+- postgrest-contract SUCCESS (ya confirma que el signer helper usa LF real);
+- lease-fencing en ejecución al último control;
+- supabase-gateway-contract sigue en ejecución. En #129 la primera RPC Gateway devolvió 403; necesitamos inspeccionar el cuerpo exacto de la respuesta y confirmar cómo la clave sb_secret local se traduce a role service_role, sin añadir permisos por intuición.
+
+La documentación de Supabase indica que sb_secret_ debe ir en apikey y se traduce al rol service_role; no debe enviarse como Bearer JWT. Ver documentación oficial de API keys y self-hosted auth keys. La prueba debe verificar explícitamente esa traducción y el claim de rol antes de atribuir el 403 a grants SQL.
