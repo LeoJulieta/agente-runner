@@ -19,23 +19,24 @@ MIGRATIONS = [
 
 def main() -> None:
     with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
-        for role, options in (
-            ("anon", "NOLOGIN"),
-            ("authenticated", "NOLOGIN"),
-            ("service_role", "NOLOGIN BYPASSRLS"),
-        ):
-            conn.execute(
-                """
-                DO $role$
-                BEGIN
-                    EXECUTE format('CREATE ROLE %I %s', %s, %s);
-                EXCEPTION WHEN duplicate_object THEN NULL;
-                END;
-                $role$
-                """,
-                (role, options, role, options),
-            )
-
+        conn.execute("""
+            DO $$ BEGIN
+                CREATE ROLE anon NOLOGIN;
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$;
+        """)
+        conn.execute("""
+            DO $$ BEGIN
+                CREATE ROLE authenticated NOLOGIN;
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$;
+        """)
+        conn.execute("""
+            DO $$ BEGIN
+                CREATE ROLE service_role NOLOGIN BYPASSRLS;
+            EXCEPTION WHEN duplicate_object THEN NULL;
+            END $$;
+        """)
         conn.execute("ALTER ROLE service_role BYPASSRLS")
         conn.execute("""
             CREATE TABLE public.youtube_shorts_log (
