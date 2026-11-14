@@ -72,6 +72,7 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
   const syncMicros = BigInt(now) * 1000n;
   let youtubeCalls = 0;
   const postgrestTrace: string[] = [];
+  let committedBatchBody: string | null = null;
   const realFetch = fetch;
 
   const fetchImpl: typeof fetch = async (input, init) => {
@@ -99,6 +100,9 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
       const headers = new Headers(init?.headers);
       headers.set("Authorization", "Bearer " + jwt);
       headers.set("apikey", "e12-disposable-test-key");
+      if (target.pathname === "/rpc/pr_d_capture_views_batch" && init?.body) {
+        committedBatchBody = String(init.body);
+      }
       const upstream = await realFetch(target, { ...init, headers });
       const responseBody = await upstream.clone().text();
       postgrestTrace.push(
@@ -144,6 +148,26 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
   );
   assert(result.candidates === 3 && result.eligible === 3 && result.captured === 3, "all three disposable database candidates must be captured");
   assert(youtubeCalls === 1, "YouTube must be called once through the deterministic fake");
+
+  // Replay the exact committed batch as a client retry after a hypothetical
+  // lost HTTP response. First-write-wins must prevent a second mutation.
+  assert(committedBatchBody !== null, "worker must issue a batch CAS request");
+  const replayResponse = await realFetch(new URL(postgrestUrl + "/rpc/pr_d_capture_views_batch"), {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + jwt,
+      apikey: "e12-disposable-test-key",
+      "Content-Type": "application/json",
+    },
+    body: committedBatchBody,
+  });
+  assert(replayResponse.ok, "duplicate batch replay must be handled by the database");
+  const replayOutcomes = await replayResponse.json();
+  assert(
+    Array.isArray(replayOutcomes) && replayOutcomes.length === 3 &&
+      replayOutcomes.every((outcome) => outcome.captured === false),
+    "replaying a committed batch must lose first-write-wins CAS for every row",
+  );
 
   const verifyUrl = new URL(postgrestUrl + "/youtube_shorts_log");
   verifyUrl.searchParams.set("id", "eq.4");
