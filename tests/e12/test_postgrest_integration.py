@@ -102,6 +102,18 @@ def test_postgrest_batch_rpc_roundtrip_and_role_boundary():
     # PostgREST is a real HTTP server backed by the disposable PostgreSQL 17
     # service. The worker's sb_secret->JWT gateway translation is not emulated
     # here; this test validates PostgREST RPC binding and SQL authorization.
+    # Use dedicated IDs that cannot overlap with the Deno worker E2E fixtures.
+    # That test runs first against the same disposable database.
+    with psycopg.connect(DATABASE_URL, autocommit=True) as conn:
+        conn.execute(
+            """
+            INSERT INTO public.youtube_shorts_log(id, youtube_video_id, status, created_at)
+            VALUES
+                (101, 'e12-python-rpc-video-101', 'published', clock_timestamp()),
+                (102, 'e12-python-rpc-video-102', 'published', clock_timestamp())
+            """
+        )
+
     claim = rpc("pr_d_claim_e12_worker_lease", {
         "p_run_id": str(RUN_A),
         "p_ttl_seconds": 90,
@@ -111,14 +123,14 @@ def test_postgrest_batch_rpc_roundtrip_and_role_boundary():
     token_a = str(claim[0]["fencing_token"])
 
     first = rpc("pr_d_capture_views_batch", {
-        "p_items": [batch_item(RUN_A, token_a, 1, "video-1", "123")],
+        "p_items": [batch_item(RUN_A, token_a, 101, "e12-python-rpc-video-101", "123")],
     })
-    assert first == [{"row_id": "1", "captured": True}]
+    assert first == [{"row_id": "101", "captured": True}]
 
     duplicate = rpc("pr_d_capture_views_batch", {
-        "p_items": [batch_item(RUN_A, token_a, 1, "video-1", "999")],
+        "p_items": [batch_item(RUN_A, token_a, 101, "e12-python-rpc-video-101", "999")],
     })
-    assert duplicate == [{"row_id": "1", "captured": False}]
+    assert duplicate == [{"row_id": "101", "captured": False}]
 
     assert rpc("pr_d_release_e12_worker_lease", {
         "p_run_id": str(RUN_A),
@@ -133,21 +145,21 @@ def test_postgrest_batch_rpc_roundtrip_and_role_boundary():
     assert int(token_b) == int(token_a) + 1
 
     stale = rpc("pr_d_capture_views_batch", {
-        "p_items": [batch_item(RUN_A, token_a, 2, "video-2", "456")],
+        "p_items": [batch_item(RUN_A, token_a, 102, "e12-python-rpc-video-102", "456")],
     })
-    assert stale == [{"row_id": "2", "captured": False}]
+    assert stale == [{"row_id": "102", "captured": False}]
 
     current = rpc("pr_d_capture_views_batch", {
-        "p_items": [batch_item(RUN_B, token_b, 2, "video-2", "456")],
+        "p_items": [batch_item(RUN_B, token_b, 102, "e12-python-rpc-video-102", "456")],
     })
-    assert current == [{"row_id": "2", "captured": True}]
+    assert current == [{"row_id": "102", "captured": True}]
 
     with psycopg.connect(DATABASE_URL) as conn:
         rows = conn.execute(
             "SELECT id, views_primeras_3h, e12_fencing_token "
-            "FROM public.youtube_shorts_log WHERE id IN (1,2) ORDER BY id"
+            "FROM public.youtube_shorts_log WHERE id IN (101,102) ORDER BY id"
         ).fetchall()
-        assert rows == [(1, 123, int(token_a)), (2, 456, int(token_b))]
+        assert rows == [(101, 123, int(token_a)), (102, 456, int(token_b))]
 
     # The public wrapper is intentionally not executable by anon.
     try:
