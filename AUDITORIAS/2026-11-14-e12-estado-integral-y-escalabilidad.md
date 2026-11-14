@@ -160,3 +160,14 @@ Una inspección adicional de `tests/e12/test_worker_lease_fencing.py` y `tests/e
 - `20261112180000_pr_d_e12_worker_run_slot.sql`
 
 Por tanto, el test actual **no demuestra una instalación limpia de las cinco migraciones E12 en secuencia** ni valida la migración del run-slot tal como está versionada. El worker E2E usa una función slot creada manualmente por `prepare_postgrest.py`, no la función desplegada desde la migración `20261112180000...`. La base descartable prueba contratos seleccionados y lógica posterior, no el grafo completo de instalación. Esto se agrega como gate prioritario: reconstruir un baseline realista desde migraciones versionadas y aplicar el conjunto E12 completo en orden, sin precrear objetos que las migraciones deben crear. Mantener una prueba aparte para upgrade desde un esquema preexistente. No promover hasta resolverlo.
+
+
+## Addendum CI #95 — 2026-11-14
+
+- Run #95 `43547004395`, SHA `1ee2b65dca82eb3054877d910f6f8a264af44a03`: **SUCCESS**.
+- Job `lease-fencing`: SUCCESS; Deno unit suite, formatter and PostgreSQL 17 adversarial tests passed.
+- Job `postgrest-contract`: SUCCESS; worker Deno E2E 1/1 and Python PostgREST RPC/role-boundary test 1/1 passed.
+- La corrección aisló el test Python en filas propias IDs 101 y 102, evitando reutilizar las filas que captura el E2E Deno. No se debilitó la semántica CAS.
+- Run: https://github.com/LeoJulieta/agente-runner/actions/runs/43547004395
+
+Este SUCCESS valida el alcance actual de los tests, pero no cierra el hallazgo del addendum de migraciones: el bootstrap aún crea un esquema base sintético y no aplica las cinco migraciones E12 completas en orden. Ese es ahora el siguiente gate técnico prioritario.
