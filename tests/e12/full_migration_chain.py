@@ -178,7 +178,7 @@ def main() -> None:
             """).fetchall()
         }
         assert "shorts_updated_at" in trigger_names
-        assert any("pr_d_guard_capture_fields" in name for name in trigger_names)
+        assert "youtube_shorts_log_pr_d_capture_guard" in trigger_names
 
         anon_can_select = conn.execute(
             "SELECT has_table_privilege('anon', 'public.youtube_shorts_log', 'SELECT')"
