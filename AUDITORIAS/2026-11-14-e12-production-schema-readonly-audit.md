@@ -96,3 +96,17 @@ La creación de una branch Supabase para staging tiene costo cotizado de USD 0.0
 - Consulta agregada de conteos, rangos y distribución status/privacy; no se leyeron textos de filas.
 - Supabase backups: https://supabase.com/docs/guides/platform/backups
 - Supabase CLI db dump: https://supabase.com/docs/reference/cli/supabase-db-dump
+
+
+## Addendum: verificación directa del rol anon — 2026-11-14
+
+Se ejecutó una transacción de solo lectura con 'SET LOCAL ROLE anon', se consultaron solo agregados y se hizo ROLLBACK. Resultado:
+- filas visibles para anon: 961;
+- filas con privacy_status distinto de public o NULL: 166;
+- filas con status distinto de published: 48.
+
+Esto confirma que no es solo una inferencia a partir de la policy: el rol SQL anon efectivamente ve las 961 filas. Sigue sin ser una petición HTTP a la API REST, por lo que el alcance exacto de exposición externa depende de la configuración del Data API; la capacidad de lectura anónima a nivel de base está verificada.
+
+Una búsqueda de funciones SECURITY DEFINER del schema public ejecutables por anon no encontró resultados. También se hizo una búsqueda acotada de funciones SECURITY DEFINER que mencionen youtube_shorts_log, TRUNCATE o DELETE FROM y no hubo coincidencias. Esto reduce un posible vector de abuso del grant TRUNCATE, pero no sustituye una auditoría completa de todas las funciones y wrappers.
+
+No se cambió ninguna policy, grant, tabla ni dato.
