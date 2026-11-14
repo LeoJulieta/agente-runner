@@ -44,7 +44,7 @@ async function cronSignature(secret: string, timestamp: string, body: string): P
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body)));
   const hex = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
   // Match the worker's canonical request format exactly.
-  const canonical = "POST\\n/e12-capture\\n" + timestamp + "\\n" + hex;
+  const canonical = "POST\n/e12-capture\n" + timestamp + "\n" + hex;
   const signature = new Uint8Array(await crypto.subtle.sign(
     "HMAC",
     key,
