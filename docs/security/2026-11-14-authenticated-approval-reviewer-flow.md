@@ -27,11 +27,11 @@ File: 20261114190000_authenticated_approval_reviewer_flow.sql
 
 The migration intentionally does not invent or hardcode a reviewer identity. After the reviewer has a confirmed Supabase Auth account, an administrator must add that Auth user UUID:
 
-\`\`\`sql
+```sql
 INSERT INTO public.approval_reviewers(user_id, active)
 VALUES ('<AUTH_USER_UUID>'::uuid, true)
 ON CONFLICT (user_id) DO UPDATE SET active = true;
-\`\`\`
+```
 
 Do not put a service_role key in the dashboard or share it with agents.
 
@@ -59,7 +59,9 @@ A PostgreSQL 17 integration test creates disposable roles/auth schema, applies t
 - function is SECURITY DEFINER with fixed search_path;
 - service_role retains backend update capability.
 
-These tests do not yet prove Supabase Auth JWT validation through a live PostgREST Gateway. That E2E test is a required next gate.
+CI run [43629061014](https://github.com/LeoJulieta/agente-runner/actions/runs/43629061014) passed against disposable PostgreSQL 17.
+
+These tests do not yet prove Supabase Auth JWT validation through a live Supabase PostgREST Gateway. That E2E test is a required next gate. The migration remains a candidate and has not been applied to production.
 
 ## Rollout and rollback
 
