@@ -1,4 +1,4 @@
-import { handleE12Capture, verifyCronSignature } from "./worker.ts";
+import { handleE12Capture, resolveSupabaseApiKey, verifyCronSignature } from "./worker.ts";
 import { parseRfc3339EpochMicros, YOUTUBE_UINT64_MAX } from "./collector.ts";
 import {
   verifyObservationAttestation,
@@ -51,7 +51,7 @@ function dependencies(fetchImpl: typeof fetch, overrides: Record<string, string>
   const values: Record<string, string> = {
     E12_CRON_HMAC_SECRET: SECRET,
     SUPABASE_URL: "https://project.example.supabase.co",
-    SUPABASE_SERVICE_ROLE_KEY: "sb_secret_test_only_not_real",
+    SUPABASE_SECRET_KEYS: JSON.stringify({ "e12-capture": "sb_secret_test_only_not_real" }),
     YOUTUBE_API_KEY: "youtube-test-key",
     E12_PROVENANCE_KEY_ID: "e12-test-key",
     E12_PROVENANCE_PRIVATE_KEY_PKCS8_B64: TEST_PRIVATE_KEY,
@@ -630,4 +630,26 @@ Deno.test("worker never calls CAS when independent attestation verification fail
   assert(response.status === 502, "invalid attestation must fail the worker cycle");
   assert(!calls.some((url) => url.includes("/rpc/pr_d_capture_views_batch")), "batch CAS must not run for an invalid attestation");
   assert(calls.some((url) => url.includes("/rpc/pr_d_release_e12_worker_lease")), "lease must still be released");
+});
+
+Deno.test("Supabase key resolver prefers the named modern secret and fails closed on malformed maps", () => {
+  const modern = resolveSupabaseApiKey((name) => ({
+    SUPABASE_SECRET_KEYS: JSON.stringify({
+      default: "sb_secret_default_test_only",
+      "e12-capture": "sb_secret_e12_capture_test_only",
+    }),
+    SUPABASE_SERVICE_ROLE_KEY: "legacy-service-role-test-only",
+  } as Record<string, string>)[name]);
+  assert(modern === "sb_secret_e12_capture_test_only", "dedicated E12 key must take precedence");
+
+  const fallback = resolveSupabaseApiKey((name) => ({
+    SUPABASE_SECRET_KEYS: JSON.stringify({ default: "sb_secret_default_test_only" }),
+  } as Record<string, string>)[name]);
+  assert(fallback === "sb_secret_default_test_only", "default modern secret must be supported");
+
+  const malformed = resolveSupabaseApiKey((name) => ({
+    SUPABASE_SECRET_KEYS: "{not-json",
+    SUPABASE_SERVICE_ROLE_KEY: "legacy-must-not-be-used",
+  } as Record<string, string>)[name]);
+  assert(malformed === undefined, "malformed modern key map must fail closed without legacy fallback");
 });
