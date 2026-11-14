@@ -117,3 +117,10 @@ No se cambió ninguna policy, grant, tabla ni dato.
 La BITACORA consolidada del proyecto describe históricamente youtube_shorts_log como registro de Shorts publicados y documenta una tarjeta de dashboard que mostraba los últimos 10 Shorts. Por ello, la policy anon_read podría haber sido intencional para una interfaz pública. Sin embargo, ese antecedente no demuestra que el alcance actual siga siendo correcto: hoy la tabla contiene 118 filas publicadas sin privacy_status y 48 filas con estados de error, además de campos como script_texto.
 
 La UI puede filtrar status=published, pero el filtro del cliente no restringe consultas directas a la tabla. Antes de cambiar RLS, localizar el consumidor actual y confirmar las columnas y filas que necesita. La opción preferida a evaluar es una interfaz pública limitada (vista/RPC con columnas explícitas y filtro status=published AND privacy_status=public) y no SELECT anónimo sobre toda la tabla.
+
+
+## Addendum: historial de consumo público
+
+La documentación histórica de julio registra youtube_shorts_log como un registro de Shorts publicados y una tarjeta de dashboard que mostraba los últimos 10. También documenta que un consumidor usó la key anon para lectura y que los inserts fallaban hasta reemplazarla por service_role. Esto hace plausible que anon_read sea intencional para lectura pública, no necesariamente un error de configuración.
+
+El riesgo actual no es la existencia de lectura pública en sí, sino su alcance: la policy no limita filas a status=published ni privacy_status=public y no limita columnas. Los filtros del dashboard no son controles de autorización. El cambio correcto puede ser mantener lectura pública mediante una vista/RPC sanitizada y dejar la tabla base cerrada; primero hay que localizar el consumidor vigente y confirmar su contrato.
