@@ -108,11 +108,18 @@ def main() -> None:
 
     github_env = os.environ.get("GITHUB_ENV")
     if github_env:
+        ephemeral_values = {
+            "E12_TEST_CRON_SECRET": "e12-disposable-cron-hmac-secret-32-bytes-min",
+            "E12_TEST_PRIVATE_KEY_PKCS8_B64": private_key_b64,
+            "E12_TEST_PUBLIC_KEY_SPKI_B64": public_key_b64,
+            "E12_TEST_HMAC_SECRET_B64": hmac_secret_b64,
+        }
+        # Mask ephemeral credentials before GitHub Actions prints later step environments.
+        for value in ephemeral_values.values():
+            print(f"::add-mask::{value}", flush=True)
         with open(github_env, "a", encoding="utf-8") as output:
-            output.write("E12_TEST_CRON_SECRET=e12-disposable-cron-hmac-secret-32-bytes-min\n")
-            output.write(f"E12_TEST_PRIVATE_KEY_PKCS8_B64={private_key_b64}\n")
-            output.write(f"E12_TEST_PUBLIC_KEY_SPKI_B64={public_key_b64}\n")
-            output.write(f"E12_TEST_HMAC_SECRET_B64={hmac_secret_b64}\n")
+            for name, value in ephemeral_values.items():
+                output.write(f"{name}={value}\n")
 
 
 if __name__ == "__main__":
