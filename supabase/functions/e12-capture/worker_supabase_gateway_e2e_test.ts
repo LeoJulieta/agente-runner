@@ -28,6 +28,8 @@ async function cronSignature(secret: string, timestamp: string, body: string): P
   return Array.from(signature, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+type BatchOutcome = { captured: boolean };
+
 Deno.test("full E12 worker uses modern sb_secret through the real local Supabase API Gateway", async () => {
   const apiUrl = Deno.env.get("E12_GATEWAY_API_URL");
   const secretKey = Deno.env.get("E12_GATEWAY_SECRET_KEY");
@@ -54,7 +56,7 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
   const postgrestTrace: string[] = [];
   let youtubeCalls = 0;
   let committedBatchBody: string | null = null;
-  let inFlightReplayOutcomes: unknown[] | null = null;
+  let inFlightReplayOutcomes: BatchOutcome[] = [];
 
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = String(input);
@@ -93,7 +95,9 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
         body: committedBatchBody,
       });
       assert(replayWhileLeaseActive.ok, "active-lease replay must be accepted by the gateway");
-      inFlightReplayOutcomes = await replayWhileLeaseActive.json();
+      const replayPayload: unknown = await replayWhileLeaseActive.json();
+      assert(Array.isArray(replayPayload), "active-lease replay must return an array");
+      inFlightReplayOutcomes = replayPayload as BatchOutcome[];
     }
     return response;
   };
@@ -133,8 +137,8 @@ Deno.test("full E12 worker uses modern sb_secret through the real local Supabase
 
   assert(committedBatchBody !== null, "worker must issue a batch CAS through the gateway");
   assert(
-    Array.isArray(inFlightReplayOutcomes) && inFlightReplayOutcomes.length === 1 &&
-      inFlightReplayOutcomes.every((item) => item.captured === false),
+    inFlightReplayOutcomes.length === 1 &&
+      inFlightReplayOutcomes.every((item: BatchOutcome) => item.captured === false),
     "replay while the original lease is active must prove first-write-wins",
   );
   const replay = await fetch(baseUrl + "/rest/v1/rpc/pr_d_capture_views_batch", {
