@@ -162,7 +162,7 @@ Deno.test("full E12 worker runs over real PostgREST HTTP with simulated YouTube 
   assert(row.collector_attestation_algorithm === "Ed25519", "persisted attestation algorithm must be Ed25519");
   assert(row.collector_key_id === "e12-postgrest-e2e-key", "persisted key ID must match the registered ephemeral key");
   assert(/^[a-f0-9]{64}$/.test(row.collector_payload_sha256), "persisted canonical payload digest must be valid");
-  assert(/^[A-Za-z0-9+/]{86}=$/.test(row.collector_signature), "persisted Ed25519 signature must have the expected encoding");
+  assert(/^[A-Za-z0-9+/]{86}==$/.test(row.collector_signature), "persisted Ed25519 signature must have the expected encoding");
   assert(/^[a-f0-9]{64}$/.test(row.collector_hmac_signature), "persisted HMAC must be present");
   const canonical = JSON.parse(row.collector_payload_canonical) as string[];
   assert(canonical.length === 12, "persisted canonical payload must have all 12 fields");
