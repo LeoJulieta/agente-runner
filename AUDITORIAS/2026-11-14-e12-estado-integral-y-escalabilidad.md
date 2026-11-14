@@ -339,3 +339,18 @@ Corrección en commit sandbox 8be816368c2be373aa54737ff053a467d8f531b0:
 - aplicar el mismo patrón a lease, registry de claves del collector y batch CAS.
 
 CI #123 run 43550534269 está QUEUED. No hubo cambios productivos.
+
+
+## Addendum — paridad ops/migration y grants múltiples — 2026-11-14
+
+CI #123 run 43550534269:
+- full-migration-chain SUCCESS.
+- postgrest-contract SUCCESS.
+- Supabase Gateway aplicó las cinco migraciones, pero la prueba terminó en una aserción demasiado estricta: el catálogo conserva dos filas pg_auth_members para pr_d_capture_owner → postgres, con distintos grantors/options; una permite SET ROLE y ambas tienen INHERIT FALSE.
+- lease-fencing falló antes de ejecutar PostgreSQL adversarial porque los SQL de supabase/ops ya no eran byte-a-byte iguales a sus migraciones versionadas.
+
+Corrección en commit sandbox 5d2f14570012f5f43037657d582dd5d37589e366:
+- sincronizados los tres archivos ops con sus migraciones lease, collector y batch;
+- la prueba ahora permite varias filas del mismo vínculo administrativo, exige que no exista ningún otro miembro y exige al menos una fila con SET TRUE y todas con INHERIT FALSE.
+
+CI #124 run 43550834102 está QUEUED. Las cinco migraciones sí se aplicaron en Gateway local; los tests HTTP y worker todavía no corrieron después de esa aplicación.
