@@ -391,3 +391,15 @@ CI #126 run 43551195566:
 Corrección en commit sandbox 98be7c01571e59c7c699e0829f033596519180b8: tipo explícito BatchOutcome y validación del payload antes de asignarlo al arreglo de replay.
 
 CI #127 run 43551378512 está IN_PROGRESS. Todavía no hay evidencia del worker ejecutado contra Supabase Gateway.
+
+
+## Addendum — separación de API key moderna y JWT del worker — 2026-11-14
+
+CI #127 run 43551378512: las cinco migraciones y el seed pasaron; el worker respondió unauthorized en su primer acceso a RPC. La causa fue el fixture: pasó sb_secret_ a SUPABASE_SECRET_KEYS, pero worker.ts documenta explícitamente que ese mapa espera el JWT legacy service_role y no un sb_secret_.
+
+Corrección en commit sandbox 85fac44dbf13114a2d8dc578e1273a542dd61267:
+- exportar por separado SECRET_KEY moderno, PUBLISHABLE_KEY moderno y SERVICE_ROLE_KEY JWT legacy del stack local;
+- el E12 worker E2E usa el JWT legacy en el contrato SUPABASE_SECRET_KEYS;
+- el test sigue comprobando que el stack ofrece sb_secret_/sb_publishable_ modernos, sin mezclarlos con la variable legacy del worker.
+
+CI #128 run 43551635213 está IN_PROGRESS. Esto no implica que el Python SDK del agente autónomo acepte sb_secret_; esa compatibilidad se debe probar aparte.
