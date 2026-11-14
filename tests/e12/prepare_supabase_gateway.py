@@ -47,6 +47,15 @@ def main() -> None:
             )
             """
         )
+        seeded = conn.execute(
+            """
+            SELECT id, status, created_at, youtube_video_id,
+                   views_primeras_3h, hs_al_publicar_al_sync,
+                   published_at, sync_captured_at, elapsed_seconds_e12
+            FROM public.youtube_shorts_log WHERE id = 4
+            """
+        ).fetchone()
+        print("E12_GATEWAY_SEEDED_CANDIDATE:", seeded, flush=True)
         privileges = conn.execute(
             """
             SELECT
