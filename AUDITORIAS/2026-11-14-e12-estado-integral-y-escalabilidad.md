@@ -379,3 +379,15 @@ CI #125 run 43550996747:
 Consulta de solo lectura a information_schema confirmó que las únicas columnas NOT NULL sin default son topic y titulo. Corrección en commit sandbox 46fe73d5f76902c1822174c2f76e9a94c00dc02f: el fixture ahora proporciona ambas columnas.
 
 CI #126 run 43551195566 está QUEUED. El worker HTTP E2E todavía no se ejecutó.
+
+
+## Addendum — TypeScript del worker Gateway — 2026-11-14
+
+CI #126 run 43551195566:
+- lease-fencing, full-migration-chain y PostgREST SUCCESS.
+- Supabase local arrancó, aplicó las cinco migraciones y sembró clave/candidato correctamente.
+- El E2E del worker no llegó a ejecutarse: Deno/TypeScript rechazó el tipo de outcomes de replay capturado dentro de un callback (control-flow narrowing a never).
+
+Corrección en commit sandbox 98be7c01571e59c7c699e0829f033596519180b8: tipo explícito BatchOutcome y validación del payload antes de asignarlo al arreglo de replay.
+
+CI #127 run 43551378512 está IN_PROGRESS. Todavía no hay evidencia del worker ejecutado contra Supabase Gateway.
