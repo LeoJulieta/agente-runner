@@ -354,3 +354,16 @@ Corrección en commit sandbox 5d2f14570012f5f43037657d582dd5d37589e366:
 - la prueba ahora permite varias filas del mismo vínculo administrativo, exige que no exista ningún otro miembro y exige al menos una fila con SET TRUE y todas con INHERIT FALSE.
 
 CI #124 run 43550834102 está QUEUED. Las cinco migraciones sí se aplicaron en Gateway local; los tests HTTP y worker todavía no corrieron después de esa aplicación.
+
+
+## Addendum — seed del registro de claves en Gateway — 2026-11-14
+
+CI #124 run 43550834102:
+- lease-fencing SUCCESS (32 Deno tests and SQL generation/ops parity).
+- full-migration-chain SUCCESS.
+- postgrest-contract SUCCESS.
+- Supabase Gateway started, prepared role and applied all five migrations; then seed step failed with permission denied on pr_d_internal.e12_collector_key_registry. This is expected least-privilege behavior: postgres does not inherit table-owner privileges after INHERIT FALSE.
+
+Corrección en commit sandbox 209f9a00c5ac11bac92b12fce00c9aef575947bf: the disposable test fixture now SET ROLE pr_d_capture_owner only around insertion of the ephemeral collector key, then RESET ROLE before seeding public candidate data. Production grants remain unchanged.
+
+CI #125 run 43550996747 is QUEUED. The actual HTTP/worker E2E has not run yet.
