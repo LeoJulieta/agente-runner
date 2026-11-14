@@ -152,6 +152,10 @@ BEGIN
             'prd_capture_table_preflight_failed: restricted capture role must not own youtube_shorts_log';
     END IF;
 
+    -- Supabase grants the managed postgres administrator membership in newly
+    -- created roles. Ensure it can SET ROLE, but never inherit the capture role.
+    GRANT pr_d_capture_owner TO postgres WITH SET TRUE, INHERIT FALSE;
+
     IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'pr_d_internal') THEN
         CREATE SCHEMA pr_d_internal AUTHORIZATION pr_d_capture_owner;
     END IF;

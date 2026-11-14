@@ -11,7 +11,9 @@ def memberships(conn, role_oid: int):
         """
         SELECT granted.rolname AS granted_role,
                member.rolname AS member_role,
-               m.admin_option
+               m.admin_option,
+               m.inherit_option,
+               m.set_option
         FROM pg_auth_members m
         JOIN pg_roles granted ON granted.oid = m.roleid
         JOIN pg_roles member ON member.oid = m.member
