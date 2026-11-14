@@ -107,3 +107,20 @@ Remediación adicional obligatoria:
 - nunca persistir secret keys en navegador;
 - agregar CSP apropiada al hosting, sin usarla como sustituto de sanitización;
 - probar payloads XSS benignos en sandbox, nunca en producción.
+
+
+## 9. SQL de contención de emergencia — NO EJECUTADO
+
+Una vez verificados backup/restore y coordinado el corte del dashboard, la contención completa sería:
+
+```sql
+BEGIN;
+DROP POLICY IF EXISTS "Permitir update anon" ON public.pending_approvals;
+DROP POLICY IF EXISTS "Permitir lectura anon" ON public.pending_approvals;
+REVOKE ALL PRIVILEGES ON TABLE public.pending_approvals FROM anon;
+COMMIT;
+```
+
+Esto corta lectura y escritura anónimas; el dashboard actual dejará de cargar y aprobar solicitudes hasta que se despliegue una versión con Auth. No altera ni elimina filas. La reversión técnica sería recrear las policies/grants anteriores, pero eso reabre la vulnerabilidad y no debe usarse como solución permanente.
+
+No ejecutar hasta comprobar respaldo restaurable, acordar ventana y disponer del flujo Auth de reemplazo o aceptar explícitamente el corte temporal.
