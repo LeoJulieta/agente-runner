@@ -93,3 +93,17 @@ No se ejecutó ninguna operación de aprobación, rechazo, modificación o lectu
 ## 7. Barrido de policies de escritura
 
 Se consultaron todas las policies de public con cmd INSERT/UPDATE/DELETE/ALL y roles anon o public. El único caso con predicate no restringido para anon es pending_approvals UPDATE USING(true). Las policies service_role_full_access de trends_manual_import, yt_canales_competencia, yt_competencia_videos y yt_fechas_especiales están declaradas TO public, pero tanto USING como WITH CHECK exigen auth.role()='service_role'; no son escritura anónima efectiva. No se modificó ninguna policy.
+
+
+## 8. Consecuencia adicional: XSS persistente en el dashboard
+
+En renderApprovals(), index.html construye list.innerHTML interpolando directamente a.title y a.reasoning, sin escape HTML. Esos campos son editables por anon debido a la policy/grants observados. Por tanto, un cliente anónimo puede intentar almacenar markup/script en una fila y activar XSS cuando un operador abre el dashboard. No se insertó ningún payload ni se ejecutó una prueba de navegador.
+
+El dashboard guarda sb_url y sb_key en localStorage. La clave prevista es anon/public, pero un operador podría pegar por error una secret key; una XSS persistente podría leer localStorage y exfiltrarla. El archivo no muestra autenticación Supabase ni sanitización de los campos de aprobación. No se verificaron headers CSP del hosting.
+
+Remediación adicional obligatoria:
+- renderizar datos con textContent o un escape HTML probado; no concatenar datos externos en innerHTML;
+- eliminar handlers inline y usar event listeners con IDs validados;
+- nunca persistir secret keys en navegador;
+- agregar CSP apropiada al hosting, sin usarla como sustituto de sanitización;
+- probar payloads XSS benignos en sandbox, nunca en producción.
