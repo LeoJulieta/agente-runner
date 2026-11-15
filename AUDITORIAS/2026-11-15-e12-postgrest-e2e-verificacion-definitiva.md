@@ -6,7 +6,7 @@
 **Commit de código probado / HEAD al cerrar el CI:** `d5ff12fe153d4f0c6350c6b5fa4e8acb73e77578`  
 **Commit inicial solicitado:** `f0853521b0c81a5d807896106de0d5586f45d77b`
 
-<badge>VERIFICADO EN CI AISLADO — NO APROBADO PARA PRODUCCIÓN</badge>
+**Estado: VERIFICADO EN CI AISLADO — NO APROBADO PARA PRODUCCIÓN.**
 
 ## 1. Resultado definitivo
 
